@@ -3,6 +3,7 @@ from diameter.message.avp.grouped import *
 from diameter.message import Message, dump
 from .constants import *
 from .subscriber import Subscriber
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,12 @@ class DiameterMessage:
     @property
     def imsi(self):
         return self.subscriber.imsi if self.subscriber else None
+    
+    @property
+    def time(self):
+        if self.timestamp:
+            return datetime.datetime.fromtimestamp(float(self.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+        return None
     
     def dump_hex_string(self, file_full_path):
         with open(file_full_path, 'w') as f:
