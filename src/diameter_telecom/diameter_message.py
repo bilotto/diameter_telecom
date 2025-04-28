@@ -28,6 +28,7 @@ class DiameterMessage:
             'pkt_number': None,
             'pcap_filepath': None,
             'framed_ip_address': None,
+            'framed_ipv6_prefix': None,
             'mcc_mnc': None,
             'apn': None
         }
