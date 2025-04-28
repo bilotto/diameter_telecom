@@ -20,39 +20,37 @@ class DiameterMessage:
         else:
             raise TypeError(f"Parameter must be a hex string or a Message instance. Provided: {obj},{type(obj)}")
         
-        self.timestamp = None
-        self.subscriber = None
-        self.pkt_number = None
-        self.pcap_filepath = None
-        self.framed_ip_address = None
-        self.mcc_mnc = None
-        self.apn = None
+        # Initialize default attributes
+        self._attributes = {
+            'timestamp': None,
+            'subscriber': None,
+            'pkt_number': None,
+            'pcap_filepath': None,
+            'framed_ip_address': None,
+            'mcc_mnc': None,
+            'apn': None
+        }
 
+    def __getattr__(self, name):
+        if name in self._attributes:
+            return self._attributes[name]
+        elif hasattr(self.message, name):
+            return getattr(self.message, name)
+        else:
+            return None
 
-    def set_timestamp(self, timestamp):
-        self.timestamp = timestamp
-
-    def set_subscriber(self, subscriber: Subscriber):
-        if not isinstance(subscriber, Subscriber):
-            raise ValueError("Subscriber must be an instance of Subscriber")
-        self.subscriber = subscriber
-    
-    def set_pcap_filepath(self, pcap_filepath: str):
-        self.pcap_filepath = pcap_filepath
-
-    def set_pkt_number(self, pkt_number: int):
-        self.pkt_number = pkt_number
-
-    def set_framed_ip_address(self, framed_ip_address: str):
-        self.framed_ip_address = framed_ip_address
-
-    def set_mcc_mnc(self, mcc_mnc: str):
-        self.mcc_mnc = mcc_mnc
-
-    def set_apn(self, apn: str):
-        self.apn = apn
-
-    
+    def __setattr__(self, name, value):
+        if name == 'message' or name == '_attributes':
+            # Handle special attributes directly
+            super().__setattr__(name, value)
+        elif name == 'subscriber' and value is not None:
+            # Special handling for subscriber to ensure type checking
+            if not isinstance(value, Subscriber):
+                raise ValueError("Subscriber must be an instance of Subscriber")
+            self._attributes[name] = value
+        else:
+            # Handle all other attributes through the _attributes dict
+            self._attributes[name] = value
 
     @property
     def name(self):
@@ -67,10 +65,6 @@ class DiameterMessage:
         return self.message.header.application_id
     
     @property
-    def session_id(self):
-        return self.message.session_id
-    
-    @property
     def is_request(self):
         return self.message.header.is_request
 
@@ -80,19 +74,11 @@ class DiameterMessage:
     
     @property
     def msisdn(self):
-        return self.subscriber.msisdn
+        return self.subscriber.msisdn if self.subscriber else None
     
     @property
     def imsi(self):
-        return self.subscriber.imsi
-    
-    @property
-    def result_code(self):
-        if hasattr(self.message, 'result_code'):
-            return self.message.result_code
-        else:
-            return None
-    
+        return self.subscriber.imsi if self.subscriber else None
     
     def dump_hex_string(self, file_full_path):
         with open(file_full_path, 'w') as f:
