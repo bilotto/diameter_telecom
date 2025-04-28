@@ -88,6 +88,15 @@ class DiameterMessage:
             return datetime.datetime.fromtimestamp(float(self.timestamp)).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         return None
     
+    @property
+    def hop_by_hop_id(self):
+        return self.message.header.hop_by_hop_identifier
+    
+    @property
+    def end_to_end_id(self):
+        return self.message.header.end_to_end_identifier
+    
+    
     def dump_hex_string(self, file_full_path):
         with open(file_full_path, 'w') as f:
             f.write(self.hex_string)
