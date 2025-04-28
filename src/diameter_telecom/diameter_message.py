@@ -84,7 +84,7 @@ class DiameterMessage:
     @property
     def time(self):
         if self.timestamp:
-            return datetime.datetime.fromtimestamp(float(self.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+            return datetime.datetime.fromtimestamp(float(self.timestamp)).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         return None
     
     def dump_hex_string(self, file_full_path):
