@@ -1,7 +1,6 @@
-from diameter.node import Node
-from diameter.message.constants import *
-from diameter.node.node import Peer
 from typing import List, Dict
+from diameter.node import Node
+from diameter.node.node import Peer
 
 def create_node(origin_host: str,
                 realm_name: str,
@@ -37,3 +36,6 @@ def create_peer_uri(node: Node) -> str:
         return f"aaa://{node.origin_host}:{node.tcp_port};transport=tcp"
     elif node.sctp_port:
         return f"aaa://{node.origin_host}:{node.sctp_port};transport=sctp"
+
+
+from diameter.message.constants import *
