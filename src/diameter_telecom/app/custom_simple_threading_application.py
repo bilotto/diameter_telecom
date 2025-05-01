@@ -1,4 +1,10 @@
 from diameter.node.application import SimpleThreadingApplication
+from ..diameter_message import DiameterMessage
+from ..constants import *
+import logging
+from diameter.message import dump
+
+logger = logging.getLogger(__name__)
 
 class CustomSimpleThreadingApplication(SimpleThreadingApplication):
     def __init__(self, application_id,
@@ -10,6 +16,16 @@ class CustomSimpleThreadingApplication(SimpleThreadingApplication):
         super().__init__(application_id, is_acct_application, is_auth_application, max_threads, request_handler)
         self.sessions = {}
         self.subscribers = {}
+
+    def remove_session(self, session_id):
+        if session_id in self.sessions:
+            del self.sessions[session_id]
+
+    def send_request_custom(self, diameter_message: DiameterMessage):
+        answer = self.send_request(diameter_message.message, timeout=10)
+        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+            logger.error(f"Answer with error: \n {dump(answer)}")
+        return answer
 
     # def send_request_custom(self, request, timeout=5):
     #     # print(request)

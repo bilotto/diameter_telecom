@@ -27,22 +27,22 @@ class DiameterSession:
     
     def __eq__(self, other) -> bool:
         return self.session_id == other.session_id
-       
-    def set_start_time(self, start_time: str):
-        self.start_time = start_time
-        self.active = True
 
-    def start(self):
+    def start(self, timestamp: str = None):
         if not self.active:
-            self.set_start_time(str(time.time()))
+            if timestamp:
+                self.start_time = timestamp
+            else:
+                self.start_time = str(time.time())
+            self.active = True
 
-    def end(self):
+    def end(self, timestamp: str = None):
         if self.active:
-            self.set_end_time(str(time.time()))
-
-    def set_end_time(self, end_time: str):
-        self.end_time = end_time
-        self.active = False
+            if timestamp:
+                self.end_time = timestamp
+            else:
+                self.end_time = str(time.time())
+            self.active = False
 
     def add_message(self, message):
         if not isinstance(message, Message) and not isinstance(message, DiameterMessage):
@@ -92,6 +92,19 @@ class SySession(DiameterSession):
     def set_gx_session_id(self, gx_session_id: str):
         self.gx_session_id = gx_session_id
 
+    def add_message(self, message):
+        super().add_message(message)
+        if message.name == SLR:
+            if message.timestamp:
+                self.start(message.timestamp)
+            else:
+                self.start()
+        elif message.name == STR:
+            if message.timestamp:
+                self.end(message.timestamp)
+            else:
+                self.end()
+
 class RxSession(DiameterSession):
     session_id: str
 
@@ -101,6 +114,19 @@ class RxSession(DiameterSession):
 
     def set_gx_session_id(self, gx_session_id: str):
         self.gx_session_id = gx_session_id
+
+    def add_message(self, message):
+        super().add_message(message)
+        if message.name == AAR:
+            if message.timestamp:
+                self.start(message.timestamp)
+            else:
+                self.start()
+        elif message.name == STR:
+            if message.timestamp:
+                self.end(message.timestamp)
+            else:
+                self.end()
 
 
 class GxSession(DiameterSession):
@@ -137,6 +163,11 @@ class GxSession(DiameterSession):
         super().add_message(message)
         if message.name == CCR_I:
             if message.timestamp:
-                self.set_start_time(message.timestamp)
+                self.start(message.timestamp)
             else:
                 self.start()
+        elif message.name == CCR_T:
+            if message.timestamp:
+                self.end(message.timestamp)
+            else:
+                self.end()
