@@ -1,9 +1,13 @@
+from dataclasses import dataclass
+
+@dataclass
 class Subscriber:
     msisdn: str
     imsi: str
-    def __init__(self, msisdn: str, imsi: str,):
-        self.msisdn = str(msisdn)
-        self.imsi = str(imsi)
+
+    def __post_init__(self):
+        self.msisdn = str(self.msisdn)
+        self.imsi = str(self.imsi)
 
     def __eq__(self, other: 'Subscriber') -> bool:
         return self.msisdn == other.msisdn and self.imsi == other.imsi
