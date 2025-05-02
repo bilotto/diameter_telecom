@@ -1,6 +1,9 @@
 from diameter.node.application import SimpleThreadingApplication
 from ..diameter_message import DiameterMessage
+from ..diameter_session import DiameterSession
+from ..subscriber import Subscriber
 from ..constants import *
+from typing import Dict
 import logging
 from diameter.message import dump
 
@@ -14,8 +17,8 @@ class CustomSimpleThreadingApplication(SimpleThreadingApplication):
                  request_handler,
                  ):
         super().__init__(application_id, is_acct_application, is_auth_application, max_threads, request_handler)
-        self.sessions = {}
-        self.subscribers = {}
+        self.sessions: Dict[str, DiameterSession] = {}
+        self.subscribers: Dict[str, Subscriber] = {}
 
     def remove_session(self, session_id):
         if session_id in self.sessions:
