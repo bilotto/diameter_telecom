@@ -1,26 +1,23 @@
 from .subscriber import Subscriber
 from .diameter_message import DiameterMessage, Message
 from .constants import *
-from typing import List
+from typing import List, Optional
 import time
+from dataclasses import dataclass, field
 
+@dataclass
 class DiameterSession:
     session_id: str
-    active: bool
-    messages: List[DiameterMessage]
-    start_time: str
-    end_time: str
+    active: bool = field(default=False)
+    error: bool = field(default=False)
+    messages: List[DiameterMessage] = field(default_factory=list)
+    start_time: Optional[str] = field(default=None)
+    end_time: Optional[str] = field(default=None)
+    subscriber: Optional[Subscriber] = field(default=None)
 
-    def __init__(self, session_id: str):
-        if not isinstance(session_id, str):
-            raise ValueError("session_id must be a string") 
-        self.session_id = session_id
-        self.active = False
-        self.error = False
-        self.messages = []
-        self.start_time = None
-        self.end_time = None
-        self.subscriber = None
+    def __post_init__(self):
+        if not isinstance(self.session_id, str):
+            raise ValueError("session_id must be a string")
 
     def __hash__(self) -> int:
         return hash(self.session_id)
@@ -81,13 +78,9 @@ class DiameterSession:
             return int(time.time() - float(self.start_time))
         return None
 
+@dataclass
 class SySession(DiameterSession):
-    session_id: str
-    gx_session_id: str
-
-    def __init__(self, session_id: str):
-        super().__init__(session_id)
-        self.gx_session_id = None
+    gx_session_id: Optional[str] = field(default=None)
 
     def set_gx_session_id(self, gx_session_id: str):
         self.gx_session_id = gx_session_id
@@ -105,12 +98,9 @@ class SySession(DiameterSession):
             else:
                 self.end()
 
+@dataclass
 class RxSession(DiameterSession):
-    session_id: str
-
-    def __init__(self, session_id: str):
-        super().__init__(session_id)
-        self.gx_session_id = None
+    gx_session_id: Optional[str] = field(default=None)
 
     def set_gx_session_id(self, gx_session_id: str):
         self.gx_session_id = gx_session_id
@@ -128,20 +118,12 @@ class RxSession(DiameterSession):
             else:
                 self.end()
 
-
+@dataclass
 class GxSession(DiameterSession):
-    session_id: str
-    _framed_ip_address: str
-    _framed_ipv6_prefix: str
-    apn: str
-    mcc_mnc: str
-
-    def __init__(self, session_id: str):
-        super().__init__(session_id)
-        self._framed_ip_address = None
-        self._framed_ipv6_prefix = None
-        self.apn = None
-        self.mcc_mnc = None
+    _framed_ip_address: Optional[str] = field(default=None)
+    _framed_ipv6_prefix: Optional[str] = field(default=None)
+    apn: Optional[str] = field(default=None)
+    mcc_mnc: Optional[str] = field(default=None)
 
     @property
     def framed_ip_address(self):
