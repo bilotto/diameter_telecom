@@ -1,27 +1,21 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
+from dataclasses import dataclass, field
 from .subscriber import Subscriber
 from .service import DataService
 from .service.ip_queue import APN
 
+@dataclass
 class Carrier:
     name: str
     mcc_mnc: str
     country_code: str
-    subscribers: Dict[str, Subscriber]
-    data_service: DataService
+    subscribers: Dict[str, Subscriber] = field(default_factory=dict)
+    apns: Dict[str, APN] = field(default_factory=dict)
+    data_service: Optional[DataService] = field(default=None)
 
-
-    def __init__(self, 
-                 name,
-                 mcc_mnc: str,
-                 country_code: str,
-                 ):
-        self.name = name
-        self.mcc_mnc = str(mcc_mnc)
-        self.country_code = str(country_code)
-        self.subscribers = {}
-        self.apns = {}
-        self.data_service = None
+    def __post_init__(self):
+        self.mcc_mnc = str(self.mcc_mnc)
+        self.country_code = str(self.country_code)
 
     def add_subscriber(self, subscriber: Subscriber):
         if not isinstance(subscriber, Subscriber):
