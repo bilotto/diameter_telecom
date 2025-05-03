@@ -120,26 +120,10 @@ class RxSession(DiameterSession):
 
 @dataclass
 class GxSession(DiameterSession):
-    _framed_ip_address: Optional[str] = field(default=None)
-    _framed_ipv6_prefix: Optional[str] = field(default=None)
+    framed_ip_address: Optional[str] = field(default=None)
+    framed_ipv6_prefix: Optional[str] = field(default=None)
     apn: Optional[str] = field(default=None)
     mcc_mnc: Optional[str] = field(default=None)
-
-    @property
-    def framed_ip_address(self):
-        return self._framed_ip_address or self._framed_ipv6_prefix
-
-    def set_mcc_mnc(self, mcc_mnc: str):
-        self.mcc_mnc = mcc_mnc
-
-    def set_framed_ip_address(self, framed_ip_address: str):
-        self._framed_ip_address = framed_ip_address
-
-    def set_framed_ipv6_prefix(self, framed_ipv6_prefix: str):
-        self._framed_ipv6_prefix = framed_ipv6_prefix
-
-    def set_apn(self, apn: str):
-        self.apn = apn
 
     def add_message(self, message: DiameterMessage):
         super().add_message(message)
@@ -148,6 +132,13 @@ class GxSession(DiameterSession):
                 self.start(message.timestamp)
             else:
                 self.start()
+            if message.framed_ip_address:
+                self.framed_ip_address = message.framed_ip_address
+            if message.framed_ipv6_prefix:
+                self.framed_ipv6_prefix = message.framed_ipv6_prefix
+            if message.called_station_id:
+                self.apn = message.called_station_id
+                
         elif message.name == CCR_T:
             if message.timestamp:
                 self.end(message.timestamp)

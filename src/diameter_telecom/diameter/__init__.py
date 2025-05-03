@@ -37,5 +37,3 @@ def create_peer_uri(node: Node) -> str:
     elif node.sctp_port:
         return f"aaa://{node.origin_host}:{node.sctp_port};transport=sctp"
 
-
-from diameter.message.constants import *

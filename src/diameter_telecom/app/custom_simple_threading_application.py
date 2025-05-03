@@ -24,8 +24,8 @@ class CustomSimpleThreadingApplication(SimpleThreadingApplication):
         if session_id in self.sessions:
             del self.sessions[session_id]
 
-    def send_request_custom(self, diameter_message: DiameterMessage):
-        answer = self.send_request(diameter_message.message, timeout=10)
+    def send_request_custom(self, diameter_message: DiameterMessage, timeout=10):
+        answer = self.send_request(diameter_message.message, timeout=timeout)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             logger.error(f"Answer with error: \n {dump(answer)}")
         return answer
