@@ -1,8 +1,8 @@
-from diameter_telecom.diameter.helpers import add_peers
-from diameter_telecom.diameter.app.rx import RxApplication
+from ..diameter.helpers import add_peers
+from ..diameter.app.rx import RxApplication
 from typing import List, Dict, Callable
 from ._entity import DiameterEntity
-from ..handle_request import handle_request_rx
+from ..diameter.handle_request import handle_request_rx
 
 class AF(DiameterEntity):
     def __init__(self, origin_host, origin_realm, ip_addresses, port, sctp, vendor_ids):

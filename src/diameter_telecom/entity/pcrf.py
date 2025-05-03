@@ -1,9 +1,7 @@
 from ._entity import DiameterEntity
-from diameter_telecom.diameter.helpers import add_peers
-from diameter_telecom.diameter.app.gx import GxApplication
-from diameter_telecom.diameter.app.rx import RxApplication
-from diameter_telecom.diameter.app.sy import SyApplication
-from ..handle_request import *
+from ..diameter.helpers import add_peers
+from ..diameter.app import GxApplication, RxApplication, SyApplication
+from ..diameter.handle_request import *
 from typing import List, Dict, Callable
 
 class PCRF(DiameterEntity):
