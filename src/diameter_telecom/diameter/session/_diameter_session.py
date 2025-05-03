@@ -1,6 +1,6 @@
-from . import Subscriber
-from .message import DiameterMessage, Message
-from .constants import *
+from .. import Subscriber
+from ..message import DiameterMessage, Message
+from ..constants import *
 from typing import List, Optional
 import time
 from dataclasses import dataclass, field
@@ -77,70 +77,3 @@ class DiameterSession:
         elif self.start_time:
             return int(time.time() - float(self.start_time))
         return None
-
-@dataclass
-class SySession(DiameterSession):
-    gx_session_id: Optional[str] = field(default=None)
-
-    def set_gx_session_id(self, gx_session_id: str):
-        self.gx_session_id = gx_session_id
-
-    def add_message(self, message):
-        super().add_message(message)
-        if message.name == SLR:
-            if message.timestamp:
-                self.start(message.timestamp)
-            else:
-                self.start()
-        elif message.name == STR:
-            if message.timestamp:
-                self.end(message.timestamp)
-            else:
-                self.end()
-
-@dataclass
-class RxSession(DiameterSession):
-    gx_session_id: Optional[str] = field(default=None)
-
-    def set_gx_session_id(self, gx_session_id: str):
-        self.gx_session_id = gx_session_id
-
-    def add_message(self, message):
-        super().add_message(message)
-        if message.name == AAR:
-            if message.timestamp:
-                self.start(message.timestamp)
-            else:
-                self.start()
-        elif message.name == STR:
-            if message.timestamp:
-                self.end(message.timestamp)
-            else:
-                self.end()
-
-@dataclass
-class GxSession(DiameterSession):
-    framed_ip_address: Optional[str] = field(default=None)
-    framed_ipv6_prefix: Optional[str] = field(default=None)
-    apn: Optional[str] = field(default=None)
-    mcc_mnc: Optional[str] = field(default=None)
-
-    def add_message(self, message: DiameterMessage):
-        super().add_message(message)
-        if message.name == CCR_I:
-            if message.timestamp:
-                self.start(message.timestamp)
-            else:
-                self.start()
-            if message.framed_ip_address:
-                self.framed_ip_address = message.framed_ip_address
-            if message.framed_ipv6_prefix:
-                self.framed_ipv6_prefix = message.framed_ipv6_prefix
-            if message.called_station_id:
-                self.apn = message.called_station_id
-                
-        elif message.name == CCR_T:
-            if message.timestamp:
-                self.end(message.timestamp)
-            else:
-                self.end()
