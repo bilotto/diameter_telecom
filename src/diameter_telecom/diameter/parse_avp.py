@@ -1,7 +1,7 @@
 from typing import List
 from diameter.message.constants import *
 from diameter.message.avp.grouped import SubscriptionId
-from ..diameter_message import DiameterMessage
+from .message import DiameterMessage
 
 import logging
 logger = logging.getLogger(__name__)

@@ -29,3 +29,10 @@ def add_peers(node: Node, peers_list: List[Dict]) -> List[Peer]:
                           is_persistent=peer.get('is_persistent', True),
                           is_default=peer.get('is_default', False))
             for peer in peers_list]
+
+def add_peer_to_node(node: Node, host: str, realm: str, port: int, ip_addresses: List[str] = ["127.0.0.1"], initiate_connection: bool = True) -> Peer:
+    if node.tcp_port:
+        peer = node.add_peer(f"aaa://{host}:{port};transport=tcp", realm, ip_addresses=ip_addresses, is_persistent=initiate_connection)
+    elif node.sctp_port:
+        peer = node.add_peer(f"aaa://{host}:{port};transport=sctp", realm, ip_addresses=ip_addresses, is_persistent=initiate_connection)
+    return peer
