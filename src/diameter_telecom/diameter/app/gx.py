@@ -1,7 +1,7 @@
 from .custom_simple_threading_application import CustomSimpleThreadingApplication
-from ..diameter_session import GxSession
+from ..session import GxSession
 from diameter.message.constants import APP_3GPP_GX
-from ..diameter_message import DiameterMessage
+from ..message import DiameterMessage
 from ..constants import *
 import logging
 from typing import Dict

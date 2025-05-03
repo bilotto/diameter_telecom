@@ -1,5 +1,5 @@
-from .subscriber import Subscriber
-from .diameter_message import DiameterMessage, Message
+from . import Subscriber
+from .message import DiameterMessage, Message
 from .constants import *
 from typing import List, Optional
 import time

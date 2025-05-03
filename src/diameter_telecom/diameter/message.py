@@ -2,7 +2,7 @@ from diameter.message.commands import *
 from diameter.message.avp.grouped import *
 from diameter.message import Message, dump
 from .constants import *
-from .subscriber import Subscriber
+from . import Subscriber
 import datetime
 
 logger = logging.getLogger(__name__)

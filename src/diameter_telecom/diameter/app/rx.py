@@ -1,7 +1,7 @@
 from .custom_simple_threading_application import CustomSimpleThreadingApplication
-from ..diameter_session import RxSession
-from diameter.message.constants import APP_3GPP_RX
-from ..diameter_message import DiameterMessage
+from ..session import RxSession
+from ..constants import APP_3GPP_RX
+from ..message import DiameterMessage
 from typing import Dict
 
 class RxApplication(CustomSimpleThreadingApplication):

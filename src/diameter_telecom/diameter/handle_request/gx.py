@@ -2,9 +2,9 @@ from diameter.message.constants import *
 from diameter.message.commands import *
 from diameter.message.avp.grouped import *
 from ..app import GxApplication
-from ..diameter_message import DiameterMessage
-from ..diameter_session import GxSession, Subscriber
-from ..diameter.parse_avp import *
+from ..message import DiameterMessage
+from ..session import GxSession, Subscriber
+from ..parse_avp import *
 
 def handle_request_gx(app: GxApplication, message: Message):
     answer = None

@@ -1,7 +1,7 @@
 from .custom_simple_threading_application import CustomSimpleThreadingApplication
-from ..diameter_session import SySession
-from diameter.message.constants import APP_3GPP_SY
-from ..diameter_message import DiameterMessage
+from ..session import SySession
+from ..constants import APP_3GPP_SY
+from ..message import DiameterMessage
 from typing import Dict
 
 class SyApplication(CustomSimpleThreadingApplication):
