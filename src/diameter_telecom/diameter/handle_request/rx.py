@@ -2,8 +2,8 @@ from diameter.message.constants import *
 from diameter.message.commands import *
 from diameter.message.avp.grouped import *
 from ..app import RxApplication
-from ..diameter_session import *
-from ..diameter_message import DiameterMessage
+from ..session import RxSession
+from ..message import DiameterMessage
 
 def handle_request_rx(app: RxApplication, message: Message):
     answer = None

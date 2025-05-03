@@ -3,7 +3,8 @@ from diameter.message.commands import *
 from diameter.message.avp.grouped import *
 from ..app import GxApplication
 from ..message import DiameterMessage
-from ..session import GxSession, Subscriber
+from ..session import GxSession
+from .. import Subscriber
 from ..parse_avp import *
 
 def handle_request_gx(app: GxApplication, message: Message):
