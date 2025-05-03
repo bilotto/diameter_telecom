@@ -1,4 +1,4 @@
-from diameter_telecom.diameter.helpers import create_node, add_peers
+from diameter_telecom.diameter.helpers import create_node
 
 class DiameterEntity:
     def __init__(self, origin_host, origin_realm, ip_addresses, port, sctp, vendor_ids):
