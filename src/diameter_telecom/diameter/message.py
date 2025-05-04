@@ -59,8 +59,8 @@ class DiameterMessage:
             'pcap_filepath': None,
             'framed_ip_address': None,
             'framed_ipv6_prefix': None,
-            'mcc_mnc': None,
-            'apn': None
+            'sgsn_mcc_mnc': None,
+            'called_station_id': None
         }
 
     def __getattr__(self, name):
@@ -204,6 +204,16 @@ class DiameterMessage:
             int: The end-to-end identifier
         """
         return self.message.header.end_to_end_identifier
+    
+    @property
+    def apn(self):
+        """
+        Get the APN from the called station ID.
+        
+        Returns:
+            str or None: The APN if called station ID exists, None otherwise
+        """
+        return self.called_station_id
     
     def dump_hex_string(self, file_full_path):
         """

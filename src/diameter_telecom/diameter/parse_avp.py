@@ -18,7 +18,7 @@ from .message import DiameterMessage
 import logging
 logger = logging.getLogger(__name__)
 
-def parse_subscription_id(subscription_id: List[SubscriptionId]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def parse_subscription_id(subscription_id: List[SubscriptionId]) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
     Parse subscription ID AVPs to extract subscriber identifiers.
     
@@ -29,8 +29,8 @@ def parse_subscription_id(subscription_id: List[SubscriptionId]) -> Tuple[Option
         subscription_id (List[SubscriptionId]): List of subscription ID AVPs
         
     Returns:
-        Tuple[Optional[str], Optional[str], Optional[str]]: Tuple containing
-            (msisdn, imsi, sip_uri). Each value may be None if not present.
+        Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]: Tuple containing
+            (msisdn, imsi, sip_uri, nai, private). Each value may be None if not present.
             
     Example:
         >>> msisdn, imsi, sip_uri = parse_subscription_id(message.subscription_id)
@@ -38,6 +38,8 @@ def parse_subscription_id(subscription_id: List[SubscriptionId]) -> Tuple[Option
     msisdn = None
     imsi = None
     sip_uri = None
+    nai = None
+    private = None
     for i in subscription_id:
         if i.subscription_id_type == E_SUBSCRIPTION_ID_TYPE_END_USER_E164:
             msisdn = i.subscription_id_data
@@ -45,7 +47,11 @@ def parse_subscription_id(subscription_id: List[SubscriptionId]) -> Tuple[Option
             imsi = i.subscription_id_data
         elif i.subscription_id_type == E_SUBSCRIPTION_ID_TYPE_END_USER_SIP_URI:
             sip_uri = i.subscription_id_data
-    return (msisdn, imsi, sip_uri)
+        elif i.subscription_id_type == E_SUBSCRIPTION_ID_TYPE_END_USER_NAI:
+            nai = i.subscription_id_data
+        elif i.subscription_id_type == E_SUBSCRIPTION_ID_TYPE_END_USER_PRIVATE:
+            private = i.subscription_id_data
+    return (msisdn, imsi, sip_uri, nai, private)
 
 import socket
 def bytes_to_ip(ip_bytes: bytes) -> Optional[str]:
