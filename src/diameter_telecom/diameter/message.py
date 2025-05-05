@@ -234,6 +234,15 @@ class DiameterMessage:
             str: Formatted message dump
         """
         return dump(self.message)
+    
+    def __repr__(self):
+        return f"{self.time},{self.name}"
+    
+    def __eq__(self, other):
+        return self.hop_by_hop_id == other.hop_by_hop_id and self.end_to_end_id == other.end_to_end_id and self.is_request == other.is_request
+    
+    def __hash__(self):
+        return hash((self.hop_by_hop_id, self.end_to_end_id, self.is_request))
 
 
 def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
