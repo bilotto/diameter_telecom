@@ -17,6 +17,16 @@ class GxApplication(CustomSimpleThreadingApplication):
     def get_session_by_id(self, session_id: str) -> GxSession:
         return self.sessions.get(session_id)
     
+    def get_session_by_framed_ip_address(self, framed_ip_address: str) -> GxSession:
+        if self.sessions_id_by_framed_ip_address.get(framed_ip_address):
+            return self.sessions[self.sessions_id_by_framed_ip_address[framed_ip_address]]
+        return None
+    
+    def get_session_by_framed_ipv6_prefix(self, framed_ipv6_prefix: str) -> GxSession:
+        if self.sessions_id_by_framed_ipv6_prefix.get(framed_ipv6_prefix):
+            return self.sessions[self.sessions_id_by_framed_ipv6_prefix[framed_ipv6_prefix]]
+        return None
+    
     def add_session(self, session: GxSession):
         self.sessions[session.session_id] = session
         if session.framed_ip_address:
@@ -38,10 +48,13 @@ class GxApplication(CustomSimpleThreadingApplication):
         gx_session = self.get_session_by_id(session_id)
         if not gx_session:
             gx_session = GxSession(session_id)
+            # Add message before adding session so it's parsed properly by the add_message method
             gx_session.add_message(request)
-            self.add_session(gx_session)
-        #
-        #
+            self.add_session(gx_session)                
+        else:
+            gx_session.add_message(request)
+        if request.subscriber and gx_session.subscriber:
+            self.add_subscriber(gx_session.subscriber)
         answer = super().send_request_custom(request, timeout)
         gx_session.add_message(answer)
         if not gx_session.active:
