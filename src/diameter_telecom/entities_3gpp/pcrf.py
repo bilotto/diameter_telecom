@@ -1,25 +1,36 @@
 from ._entity import DiameterEntity
-from ..diameter.helpers import add_peers
-from ..diameter.app import GxApplication, RxApplication, SyApplication
-from ..diameter.handle_request import *
-from typing import List, Dict, Callable
+from ..diameter.handle_request import handle_request_gx, handle_request_rx, handle_request_sy
+from typing import List, Dict, Callable, Optional
+from ..diameter.helpers import Node
 
 class PCRF(DiameterEntity):
-    def __init__(self, origin_host, origin_realm, ip_addresses, port, sctp, vendor_ids):
-        super().__init__(origin_host, origin_realm, ip_addresses, port, sctp, vendor_ids)
-        self.gx_app: GxApplication = None
-        self.rx_app: RxApplication = None
-        self.sy_app: SyApplication = None
+    def __init__(self, 
+                 node: Optional[Node] = None,
+                 origin_host: Optional[str] = None,
+                 origin_realm: Optional[str] = None,
+                 ip_addresses: Optional[List[str]] = None,
+                 port: Optional[int] = None,
+                 sctp: Optional[bool] = False, 
+                 vendor_ids: Optional[List[int]] = None):
+        super().__init__(node=node,
+                        origin_host=origin_host,
+                        origin_realm=origin_realm,
+                        ip_addresses=ip_addresses,
+                        port=port,
+                        sctp=sctp,
+                        vendor_ids=vendor_ids)
 
-    def add_gx_peers(self, peers_list: List[Dict], request_handler: Callable = handle_request_gx, realms: List[str] = None):
-        self.gx_app = GxApplication(request_handler=request_handler)
-        self.node.add_application(self.gx_app, add_peers(self.node, peers_list), realms)
+    def setup_gx(self, peers_list: List[Dict], request_handler: Callable = handle_request_gx, realms: List[str] = None):
+        """Setup Gx application with peers and request handler"""
+        self.add_gx_peers(peers_list)
+        self.add_gx_application(request_handler, realms)
 
-    def add_rx_peers(self, peers_list: List[Dict], request_handler: Callable = handle_request_rx, realms: List[str] = None):
-        self.rx_app = RxApplication(request_handler=request_handler)
-        self.node.add_application(self.rx_app, add_peers(self.node, peers_list), realms)
+    def setup_rx(self, peers_list: List[Dict], request_handler: Callable = handle_request_rx, realms: List[str] = None):
+        """Setup Rx application with peers and request handler"""
+        self.add_rx_peers(peers_list)
+        self.add_rx_application(request_handler, realms)
 
-    def add_sy_peers(self, peers_list: List[Dict], request_handler: Callable = handle_request_sy, realms: List[str] = None):
-        self.sy_app = SyApplication(request_handler=request_handler)
-        self.node.add_application(self.sy_app, add_peers(self.node, peers_list), realms)
-
+    def setup_sy(self, peers_list: List[Dict], request_handler: Callable = handle_request_sy, realms: List[str] = None):
+        """Setup Sy application with peers and request handler"""
+        self.add_sy_peers(peers_list)
+        self.add_sy_application(request_handler, realms)

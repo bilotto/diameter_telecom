@@ -9,7 +9,7 @@ class AF(DiameterEntity):
         super().__init__(origin_host, origin_realm, ip_addresses, port, sctp, vendor_ids)
         self.rx_app: RxApplication = None
 
-    def add_rx_peers(self, peers_list: List[Dict], request_handler: Callable = handle_request_rx, realms: List[str] = None):
-        self.rx_app = RxApplication(request_handler=request_handler)
-        self.node.add_application(self.rx_app, add_peers(self.node, peers_list), realms)
+    def setup_rx(self, peers_list: List[Dict], request_handler: Callable = handle_request_rx, realms: List[str] = None):
+        self.add_rx_peers(peers_list, request_handler, realms)
+        self.add_rx_application(request_handler, realms)
 
