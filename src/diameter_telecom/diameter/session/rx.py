@@ -15,10 +15,10 @@ class RxSession(DiameterSession):
         if diameter_message.name == AAR:
             if diameter_message.timestamp:
                 self.start(diameter_message.timestamp)
-            # else:
-            #     self.start()
+            else:
+                self.start()
         elif diameter_message.name == STR:
             if diameter_message.timestamp:
                 self.end(diameter_message.timestamp)
-            # else:
-            #     self.end()
+            else:
+                self.end()

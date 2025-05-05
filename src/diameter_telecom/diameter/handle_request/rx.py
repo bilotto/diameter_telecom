@@ -4,8 +4,11 @@ from diameter.message.avp.grouped import *
 from ..app import RxApplication
 from ..session import RxSession
 from ..message import DiameterMessage
+import logging
+logger = logging.getLogger(__name__)
 
 def handle_request_rx(app: RxApplication, message: Message):
+    logger.info(f"Received message: {message}")
     answer = None
     rx_session = app.get_session_by_id(message.session_id)
     if not rx_session:
@@ -64,5 +67,5 @@ def handle_asr(app: RxApplication, message: AbortSessionRequest):
     session.add_message(req_diameter_message)
     answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
     session.add_message(answer)
-    app.sessions.remove_session(session_id)
+    app.terminate_session_after_successful_abort(session_id)
     return answer

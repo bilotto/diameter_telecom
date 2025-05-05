@@ -25,7 +25,6 @@ class VoiceService:
             logger.debug(f"Sending Gx request: {request}")
             answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
         elif request.app_id == APP_3GPP_RX:
-            print(f"Sending Rx request: {request}")
             rx_session = self.rx_app.get_session_by_id(session_id)
             if not rx_session:
                 logger.debug(f"No rx_session found for session_id: {session_id}. Will create a new one")
@@ -41,8 +40,7 @@ class VoiceService:
                         rx_session = RxSession(session_id)
                     rx_session.add_message(request)
                     self.rx_app.add_session(rx_session)
-            else:
-                logger.info(f"Found rx_session: {rx_session}")
+            logger.info(f"Found rx_session: {rx_session}")
             logger.debug(f"Sending Rx request: {request}")
             answer: DiameterMessage = self.rx_app.send_request_custom(request, timeout)
         else:

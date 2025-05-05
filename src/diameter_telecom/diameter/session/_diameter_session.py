@@ -4,6 +4,8 @@ from ..constants import *
 from typing import List, Optional
 import time
 from dataclasses import dataclass, field
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class DiameterSession:
@@ -32,6 +34,7 @@ class DiameterSession:
             else:
                 self.start_time = str(time.time())
             self.active = True
+            logger.info(f"Session {self.session_id} started at {self.start_time}")
 
     def end(self, timestamp: str = None):
         if self.active:
@@ -40,6 +43,7 @@ class DiameterSession:
             else:
                 self.end_time = str(time.time())
             self.active = False
+            logger.info(f"Session {self.session_id} ended at {self.end_time}")
 
     def add_message(self, message):
         if not isinstance(message, Message) and not isinstance(message, DiameterMessage):
