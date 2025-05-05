@@ -9,14 +9,16 @@ class SySession(DiameterSession):
         self.gx_session_id = gx_session_id
 
     def add_message(self, message):
-        super().add_message(message)
-        if message.name == SLR:
-            if message.timestamp:
-                self.start(message.timestamp)
-            else:
-                self.start()
-        elif message.name == STR:
-            if message.timestamp:
-                self.end(message.timestamp)
-            else:
-                self.end()
+        diameter_message = super().add_message(message)
+        if not diameter_message:
+            return
+        if diameter_message.name == SLR:
+            if diameter_message.timestamp:
+                self.start(diameter_message.timestamp)
+            # else:
+            #     self.start()
+        elif diameter_message.name == STR:
+            if diameter_message.timestamp:
+                self.end(diameter_message.timestamp)
+            # else:
+            #     self.end()

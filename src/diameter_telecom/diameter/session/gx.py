@@ -13,28 +13,30 @@ class GxSession(DiameterSession):
         return self.called_station_id
 
     def add_message(self, message: DiameterMessage):
-        super().add_message(message)
-        if message.name == CCR_I:
-            if message.timestamp:
-                self.start(message.timestamp)
-            else:
-                self.start()
-            if message.framed_ip_address:
-                self.framed_ip_address = message.framed_ip_address
-            if message.framed_ipv6_prefix:
-                self.framed_ipv6_prefix = message.framed_ipv6_prefix
-            if message.called_station_id:
-                self.called_station_id = message.called_station_id
-            if message.sgsn_mcc_mnc:
-                self.sgsn_mcc_mnc = message.sgsn_mcc_mnc
-            if message.subscription_id:
-                msisdn, imsi, sip_uri, nai, private = parse_subscription_id(message.subscription_id)
+        diameter_message = super().add_message(message)
+        if not diameter_message:
+            return
+        if diameter_message.name == CCR_I:
+            if diameter_message.timestamp:
+                self.start(diameter_message.timestamp)
+            # else:
+            #     self.start()
+            if diameter_message.message.framed_ip_address:
+                self.framed_ip_address = diameter_message.message.framed_ip_address
+            if diameter_message.message.framed_ipv6_prefix:
+                self.framed_ipv6_prefix = diameter_message.message.framed_ipv6_prefix
+            if diameter_message.message.called_station_id:
+                self.called_station_id = diameter_message.message.called_station_id
+            if diameter_message.message.sgsn_mcc_mnc:
+                self.sgsn_mcc_mnc = diameter_message.message.sgsn_mcc_mnc
+            if diameter_message.message.subscription_id:
+                msisdn, imsi, sip_uri, nai, private = parse_subscription_id(diameter_message.message.subscription_id)
                 if not self.subscriber:
                     self.subscriber = Subscriber(msisdn=msisdn, imsi=imsi)
-        elif message.name == CCR_T:
-            if message.timestamp:
-                self.end(message.timestamp)
-            else:
-                self.end()
-        if not message.subscriber:
-            message.subscriber = self.subscriber
+        elif diameter_message.name == CCR_T:
+            if diameter_message.timestamp:
+                self.end(diameter_message.timestamp)
+            # else:
+            #     self.end()
+        if not diameter_message.subscriber and self.subscriber:
+            diameter_message.subscriber = self.subscriber

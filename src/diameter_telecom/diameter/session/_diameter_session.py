@@ -50,7 +50,10 @@ class DiameterSession:
             diameter_message = DiameterMessage(message)
         else:
             raise ValueError("message must be an instance of Message or DiameterMessage")
+        if diameter_message in self.messages:
+            return None
         self.messages.append(diameter_message)
+        return diameter_message
 
     def get_messages(self) -> List[DiameterMessage]:
         return self.messages
