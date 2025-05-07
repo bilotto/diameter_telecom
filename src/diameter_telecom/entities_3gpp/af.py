@@ -1,15 +1,14 @@
-from ..diameter.helpers import add_peers
 from ..diameter.app.rx import RxApplication
-from typing import List, Dict, Callable
+from typing import List, Callable
 from ._entity import DiameterEntity
 from ..diameter.handle_request import handle_request_rx
 
 class AF(DiameterEntity):
-    def __init__(self, origin_host, origin_realm, ip_addresses, port, sctp, vendor_ids):
-        super().__init__(origin_host, origin_realm, ip_addresses, port, sctp, vendor_ids)
-        self.rx_app: RxApplication = None
-
-    def setup_rx(self, peers_list: List[Dict], request_handler: Callable = handle_request_rx, realms: List[str] = None):
-        self.add_rx_peers(peers_list, request_handler, realms)
-        self.add_rx_application(request_handler, realms)
-
+    def __init__(self, origin_host: str, realm_name: str,
+                 ip_addresses: List[str],
+                 tcp_port: int = None, sctp_port: int = None,
+                 vendor_ids: List[int] = None,
+                 max_threads: int = 1,
+                 request_handler: Callable = handle_request_rx):
+        super().__init__(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
+        self.rx_app: RxApplication = RxApplication(max_threads=max_threads, request_handler=request_handler)
