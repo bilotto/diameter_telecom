@@ -2,6 +2,7 @@ from ..diameter.app.rx import RxApplication
 from typing import List, Callable
 from ._entity import DiameterEntity
 from ..diameter.handle_request import handle_request_rx
+from ..diameter.constants import *
 
 class AF(DiameterEntity):
     def __init__(self, origin_host: str, realm_name: str,
