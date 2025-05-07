@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from typing import List
+from diameter.message.avp.grouped import SubscriptionId
+from .diameter.constants import *
 
 @dataclass
 class Subscriber:
@@ -40,3 +43,36 @@ class Subscriber:
             val = getattr(self, attr)
             if val is not None:
                 setattr(self, attr, str(val))
+
+    def subscription_id(self) -> List[SubscriptionId]:
+        """
+        Create a SubscriptionId AVP for the subscriber.
+        
+        Returns:
+            SubscriptionId: A new SubscriptionId AVP instance.
+        """
+        subscription_id: List[SubscriptionId] = []
+        subscription_id.append(SubscriptionId(
+            subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_E164,
+            subscription_id_data=self.msisdn
+        ))
+        subscription_id.append(SubscriptionId(
+            subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_IMSI,
+            subscription_id_data=self.imsi
+        ))
+        if self.sip_uri:
+            subscription_id.append(SubscriptionId(
+                subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_SIP_URI,
+                subscription_id_data=self.sip_uri
+            ))
+        if self.nai:
+            subscription_id.append(SubscriptionId(
+                subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_NAI,
+                subscription_id_data=self.nai
+            ))
+        if self.private_id:
+            subscription_id.append(SubscriptionId(
+                subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_PRIVATE,
+                subscription_id_data=self.private_id
+            ))
+        return subscription_id
