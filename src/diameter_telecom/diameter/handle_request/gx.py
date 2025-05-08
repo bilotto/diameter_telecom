@@ -60,6 +60,8 @@ def handle_asr(app: GxApplication, message: AbortSessionRequest):
 
 def handle_ccr(app: GxApplication, message: CreditControlRequest):
     answer = message.to_answer()
+    answer.cc_request_number = message.cc_request_number
+    answer.cc_request_type = message.cc_request_type
     if not isinstance(answer, CreditControlAnswer):
         raise ValueError("Answer is not CreditControlAnswer")
     answer.session_id = message.session_id
@@ -70,7 +72,7 @@ def handle_ccr(app: GxApplication, message: CreditControlRequest):
     answer.cc_request_number = message.cc_request_number
 
     if message.cc_request_type == E_CC_REQUEST_TYPE_INITIAL_REQUEST:
-        msisdn, imsi, sip_uri = parse_subscription_id(message.subscription_id)
+        msisdn, imsi, sip_uri, nai, private = parse_subscription_id(message.subscription_id)
         subscriber = app.subscribers.get(msisdn)
         if not subscriber:
             subscriber = Subscriber(msisdn=msisdn, imsi=imsi)
