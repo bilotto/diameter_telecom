@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List
 from diameter.message.avp.grouped import SubscriptionId
 from .diameter.constants import *
+from .apn import APN
 
 @dataclass
 class Subscriber:
@@ -32,6 +33,7 @@ class Subscriber:
     nai: str = None
     private_id: str = None
     imei: str = None
+    apn: APN = None
 
     def __post_init__(self):
         """
