@@ -5,6 +5,7 @@ from ..message import DiameterMessage
 from ..constants import *
 import logging
 from typing import Dict
+import time
 
 logger = logging.getLogger(__name__)
 class GxApplication(CustomSimpleThreadingApplication):
@@ -45,12 +46,15 @@ class GxApplication(CustomSimpleThreadingApplication):
         if not isinstance(request, DiameterMessage):
             raise ValueError("request must be an instance of DiameterMessage")
         session_id = request.session_id
+        if not request.timestamp:
+            request.timestamp = time.time()
         gx_session = self.get_session_by_id(session_id)
         if not gx_session:
+            logger.debug("GxSession not found. Creating new one.")
             gx_session = GxSession(session_id)
             # Add message before adding session so it's parsed properly by the add_message method
             gx_session.add_message(request)
-            self.add_session(gx_session)                
+            self.add_session(gx_session)
         else:
             gx_session.add_message(request)
         if request.subscriber and gx_session.subscriber:
@@ -58,5 +62,6 @@ class GxApplication(CustomSimpleThreadingApplication):
         answer = super().send_request_custom(request, timeout)
         gx_session.add_message(answer)
         if not gx_session.active:
+            logger.debug(f"GxSession {session_id} is not active. Removing it.")
             self.remove_session(session_id)
         return answer
