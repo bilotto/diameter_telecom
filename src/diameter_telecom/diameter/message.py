@@ -176,13 +176,13 @@ class DiameterMessage:
     @property
     def time(self):
         """
-        Get the formatted timestamp of the message.
+        Get the formatted timestamp of the message in GMT/UTC.
         
         Returns:
-            str or None: Formatted timestamp string if timestamp exists, None otherwise
+            str or None: Formatted timestamp string in GMT/UTC if timestamp exists, None otherwise
         """
         if self.timestamp:
-            return datetime.datetime.fromtimestamp(float(self.timestamp)).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            return datetime.datetime.fromtimestamp(float(self.timestamp), tz=datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         return None
     
     @property
@@ -283,7 +283,8 @@ def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
         DeviceWatchdog: (DWR, DWA),
         CapabilitiesExchange: (CER, CEA),
         SessionTermination: (STR, STA),
-        Aa: (AAR, AAA)
+        Aa: (AAR, AAA),
+        DisconnectPeer: (DPR, DPA)
     }
 
     # Get the appropriate name based on message type and request/answer status
@@ -291,5 +292,5 @@ def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
         if isinstance(message, msg_type):
             return req_name if is_request else ans_name
 
-    return None
+    return f"{diameter_message.message.header.application_id},{diameter_message.message.header.command_code}"
 
