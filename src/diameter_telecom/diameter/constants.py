@@ -60,3 +60,8 @@ DWA = "DWA"  # Device Watchdog Answer
 # Capabilities Exchange Messages
 CER = "CER"  # Capabilities Exchange Request
 CEA = "CEA"  # Capabilities Exchange Answer
+
+DPR = "DPR"  # Disconnect Peer Request
+DPA = "DPA"  # Disconnect Peer Answer
+
+
