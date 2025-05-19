@@ -271,3 +271,91 @@ def check_rat_type(diameter_message: DiameterMessage) -> Optional[int]:
         pass
 
 
+def parse_user_location_info_fixed(hex_string):
+    # Wireshark interprets the MNC using BCD digits in this order:
+    #   - Digit 1: Byte 3 low nibble
+    #   - Digit 2: Byte 3 high nibble
+    #   - Digit 3: Byte 2 high nibble
+    # This may differ from raw spec parsing (3GPP TS 24.008), but matches real-world tools.
+    def decode_mcc_mnc(data):
+        # MCC
+        mcc = f"{data[0] & 0x0F}{(data[0] & 0xF0) >> 4}{data[1] & 0x0F}"
+
+        # Wireshark-like MNC interpretation (b3 low, b3 high, b2 high)
+        mnc_digit1 = data[2] & 0x0F
+        mnc_digit2 = (data[2] & 0xF0) >> 4
+        mnc_digit3 = (data[1] & 0xF0) >> 4
+
+        if mnc_digit3 == 0xF:
+            mnc = f"{mnc_digit1}{mnc_digit2}"
+        else:
+            mnc = f"{mnc_digit1}{mnc_digit2}{mnc_digit3}"
+
+        return mcc, mnc
+
+    data = bytes.fromhex(hex_string.replace(" ", ""))
+
+    if data[0] != 0x82:
+        raise ValueError("Unsupported Location Type")
+
+    # --- TAI part (bytes 1–5) ---
+    mcc_tai, mnc_tai = decode_mcc_mnc(data[1:4])
+    tac = int.from_bytes(data[4:6], byteorder='big')
+
+    # --- ECGI part (bytes 6–10) ---
+    mcc_ecgi, mnc_ecgi = decode_mcc_mnc(data[6:9])
+    eci = int.from_bytes(data[9:13], byteorder='big')  # 4 full bytes
+
+    return {
+        "TAI": {
+            "MCC": mcc_tai,
+            "MNC": mnc_tai,
+            "TAC": tac
+        },
+        "ECGI": {
+            "MCC": mcc_ecgi,
+            "MNC": mnc_ecgi,
+            "ECI": eci
+        }
+    }
+
+
+def build_user_location_info_hex(parsed):
+    def encode_mcc_mnc(mcc: str, mnc: str) -> bytes:
+        # MCC: always 3 digits
+        mcc_digit1 = int(mcc[0])
+        mcc_digit2 = int(mcc[1])
+        mcc_digit3 = int(mcc[2])
+
+        # MNC: pad to 3 digits if needed
+        mnc = mnc.zfill(3)
+        mnc_digit1 = int(mnc[0])  # b3 low nibble
+        mnc_digit2 = int(mnc[1])  # b3 high nibble
+        mnc_digit3 = int(mnc[2])  # b2 high nibble
+
+        byte1 = (mcc_digit2 << 4) | mcc_digit1
+        byte2 = (mnc_digit3 << 4) | mcc_digit3
+        byte3 = (mnc_digit2 << 4) | mnc_digit1
+
+        return bytes([byte1, byte2, byte3])
+
+    result = bytearray()
+    result.append(0x82)  # fixed type byte
+
+    # Encode TAI
+    tai = parsed["TAI"]
+    result += encode_mcc_mnc(tai["MCC"], tai["MNC"])
+    result += tai["TAC"].to_bytes(2, byteorder='big')
+
+    # Encode ECGI
+    ecgi = parsed["ECGI"]
+    result += encode_mcc_mnc(ecgi["MCC"], ecgi["MNC"])
+    result += ecgi["ECI"].to_bytes(4, byteorder='big')
+
+    return result.hex()
+
+# Given parsed values
+correct_values = {
+    'TAI': {'MCC': '310', 'MNC': '260', 'TAC': 30472},
+    'ECGI': {'MCC': '310', 'MNC': '260', 'ECI': 70065420}
+}
