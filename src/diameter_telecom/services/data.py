@@ -8,13 +8,15 @@ import logging
 logger = logging.getLogger(__name__)
 import time
 from ..apn import *
-from diameter.message.commands import CreditControlRequest
+from ..carrier import Carrier
+from dataclasses import dataclass
 
+@dataclass
 class DataService:
-    def __init__(self, pcef: PCEF, ocs: OCS = None, diameter_config: dict = None):
-        self.pcef: PCEF = pcef
-        self.ocs: OCS = ocs
-        self.diameter_config: dict = diameter_config
+    pcef: PCEF
+    ocs: OCS = None
+    diameter_config: dict = None
+    carrier: Carrier = None
 
     @property
     def gx_app(self):
