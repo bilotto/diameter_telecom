@@ -85,3 +85,10 @@ class DiameterSession:
         elif self.start_time:
             return int(time.time() - float(self.start_time))
         return None
+
+    def dump_messages(self, output_file: str):
+        """Dump all messages in the session to a file."""
+        with open(output_file, 'w') as f:
+            for message in self.messages:
+                f.write(message.dump() + '\n')
+        logger.info(f"Messages dumped to {output_file}")
