@@ -92,3 +92,10 @@ class DiameterSession:
             for message in self.messages:
                 f.write(message.dump() + '\n')
         logger.info(f"Messages dumped to {output_file}")
+
+    def dump_hex_strings(self, output_file: str):
+        """Dump all messages in the session as hex strings to a file."""
+        with open(output_file, 'w') as f:
+            for message in self.messages:
+                f.write(message.hex_string + '\n')
+        logger.info(f"Hex strings dumped to {output_file}")
