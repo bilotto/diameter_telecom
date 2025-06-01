@@ -12,6 +12,7 @@ class DiameterSession:
     session_id: str
     active: bool = field(default=False)
     error: bool = field(default=False)
+    ended: bool = field(default=False)
     messages: List[DiameterMessage] = field(default_factory=list)
     start_time: Optional[str] = field(default=None)
     end_time: Optional[str] = field(default=None)

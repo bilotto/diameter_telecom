@@ -271,7 +271,9 @@ def check_rat_type(diameter_message: DiameterMessage) -> Optional[int]:
         pass
 
 
-def parse_user_location_info_fixed(hex_string):
+def parse_user_location_info_fixed(hex_string: str):
+    if isinstance(hex_string, bytes):
+        hex_string = hex_string.hex()
     # Wireshark interprets the MNC using BCD digits in this order:
     #   - Digit 1: Byte 3 low nibble
     #   - Digit 2: Byte 3 high nibble
@@ -354,8 +356,3 @@ def build_user_location_info_hex(parsed):
 
     return result.hex()
 
-# Given parsed values
-correct_values = {
-    'TAI': {'MCC': '310', 'MNC': '260', 'TAC': 30472},
-    'ECGI': {'MCC': '310', 'MNC': '260', 'ECI': 70065420}
-}
