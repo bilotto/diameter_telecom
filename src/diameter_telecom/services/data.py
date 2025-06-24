@@ -10,6 +10,7 @@ import time
 from ..apn import *
 from ..carrier import Carrier
 from dataclasses import dataclass
+from ..csv_file import CsvFile, write_to_csv
 
 @dataclass
 class DataService:
@@ -17,6 +18,7 @@ class DataService:
     ocs: OCS = None
     diameter_config: dict = None
     carrier: Carrier = None
+    csv_file: CsvFile = None
 
     @property
     def gx_app(self):
@@ -48,7 +50,11 @@ class DataService:
                 gx_session.add_message(request)
                 self.gx_app.add_session(gx_session)
             logger.debug(f"Sending Gx request: {request}")
+            if self.csv_file:
+                write_to_csv(self.csv_file, request)
             answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
+            if self.csv_file:
+                write_to_csv(self.csv_file, answer)
         else:
             raise ValueError(f"Invalid app_id: {request.app_id}")
         logger.debug(f"Got answer: {answer}")
