@@ -26,11 +26,21 @@ class DataService:
     def sy_app(self):
         if self.ocs:
             return self.ocs.sy_app
+        
+    def set_host_and_realm(self, diameter_message: DiameterMessage):
+        if diameter_message.app_id == APP_3GPP_GX:
+            diameter_message.message.origin_host = self.pcef.origin_host.encode()
+            diameter_message.message.origin_realm = (self.diameter_config[APP_3GPP_GX].get('origin_realm') or self.pcef.realm_name).encode()
+            diameter_message.message.destination_realm = (self.diameter_config[APP_3GPP_GX].get('destination_realm') or self.pcef.realm_name).encode()
+            if diameter_message.message.destination_host:
+                diameter_message.message.destination_host = (self.diameter_config[APP_3GPP_GX].get('destination_host') or self.pcef.realm_name).encode()
+        return diameter_message
     
     def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
         request.timestamp = time.time()
         session_id = request.session_id
         answer = None
+        request = self.set_host_and_realm(request)
         if request.app_id == APP_3GPP_GX:
             gx_session = self.gx_app.get_session_by_id(session_id)
             if not gx_session:
