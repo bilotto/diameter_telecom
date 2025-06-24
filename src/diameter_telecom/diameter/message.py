@@ -73,7 +73,7 @@ class DiameterMessage:
         Returns:
             The requested attribute value or None if not found
         """
-        if name in self._attributes:
+        if name in self._attributes and self._attributes[name] is not None:
             return self._attributes[name]
         elif hasattr(self.message, name):
             return getattr(self.message, name)
