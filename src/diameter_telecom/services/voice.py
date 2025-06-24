@@ -6,11 +6,16 @@ from ..diameter.session import GxSession, RxSession
 import logging
 logger = logging.getLogger(__name__)
 import time
+from ..carrier import Carrier
+
 
 class VoiceService:
-    def __init__(self, pcef: PCEF, af: AF):
+    def __init__(self, pcef: PCEF, af: AF, diameter_config: dict = None):
         self.pcef: PCEF = pcef
         self.af: AF = af
+        self.diameter_config = diameter_config
+        self.carrier: Carrier = None
+        logger.debug(f"VoiceService initialized with PCEF: {pcef}, AF: {af}, Diameter Config: {diameter_config}")
 
     @property
     def gx_app(self):
@@ -19,11 +24,27 @@ class VoiceService:
     @property
     def rx_app(self):
         return self.af.rx_app
+    
+    def set_host_and_realm(self, diameter_message: DiameterMessage):
+        if diameter_message.app_id == APP_3GPP_GX:
+            diameter_message.message.origin_host = self.pcef.origin_host.encode()
+            diameter_message.message.origin_realm = (self.diameter_config[APP_3GPP_GX].get('origin_realm') or self.pcef.realm_name).encode()
+            diameter_message.message.destination_realm = (self.diameter_config[APP_3GPP_GX].get('destination_realm') or self.pcef.realm_name).encode()
+            # diameter_message.message.destination_host = (self.diameter_config[APP_3GPP_GX].get('destination_host') or self.pcef.realm_name).encode()
+        elif diameter_message.app_id == APP_3GPP_RX:
+            diameter_message.message.origin_host = self.af.origin_host.encode()
+            diameter_message.message.origin_realm = (self.diameter_config[APP_3GPP_RX].get('origin_realm') or self.af.realm_name).encode()
+            diameter_message.message.destination_realm = (self.diameter_config[APP_3GPP_RX].get('destination_realm') or self.af.realm_name).encode()
+            # diameter_message.message.destination_host = (self.diameter_config[APP_3GPP_RX].get('destination_host') or self.pcef.realm_name).encode()
+        return diameter_message
+
 
     def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
+        logger.debug(f"Sending request: {request}")
         request.timestamp = time.time()
         session_id = request.session_id
         answer = None
+        request = self.set_host_and_realm(request)
         if request.app_id == APP_3GPP_GX:
             gx_session = self.gx_app.get_session_by_id(session_id)
             if not gx_session:
@@ -46,6 +67,7 @@ class VoiceService:
                     rx_session.add_message(request)
                     self.rx_app.add_session(rx_session)
             #
+            
             answer: DiameterMessage = self.rx_app.send_request_custom(request, timeout)
         else:
             raise ValueError(f"Invalid app_id: {request.app_id}")
@@ -57,12 +79,17 @@ class VoiceService:
             self.gx_app.node.start()
         if not self.rx_app.node._started:
             self.rx_app.node.start()
-        self.gx_app.wait_for_ready()
-        self.rx_app.wait_for_ready()
+        # self.gx_app.wait_for_ready()
+        # self.rx_app.wait_for_ready()
 
     def stop(self):
         if self.gx_app.node._started:
             self.gx_app.node.stop()
         if self.rx_app.node._started:
             self.rx_app.node.stop()
+
+
+    def wait_for_ready(self):
+        self.gx_app.wait_for_ready()
+        self.rx_app.wait_for_ready()
 

@@ -58,7 +58,7 @@ class OCS():
         if realm_name not in self.sy_realms:
             self.add_realm(APP_3GPP_SY, realm_name)
 
-    def setup_app(self, app_id: int, max_threads: int = 1, request_handler: Callable = handle_request_sy):
+    def setup_app(self, app_id: int, max_threads: int = 1, request_handler: Callable = None):
         if app_id == APP_3GPP_SY:
             self.sy_app = SyApplication(max_threads=max_threads, request_handler=request_handler)
             self.node.add_application(self.sy_app, self.sy_peers, self.sy_realms)

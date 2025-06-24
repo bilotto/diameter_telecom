@@ -45,7 +45,7 @@ class RxApplication(CustomSimpleThreadingApplication):
                 self.add_subscriber(rx_session.subscriber)
         else:
             rx_session.add_message(request)
-        answer = super().send_request_custom(request)
+        answer = super().send_request_custom(request, timeout)
         rx_session.add_message(answer)
         if not rx_session.active:
             self.remove_session(session_id)
@@ -61,6 +61,7 @@ class RxApplication(CustomSimpleThreadingApplication):
             # str_message = create_str_message(session_id)
             session_termination_request = SessionTerminationRequest()
             session_termination_request.header.is_proxyable = True
+            session_termination_request.header.application_id = APP_3GPP_RX
             session_termination_request.session_id = session_id
             session_termination_request.origin_host = last_message.origin_host
             session_termination_request.origin_realm = last_message.origin_realm

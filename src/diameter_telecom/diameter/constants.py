@@ -65,3 +65,4 @@ DPR = "DPR"  # Disconnect Peer Request
 DPA = "DPA"  # Disconnect Peer Answer
 
 
+create_session_messages = [CCR_I, AAR, SLR]

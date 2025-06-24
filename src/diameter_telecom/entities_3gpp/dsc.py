@@ -167,6 +167,11 @@ class DSC():
             self.node.stop()
 
     def wait_for_ready(self):
-        for app in self.node.applications:
-            app.wait_for_ready()
-
+        import time
+        for peer in self.node.peers.values():
+            if peer.connection:
+                if not peer.connection.state in PEER_READY_STATES:
+                    logger.info(f"Peer {peer.node_name} is in state {peer.connection.state}")
+                    time.sleep(0.5)
+                else:
+                    logger.info(f"Peer {peer.node_name} is in state {peer.connection.state}")

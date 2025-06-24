@@ -243,6 +243,11 @@ class DiameterMessage:
     
     def __hash__(self):
         return hash((self.hop_by_hop_id, self.end_to_end_id, self.is_request))
+    
+    def set_message_attribute(self, name, value):
+        if not hasattr(self.message, name):
+            raise ValueError(f"Attribute {name} not found in message")
+        setattr(self.message, name, value)
 
 
 def name_diameter_message(diameter_message: DiameterMessage) -> str | None:

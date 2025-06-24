@@ -24,7 +24,8 @@ class DataService:
 
     @property
     def sy_app(self):
-        return self.ocs.sy_app
+        if self.ocs:
+            return self.ocs.sy_app
     
     def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
         request.timestamp = time.time()
@@ -42,3 +43,24 @@ class DataService:
             raise ValueError(f"Invalid app_id: {request.app_id}")
         logger.debug(f"Got answer: {answer}")
         return answer
+    
+    def start(self):
+        if not self.gx_app.node._started:
+            self.gx_app.node.start()
+        if self.sy_app:
+            if not self.sy_app.node._started:
+                self.sy_app.node.start()
+
+    def stop(self):
+        if self.gx_app.node._started:
+            self.gx_app.node.stop()
+        if self.sy_app:
+            if self.sy_app.node._started:
+                self.sy_app.node.stop()
+
+
+    def wait_for_ready(self):
+        self.gx_app.wait_for_ready()
+        if self.sy_app:
+            self.sy_app.wait_for_ready()
+
