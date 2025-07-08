@@ -1,6 +1,6 @@
 # from .ip_queue import APN
 from ..diameter.message import DiameterMessage
-from ..diameter.app import GxApplication, RxApplication
+from ..entities_3gpp import PCEF, AF
 from ..diameter.constants import APP_3GPP_GX, APP_3GPP_RX
 from ..diameter.session import GxSession, RxSession
 import logging
@@ -8,9 +8,17 @@ logger = logging.getLogger(__name__)
 import time
 
 class VoiceService:
-    def __init__(self, gx_app: GxApplication, rx_app: RxApplication):
-        self.gx_app: GxApplication = gx_app
-        self.rx_app: RxApplication = rx_app
+    def __init__(self, pcef: PCEF, af: AF):
+        self.pcef: PCEF = pcef
+        self.af: AF = af
+
+    @property
+    def gx_app(self):
+        return self.pcef.gx_app
+
+    @property
+    def rx_app(self):
+        return self.af.rx_app
 
     def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
         request.timestamp = time.time()
@@ -26,22 +34,18 @@ class VoiceService:
             answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
         elif request.app_id == APP_3GPP_RX:
             rx_session = self.rx_app.get_session_by_id(session_id)
+            #
             if not rx_session:
                 logger.debug(f"No rx_session found for session_id: {session_id}. Will create a new one")
                 gx_session = None
                 if request.message.framed_ip_address:
-                    logger.debug(f"Request has framed_ip_address: {request.message.framed_ip_address}. Will try to find gx_session by framed_ip_address")
                     gx_session = self.gx_app.get_session_by_framed_ip_address(request.message.framed_ip_address)
                     if gx_session:
                         logger.debug(f"Found gx_session that rx_session is bind to: {gx_session}")
                         rx_session = RxSession(session_id, gx_session_id=gx_session.session_id, subscriber=gx_session.subscriber)
-                    else:
-                        logger.debug(f"No gx_session found for framed_ip_address: {request.message.framed_ip_address}. Will create a new rx_session")
-                        rx_session = RxSession(session_id)
                     rx_session.add_message(request)
                     self.rx_app.add_session(rx_session)
-            logger.info(f"Found rx_session: {rx_session}")
-            logger.debug(f"Sending Rx request: {request}")
+            #
             answer: DiameterMessage = self.rx_app.send_request_custom(request, timeout)
         else:
             raise ValueError(f"Invalid app_id: {request.app_id}")

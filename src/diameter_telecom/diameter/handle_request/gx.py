@@ -6,6 +6,8 @@ from ..message import DiameterMessage
 from ..session import GxSession
 from .. import Subscriber
 from ..parse_avp import *
+import logging
+logger = logging.getLogger(__name__)
 
 def handle_request_gx(app: GxApplication, message: Message):
     answer = None
