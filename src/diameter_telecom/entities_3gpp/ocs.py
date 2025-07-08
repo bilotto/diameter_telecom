@@ -1,4 +1,4 @@
-from ..diameter.handle_request import handle_request_sy
+from ..diameter.handle_request import handle_request
 from typing import List, Dict, Callable, Optional
 from ..diameter.helpers import Node, Peer, create_node
 from diameter_telecom.diameter.app import SyApplication
@@ -19,8 +19,6 @@ class OCS():
                  ip_addresses: List[str],
                  tcp_port: int = None, sctp_port: int = None,
                  vendor_ids: List[int] = None,
-                #  max_threads: int = 10,
-                #  request_handler_sy: Callable = handle_request_sy,
                  ):
         self.origin_host = origin_host
         self.realm_name = realm_name
@@ -29,7 +27,6 @@ class OCS():
         self.sctp_port = sctp_port
         self.vendor_ids = vendor_ids
         self.node: Node = create_node(origin_host, realm_name, ip_addresses, tcp_port, sctp_port, vendor_ids)
-        # self.sy_app: SyApplication = SyApplication(max_threads=max_threads, request_handler=request_handler_sy)
         self.all_peers: Dict[str, List[Peer]] = {}
         self.all_realms: Dict[str, List[str]] = {}
         self._setup_app_ran = False

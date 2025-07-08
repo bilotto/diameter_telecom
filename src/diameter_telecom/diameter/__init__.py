@@ -31,3 +31,5 @@ from .session import GxSession, RxSession, SySession
 from .message import DiameterMessage
 
 from .constants import *
+
+from .handle_request import handle_request

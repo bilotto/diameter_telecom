@@ -5,10 +5,10 @@ from .constants import *
 from . import Subscriber
 import datetime
 import logging
-
 logger = logging.getLogger(__name__)
 
 class DiameterMessage:
+    message: CreditControlRequest | ReAuthRequest | AbortSessionRequest | SpendingLimitRequest | SpendingStatusNotificationRequest | SessionTerminationRequest | AaRequest | CreditControlAnswer | ReAuthAnswer | AbortSessionAnswer | SpendingLimitAnswer | SpendingStatusNotificationAnswer | SessionTerminationAnswer | AaAnswer | DisconnectPeerRequest | DisconnectPeerAnswer
     def __init__(self, obj):
         if isinstance(obj, Message):
             self.message = obj

@@ -1,6 +1,6 @@
 from typing import List, Dict, Callable, Optional
 from ..diameter.helpers import Node, Peer, create_node
-from ..diameter.handle_request import handle_request_gx
+from ..diameter.handle_request import handle_request
 from ..diameter.constants import *
 from diameter_telecom.diameter.app import GxApplication
 import logging
@@ -60,13 +60,13 @@ class PCEF():
         if realm_name not in self.gx_realms:
             self.add_realm(APP_3GPP_GX, realm_name)
 
-    def setup_app(self, app_id: int, max_threads: int = 1, request_handler: Callable = handle_request_gx):
+    def setup_app(self, app_id: int, max_threads: int = 1, request_handler: Callable = handle_request):
         if app_id == APP_3GPP_GX:
             self.gx_app = GxApplication(max_threads=max_threads, request_handler=request_handler)
             self.node.add_application(self.gx_app, self.gx_peers, self.gx_realms)
         self._setup_app_ran = True
 
-    def setup_gx_app(self, max_threads: int = 1, request_handler: Callable = handle_request_gx):
+    def setup_gx_app(self, max_threads: int = 1, request_handler: Callable = handle_request):
         self.setup_app(APP_3GPP_GX, max_threads, request_handler)
 
     def start(self):
