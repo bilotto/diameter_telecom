@@ -1,5 +1,6 @@
 from ._diameter_session import *
 from ..parse_avp import *
+from typing import *
 
 @dataclass
 class GxSession(DiameterSession):
@@ -7,6 +8,9 @@ class GxSession(DiameterSession):
     framed_ipv6_prefix: Optional[str] = field(default=None)
     called_station_id: Optional[str] = field(default=None)
     sgsn_mcc_mnc: Optional[str] = field(default=None)
+    granted_service_unit: Optional[Dict] = field(default_factory=dict)
+    event_trigger: Optional[List[int]] = field(default_factory=list)
+    cc_request_number: Optional[int] = field(default=None)
 
     @property
     def apn(self):
@@ -47,6 +51,17 @@ class GxSession(DiameterSession):
                     self.active = False
                     self.ended = True
                     self.end_time = diameter_message.timestamp
+            if hasattr(diameter_message.message, 'usage_monitoring_information') and diameter_message.message.usage_monitoring_information:
+                umi_gsu_usu = parse_usage_monitoring_information(diameter_message.message.usage_monitoring_information)
+                self.granted_service_unit = umi_gsu_usu.get('granted_service_unit')
+            if hasattr(diameter_message.message, 'event_trigger') and diameter_message.message.event_trigger:
+                for et in diameter_message.message.event_trigger:
+                    if et not in self.event_trigger:
+                        self.event_trigger.append(et)
         #
+        if hasattr(diameter_message.message, 'cc_request_number') and diameter_message.message.cc_request_number is not None:
+            self.cc_request_number = diameter_message.message.cc_request_number
+        if hasattr(diameter_message.message, 'sgsn_mcc_mnc') and diameter_message.message.sgsn_mcc_mnc:
+            self.sgsn_mcc_mnc = diameter_message.message.sgsn_mcc_mnc
         if not diameter_message.subscriber and self.subscriber:
             diameter_message.subscriber = self.subscriber

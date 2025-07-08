@@ -64,7 +64,7 @@ class OCS():
             self.node.add_application(self.sy_app, self.sy_peers, self.sy_realms)
         self._setup_app_ran = True
 
-    def setup_sy_app(self, max_threads: int = 1, request_handler: Callable = handle_request_sy):
+    def setup_sy_app(self, max_threads: int = 1, request_handler: Callable = None):
         self.setup_app(APP_3GPP_SY, max_threads, request_handler)
 
     def start(self):

@@ -10,7 +10,7 @@ The module is designed to work with the base diameter library's message structur
 and provides telecom-specific parsing functionality.
 """
 
-from typing import List, Tuple, Optional, Set
+from typing import List, Tuple, Optional, Set, Dict
 from diameter.message.constants import *
 from diameter.message.avp.grouped import SubscriptionId
 from .message import DiameterMessage
@@ -356,3 +356,47 @@ def build_user_location_info_hex(parsed):
 
     return result.hex()
 
+from diameter.message.avp.grouped import UsageMonitoringInformation
+def parse_usage_monitoring_information(umi_list: List[UsageMonitoringInformation]) -> Dict[str, Dict[str, int]]:
+    umi_gsu_usu: Dict[str, Dict[str, int]] = {}
+    gsu: Dict[str, int] = {}
+    usu: Dict[str, int] = {}
+    for umi in umi_list:
+        if umi.granted_service_unit and umi.granted_service_unit.cc_total_octets:
+            if umi.granted_service_unit.cc_total_octets > 0:
+                monitoring_key = umi.monitoring_key
+                if isinstance(monitoring_key, bytes):
+                    monitoring_key = monitoring_key.decode('utf-8')
+                gsu[monitoring_key] = umi.granted_service_unit.cc_total_octets
+            else:
+                gsu[monitoring_key] = 0
+        if umi.used_service_unit and umi.used_service_unit.cc_total_octets:
+            if umi.used_service_unit.cc_total_octets > 0:
+                monitoring_key = umi.monitoring_key
+                if isinstance(monitoring_key, bytes):
+                    monitoring_key = monitoring_key.decode('utf-8')
+                usu[monitoring_key] = umi.used_service_unit.cc_total_octets
+            else:
+                usu[monitoring_key] = 0
+    if gsu:
+        umi_gsu_usu['granted_service_unit'] = gsu
+    if usu:
+        umi_gsu_usu['used_service_unit'] = usu
+    return umi_gsu_usu
+    
+
+
+
+__all__ = [
+    'parse_subscription_id',
+    'bytes_to_ip',
+    'decode_framed_ipv6',
+    'check_charging_rule_remove',
+    'check_charging_rule_install',
+    'check_qos',
+    'check_event_trigger',
+    'check_rat_type',
+    'parse_user_location_info_fixed',
+    'build_user_location_info_hex',
+    'parse_usage_monitoring_information'
+] 

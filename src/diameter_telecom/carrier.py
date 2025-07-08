@@ -72,7 +72,7 @@ class Carrier:
         self.add_apn(apn)
         return apn
 
-    def create_subscriber(self, msisdn: str, imsi: str) -> Subscriber:
+    def create_subscriber(self, msisdn: str, imsi: str = None) -> Subscriber:
         subscriber = Subscriber(msisdn=msisdn, imsi=imsi)
         self.add_subscriber(subscriber)
         return subscriber

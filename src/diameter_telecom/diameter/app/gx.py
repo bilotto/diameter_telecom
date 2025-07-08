@@ -1,4 +1,5 @@
 from .custom_simple_threading_application import CustomSimpleThreadingApplication
+from .. import Subscriber
 from ..session import GxSession
 from diameter.message.constants import APP_3GPP_GX
 from ..message import DiameterMessage
@@ -14,6 +15,7 @@ class GxApplication(CustomSimpleThreadingApplication):
         self.sessions: Dict[str, GxSession] = {}
         self.sessions_id_by_framed_ip_address: Dict[str, str] = {}
         self.sessions_id_by_framed_ipv6_prefix: Dict[str, str] = {}
+        self.sessions_id_by_msisdn: Dict[str, str] = {}
 
     def get_session_by_id(self, session_id: str) -> GxSession:
         return self.sessions.get(session_id)
@@ -28,12 +30,19 @@ class GxApplication(CustomSimpleThreadingApplication):
             return self.sessions[self.sessions_id_by_framed_ipv6_prefix[framed_ipv6_prefix]]
         return None
     
+    def get_session_by_subscriber(self, subscriber: Subscriber) -> GxSession:
+        if subscriber.msisdn and self.sessions_id_by_msisdn.get(subscriber.msisdn):
+            return self.sessions[self.sessions_id_by_msisdn[subscriber.msisdn]]
+        return None
+    
     def add_session(self, session: GxSession):
         self.sessions[session.session_id] = session
         if session.framed_ip_address:
             self.sessions_id_by_framed_ip_address[session.framed_ip_address] = session.session_id
         if session.framed_ipv6_prefix:
             self.sessions_id_by_framed_ipv6_prefix[session.framed_ipv6_prefix] = session.session_id
+        if session.subscriber and session.subscriber.msisdn:
+            self.sessions_id_by_msisdn[session.subscriber.msisdn] = session.session_id
 
     def remove_session(self, session_id: str):
         session = self.sessions.pop(session_id)
@@ -41,6 +50,9 @@ class GxApplication(CustomSimpleThreadingApplication):
             self.sessions_id_by_framed_ip_address.pop(session.framed_ip_address)
         if session.framed_ipv6_prefix:
             self.sessions_id_by_framed_ipv6_prefix.pop(session.framed_ipv6_prefix)
+        if session.subscriber and session.subscriber.msisdn:
+            self.sessions_id_by_msisdn.pop(session.subscriber.msisdn, None)
+
             
     def send_request_custom(self, request: DiameterMessage, timeout=5):
         if not isinstance(request, DiameterMessage):

@@ -28,7 +28,7 @@ class Subscriber:
                              identifier for the subscriber's mobile device.
     """
     msisdn: str
-    imsi: str
+    imsi: str = None
     sip_uri: str = None
     nai: str = None
     private_id: str = None
@@ -58,10 +58,11 @@ class Subscriber:
             subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_E164,
             subscription_id_data=self.msisdn
         ))
-        subscription_id.append(SubscriptionId(
-            subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_IMSI,
-            subscription_id_data=self.imsi
-        ))
+        if self.imsi:
+            subscription_id.append(SubscriptionId(
+                subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_IMSI,
+                subscription_id_data=self.imsi
+            ))
         if self.sip_uri:
             subscription_id.append(SubscriptionId(
                 subscription_id_type=E_SUBSCRIPTION_ID_TYPE_END_USER_SIP_URI,

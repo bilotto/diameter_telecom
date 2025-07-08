@@ -30,9 +30,11 @@ class CustomSimpleThreadingApplication(SimpleThreadingApplication):
 
     def send_request_custom(self, diameter_message: DiameterMessage, timeout=10):
         diameter_message.timestamp = time.time()
+        logger.info(f"\n{diameter_message.dump()}")
         answer = self.send_request(diameter_message.message, timeout=timeout)
         diameter_message_answer = DiameterMessage(answer)
         diameter_message_answer.timestamp = time.time()
         if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-            logger.error(f"Answer with error: \n {diameter_message_answer.dump()}")
+            logger.error(f"Answer with error: \n {diameter_message_answer}")
+        logger.info(f"\n{diameter_message_answer.dump()}")
         return diameter_message_answer
