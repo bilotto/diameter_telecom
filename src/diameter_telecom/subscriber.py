@@ -46,7 +46,11 @@ class Subscriber:
             if val is not None:
                 setattr(self, attr, str(val))
 
+    @property
     def subscription_id(self) -> List[SubscriptionId]:
+        return self.get_subscription_id()
+
+    def get_subscription_id(self) -> List[SubscriptionId]:
         """
         Create a SubscriptionId AVP for the subscriber.
         
@@ -79,3 +83,4 @@ class Subscriber:
                 subscription_id_data=self.private_id
             ))
         return subscription_id
+

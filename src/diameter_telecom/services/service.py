@@ -73,6 +73,9 @@ class Service:
         if self.sy_app:
             if not self.sy_app.node._started:
                 self.sy_app.node.start()
+        if self.rx_app:
+            if not self.rx_app.node._started:
+                self.rx_app.node.start()
 
     def stop(self):
         if self.gx_app.node._started:
@@ -80,10 +83,14 @@ class Service:
         if self.sy_app:
             if self.sy_app.node._started:
                 self.sy_app.node.stop()
+        if self.rx_app:
+            if self.rx_app.node._started:
+                self.rx_app.node.stop()
 
 
     def wait_for_ready(self):
         self.gx_app.wait_for_ready()
         if self.sy_app:
             self.sy_app.wait_for_ready()
-
+        if self.rx_app:
+            self.rx_app.wait_for_ready()

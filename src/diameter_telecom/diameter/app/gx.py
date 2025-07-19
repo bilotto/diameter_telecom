@@ -30,9 +30,9 @@ class GxApplication(CustomSimpleThreadingApplication):
             return self.sessions[self.sessions_id_by_framed_ipv6_prefix[framed_ipv6_prefix]]
         return None
     
-    def get_session_by_subscriber(self, subscriber: Subscriber) -> GxSession:
-        if subscriber.msisdn and self.sessions_id_by_msisdn.get(subscriber.msisdn):
-            return self.sessions[self.sessions_id_by_msisdn[subscriber.msisdn]]
+    def get_session_by_msisdn(self, msisdn: str) -> GxSession:
+        if msisdn and self.sessions_id_by_msisdn.get(msisdn):
+            return self.sessions[self.sessions_id_by_msisdn[msisdn]]
         return None
     
     def add_session(self, session: GxSession):

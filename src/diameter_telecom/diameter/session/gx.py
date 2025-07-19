@@ -41,19 +41,22 @@ class GxSession(DiameterSession):
                         msisdn, imsi, sip_uri, nai, private = parse_subscription_id(diameter_message.message.subscription_id)
                         self.subscriber = Subscriber(msisdn=msisdn, imsi=imsi)
         else:
-            if diameter_message.result_code and diameter_message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+            if diameter_message.message.result_code and diameter_message.message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
                 self.error = True
             if diameter_message.name == CCA_I:
-                if diameter_message.timestamp and diameter_message.result_code == E_RESULT_CODE_DIAMETER_SUCCESS:
+                if diameter_message.timestamp and diameter_message.message.result_code == E_RESULT_CODE_DIAMETER_SUCCESS:
                     self.active = True
             elif diameter_message.name == CCA_T:
                 if diameter_message.timestamp:
                     self.active = False
                     self.ended = True
                     self.end_time = diameter_message.timestamp
-            if hasattr(diameter_message.message, 'usage_monitoring_information') and diameter_message.message.usage_monitoring_information:
-                umi_gsu_usu = parse_usage_monitoring_information(diameter_message.message.usage_monitoring_information)
-                self.granted_service_unit = umi_gsu_usu.get('granted_service_unit')
+            if hasattr(diameter_message.message, 'usage_monitoring_information'):
+                if not diameter_message.message.usage_monitoring_information:
+                    self.granted_service_unit = None
+                else:
+                    umi_gsu_usu = parse_usage_monitoring_information(diameter_message.message.usage_monitoring_information)
+                    self.granted_service_unit = umi_gsu_usu.get('granted_service_unit')
             if hasattr(diameter_message.message, 'event_trigger') and diameter_message.message.event_trigger:
                 for et in diameter_message.message.event_trigger:
                     if et not in self.event_trigger:
