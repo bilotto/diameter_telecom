@@ -1,6 +1,6 @@
 from . import Subscriber
 from .session import GxSession, RxSession, SySession, DiameterSession
-from typing import Dict
+from typing import List, Dict
 from dataclasses import dataclass, field
 import threading
 from .constants import *
@@ -21,6 +21,7 @@ class Subscribers:
 class SessionManager:
     sessions: Dict[int, Dict[str, DiameterSession]] = field(default_factory=dict)
     subscribers: Subscribers = field(default_factory=Subscribers)
+    messages: List[DiameterMessage] = field(default_factory=list)
 
     def __post_init__(self):
         # Ensure the main session dicts for each app_id are present
@@ -31,16 +32,9 @@ class SessionManager:
     def stage_create_session(self, dm: DiameterMessage):
         app_id = dm.app_id
         session_id = dm.session_id
-        # Ensure the app_id dict exists
-        if app_id not in self.sessions:
-            if app_id == APP_3GPP_GX:
-                self.sessions[APP_3GPP_GX] = dict()
-            elif app_id == APP_3GPP_RX:
-                self.sessions[APP_3GPP_RX] = dict()
-            elif app_id == APP_3GPP_SY:
-                self.sessions[APP_3GPP_SY] = dict()
-            else:
-                self.sessions[app_id] = dict()
+        if dm.name not in [CCR_I, AAR, SLR]:
+            self.messages.append(dm)
+            return
         if app_id == APP_3GPP_GX:
             self.sessions[APP_3GPP_GX][session_id] = GxSession(session_id=session_id)
         elif app_id == APP_3GPP_RX:
@@ -59,18 +53,16 @@ class SessionManager:
             self.subscribers.add_subscriber(subscriber)
 
     def stage_parse_request(self, dm: DiameterMessage):
-            self.stage_identify_subscriber(dm)
             self.stage_create_session(dm)
+            self.stage_identify_subscriber(dm)
 
     def stage_parse_response(self, dm: DiameterMessage):
         app_id = dm.app_id
         session_id = dm.session_id
-        if app_id in self.sessions and session_id in self.sessions[app_id]:
+        session = self.sessions[app_id].get(session_id)
+        if session:
             self.sessions[app_id][session_id].add_message(dm)
-            return self.sessions[app_id][session_id]
-        else:
-            # Optionally, handle the case where the session does not exist
-            return None
+            return 
 
     def process_diameter_message(self, dm: DiameterMessage):
         if dm.is_request:
