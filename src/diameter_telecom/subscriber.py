@@ -46,6 +46,17 @@ class Subscriber:
             if val is not None:
                 setattr(self, attr, str(val))
 
+    def __repr__(self) -> str:
+        fields = []
+        for attr in ['msisdn', 'imsi', 'sip_uri', 'nai', 'private_id', 'imei', 'apn']:
+            val = getattr(self, attr)
+            if val is not None:
+                if attr == 'apn':
+                    fields.append(f"{attr}={val!r}")
+                else:
+                    fields.append(f"{attr}='{val}'")
+        return f"Subscriber({', '.join(fields)})"
+
     @property
     def subscription_id(self) -> List[SubscriptionId]:
         return self.get_subscription_id()

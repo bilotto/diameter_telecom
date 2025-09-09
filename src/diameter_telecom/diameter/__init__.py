@@ -33,3 +33,5 @@ from .message import DiameterMessage
 from .constants import *
 
 from .handle_request import handle_request
+
+from .session_manager import SessionManager

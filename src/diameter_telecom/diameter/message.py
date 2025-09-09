@@ -82,7 +82,10 @@ class DiameterMessage:
         return dump(self.message)
     
     def __repr__(self):
-        return f"{self.time},{self.name}"
+        if self.subscriber:
+            return f"{self.time},{self.name},{self.subscriber}"
+        else:
+            return f"{self.time},{self.name}"
     
     def __eq__(self, other):
         return self.hop_by_hop_id == other.hop_by_hop_id and self.end_to_end_id == other.end_to_end_id and self.is_request == other.is_request
