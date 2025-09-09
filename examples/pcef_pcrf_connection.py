@@ -43,7 +43,7 @@ diameter_message = DiameterMessage(ccr)
 
 subscriber = Subscriber(msisdn="123456789", imsi="123456789012345")
 
-diameter_message.message.subscription_id = subscriber.subscription_id()
+diameter_message.message.subscription_id = subscriber.subscription_id
 
 request, answer = pcef_service.send_request(diameter_message)
 
