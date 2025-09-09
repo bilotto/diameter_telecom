@@ -29,11 +29,13 @@ class SessionManager:
         self.sessions.setdefault(APP_3GPP_RX, dict())
         self.sessions.setdefault(APP_3GPP_SY, dict())
 
+    def get_messages(self):
+        return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
+
     def stage_create_session(self, dm: DiameterMessage):
         app_id = dm.app_id
         session_id = dm.session_id
         if dm.name not in [CCR_I, AAR, SLR]:
-            self.messages.append(dm)
             return
         if app_id == APP_3GPP_GX:
             self.sessions[APP_3GPP_GX][session_id] = GxSession(session_id=session_id)
@@ -60,12 +62,14 @@ class SessionManager:
         app_id = dm.app_id
         session_id = dm.session_id
         session = self.sessions[app_id].get(session_id)
-        if session:
-            self.sessions[app_id][session_id].add_message(dm)
-            return 
+        if not session:
+            return
+        session.add_message(dm)
 
     def process_diameter_message(self, dm: DiameterMessage):
+        self.messages.append(dm)
         if dm.is_request:
             self.stage_parse_request(dm)
         else:
             self.stage_parse_response(dm)
+  
