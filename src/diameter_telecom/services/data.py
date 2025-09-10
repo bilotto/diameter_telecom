@@ -32,17 +32,17 @@ class DataService(Service):
         answer = None
         request = self.set_host_and_realm(request)
         if request.app_id == APP_3GPP_GX:
-            gx_session = self.gx_app.get_session_by_id(session_id)
-            if not gx_session:
-                gx_session = GxSession(session_id)
-                gx_session.add_message(request)
-                self.gx_app.add_session(gx_session)
-            logger.debug(f"Sending Gx request: {request}")
-            if self.csv_file:
-                write_to_csv(self.csv_file, request)
+            # gx_session = self.gx_app.get_session_by_id(session_id)
+            # if not gx_session:
+            #     gx_session = GxSession(session_id)
+            #     gx_session.add_message(request)
+            #     self.gx_app.add_session(gx_session)
+            # logger.debug(f"Sending Gx request: {request}")
+            # if self.csv_file:
+            #     write_to_csv(self.csv_file, request)
             answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
-            if self.csv_file:
-                write_to_csv(self.csv_file, answer)
+            # if self.csv_file:
+            #     write_to_csv(self.csv_file, answer)
         else:
             raise ValueError(f"Invalid app_id: {request.app_id}")
         logger.debug(f"Got answer: {answer}")

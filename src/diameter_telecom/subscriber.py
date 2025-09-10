@@ -95,3 +95,23 @@ class Subscriber:
             ))
         return subscription_id
 
+
+from dataclasses import dataclass, field
+from typing import Dict, Optional
+
+
+@dataclass
+class Subscribers:
+    subscribers: Dict[str, Subscriber] = field(default_factory=dict)
+
+    def add_subscriber(self, subscriber: Subscriber):
+        self.subscribers[subscriber.msisdn] = subscriber
+    
+    def get_subscriber_by_msisdn(self, msisdn: str) -> Optional[Subscriber]:
+        return self.subscribers.get(msisdn)
+    
+    def get_subscriber_by_imsi(self, imsi: str) -> Optional[Subscriber]:
+        for subscriber in self.subscribers.values():
+            if subscriber.imsi == imsi:
+                return subscriber
+        return None

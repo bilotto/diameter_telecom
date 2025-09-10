@@ -9,6 +9,7 @@ import time
 from ..carrier import Carrier
 from .service import Service
 from dataclasses import dataclass
+# from ..diameter.session_manager import SessionManager
 
 @dataclass
 class VoiceService(Service):
@@ -19,6 +20,11 @@ class VoiceService(Service):
 
     def __post_init__(self):
         super().__post_init__()
+        # session_manager = SessionManager()
+        # self.pcef.gx_app.set_session_manager(session_manager)
+        # if self.af:
+        #     self.af.rx_app.set_session_manager(session_manager)
+
 
     def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
         logger.debug(f"Sending request: {request}")
@@ -27,26 +33,26 @@ class VoiceService(Service):
         answer = None
         request = self.set_host_and_realm(request)
         if request.app_id == APP_3GPP_GX:
-            gx_session = self.gx_app.get_session_by_id(session_id)
-            if not gx_session:
-                gx_session = GxSession(session_id)
-                gx_session.add_message(request)
-                self.gx_app.add_session(gx_session)
-            logger.debug(f"Sending Gx request: {request}")
+            # gx_session = self.gx_app.get_session_by_id(session_id)
+            # if not gx_session:
+            #     gx_session = GxSession(session_id)
+            #     gx_session.add_message(request)
+            #     self.gx_app.add_session(gx_session)
+            # logger.debug(f"Sending Gx request: {request}")
             answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
         elif request.app_id == APP_3GPP_RX:
-            rx_session = self.rx_app.get_session_by_id(session_id)
-            #
-            if not rx_session:
-                logger.debug(f"No rx_session found for session_id: {session_id}. Will create a new one")
-                gx_session = None
-                if request.message.framed_ip_address:
-                    gx_session = self.gx_app.get_session_by_framed_ip_address(request.message.framed_ip_address)
-                    if gx_session:
-                        logger.debug(f"Found gx_session that rx_session is bind to: {gx_session}")
-                        rx_session = RxSession(session_id, gx_session_id=gx_session.session_id, subscriber=gx_session.subscriber)
-                    rx_session.add_message(request)
-                    self.rx_app.add_session(rx_session)
+            # rx_session = self.rx_app.get_session_by_id(session_id)
+            # #
+            # if not rx_session:
+            #     logger.debug(f"No rx_session found for session_id: {session_id}. Will create a new one")
+            #     gx_session = None
+            #     if request.message.framed_ip_address:
+            #         gx_session = self.gx_app.get_session_by_framed_ip_address(request.message.framed_ip_address)
+            #         if gx_session:
+            #             logger.debug(f"Found gx_session that rx_session is bind to: {gx_session}")
+            #             rx_session = RxSession(session_id, gx_session_id=gx_session.session_id, subscriber=gx_session.subscriber)
+            #         rx_session.add_message(request)
+            #         self.rx_app.add_session(rx_session)
             #
             
             answer: DiameterMessage = self.rx_app.send_request_custom(request, timeout)

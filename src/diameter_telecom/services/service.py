@@ -11,6 +11,7 @@ from ..apn import *
 from ..carrier import Carrier
 from dataclasses import dataclass
 from ..csv_file import CsvFile, write_to_csv
+from ..diameter.session_manager import SessionManager
 
 
 @dataclass
@@ -43,6 +44,14 @@ class Service:
     def rx_app(self):
         if self.af:
             return self.af.rx_app
+
+    def set_session_manager(self, session_manager: SessionManager = None):
+        session_manager = session_manager if session_manager else SessionManager()
+        self.gx_app.set_session_manager(session_manager)
+        if self.ocs:
+            self.sy_app.set_session_manager(session_manager)
+        if self.af:
+            self.rx_app.set_session_manager(session_manager)
         
     def set_host_and_realm(self, diameter_message: DiameterMessage):
         if diameter_message.app_id == APP_3GPP_GX:

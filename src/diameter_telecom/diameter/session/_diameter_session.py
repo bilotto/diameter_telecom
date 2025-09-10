@@ -46,17 +46,17 @@ class DiameterSession:
             self.active = False
             logger.info(f"Session {self.session_id} ended at {self.end_time}")
 
-    def add_message(self, message):
-        if not isinstance(message, Message) and not isinstance(message, DiameterMessage):
-            raise ValueError("message must be an instance of Message or DiameterMessage")
+    def add_message(self, message) -> DiameterMessage:
         if isinstance(message, DiameterMessage):
-            diameter_message = message
+            dm = message
         elif isinstance(message, Message):
-            diameter_message = DiameterMessage(message)
+            dm = DiameterMessage(message)
         else:
             raise ValueError("message must be an instance of Message or DiameterMessage")
-        self.messages.append(diameter_message)
-        return diameter_message
+        if not dm.timestamp:
+            dm.timestamp = time.time()
+        self.messages.append(dm)
+        return dm
 
     def get_messages(self) -> List[DiameterMessage]:
         return self.messages
