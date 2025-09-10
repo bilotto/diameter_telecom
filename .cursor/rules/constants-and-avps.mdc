@@ -1,0 +1,112 @@
+---
+description: Diameter constants and AVP handling patterns
+---
+
+# Diameter Constants and AVPs
+
+## Application IDs
+
+### 3GPP Applications
+```python
+APP_3GPP_GX = 16777238  # Policy and Charging Control
+APP_3GPP_RX = 16777236  # Application Function
+APP_3GPP_SY = 16777265  # Spending Limit Control
+```
+
+## Message Types
+
+### Gx Application Messages
+```python
+CCR_I = "Credit-Control-Request-Initial"
+CCR_U = "Credit-Control-Request-Update"
+CCR_T = "Credit-Control-Request-Terminate"
+CCA_I = "Credit-Control-Answer-Initial"
+CCA_U = "Credit-Control-Answer-Update"
+CCA_T = "Credit-Control-Answer-Terminate"
+RAR = "Re-Auth-Request"
+RAA = "Re-Auth-Answer"
+ASR = "Abort-Session-Request"
+ASA = "Abort-Session-Answer"
+```
+
+### Rx Application Messages
+```python
+AAR = "AA-Request"
+AAA = "AA-Answer"
+RAR = "Re-Auth-Request"
+RAA = "Re-Auth-Answer"
+ASR = "Abort-Session-Request"
+ASA = "Abort-Session-Answer"
+STR = "Session-Termination-Request"
+STA = "Session-Termination-Answer"
+```
+
+### Sy Application Messages
+```python
+SLR = "Spending-Limit-Request"
+SLA = "Spending-Limit-Answer"
+STR = "Session-Termination-Request"
+STA = "Session-Termination-Answer"
+```
+
+## Key AVPs
+
+### Common AVPs
+```python
+SESSION_ID = "Session-Id"
+ORIGIN_HOST = "Origin-Host"
+ORIGIN_REALM = "Origin-Realm"
+DESTINATION_HOST = "Destination-Host"
+DESTINATION_REALM = "Destination-Realm"
+RESULT_CODE = "Result-Code"
+```
+
+### Gx-Specific AVPs
+```python
+FRAMED_IP_ADDRESS = "Framed-IP-Address"
+FRAMED_IPV6_PREFIX = "Framed-IPv6-Prefix"
+CALLED_STATION_ID = "Called-Station-Id"
+SGSN_MCC_MNC = "SGSN-MCC-MNC"
+SUBSCRIPTION_ID = "Subscription-Id"
+USAGE_MONITORING_INFORMATION = "Usage-Monitoring-Information"
+EVENT_TRIGGER = "Event-Trigger"
+CC_REQUEST_NUMBER = "CC-Request-Number"
+```
+
+### Rx-Specific AVPs
+```python
+FRAMED_IP_ADDRESS = "Framed-IP-Address"
+SUBSCRIPTION_ID = "Subscription-Id"
+```
+
+## Result Codes
+
+### Success Codes
+```python
+E_RESULT_CODE_DIAMETER_SUCCESS = 2001
+```
+
+### Error Codes
+```python
+E_RESULT_CODE_DIAMETER_UNKNOWN_SESSION_ID = 5002
+E_RESULT_CODE_DIAMETER_AUTHORIZATION_REJECTED = 5003
+E_RESULT_CODE_DIAMETER_INVALID_AVP_VALUE = 5004
+E_RESULT_CODE_DIAMETER_MISSING_AVP = 5005
+E_RESULT_CODE_DIAMETER_RESOURCES_EXCEEDED = 5006
+E_RESULT_CODE_DIAMETER_CONTRADICTING_AVPS = 5007
+E_RESULT_CODE_DIAMETER_AVP_NOT_ALLOWED = 5008
+E_RESULT_CODE_DIAMETER_AVP_OCCURS_TOO_MANY_TIMES = 5009
+E_RESULT_CODE_DIAMETER_NO_COMMON_APPLICATION = 5010
+E_RESULT_CODE_DIAMETER_UNSUPPORTED_VERSION = 5011
+E_RESULT_CODE_DIAMETER_UNABLE_TO_COMPLY = 5012
+E_RESULT_CODE_DIAMETER_INVALID_BIT_IN_HEADER = 5013
+E_RESULT_CODE_DIAMETER_INVALID_AVP_LENGTH = 5014
+E_RESULT_CODE_DIAMETER_INVALID_MESSAGE_LENGTH = 5015
+E_RESULT_CODE_DIAMETER_INVALID_AVP_BIT_COMBO = 5016
+E_RESULT_CODE_DIAMETER_NO_COMMON_SECURITY = 5017
+```
+
+## Key Files
+- [constants.py](mdc:src/diameter_telecom/diameter/constants.py) - All constants
+- [parse_avp.py](mdc:src/diameter_telecom/diameter/parse_avp.py) - AVP parsing utilities
+- [message.py](mdc:src/diameter_telecom/diameter/message.py) - Message handling

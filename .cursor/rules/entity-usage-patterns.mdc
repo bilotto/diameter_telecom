@@ -1,0 +1,63 @@
+---
+description: 3GPP entity usage patterns and configuration
+---
+
+# 3GPP Entity Usage Patterns
+
+## Entity Types
+
+### Core Network Elements
+- **`PCEF`**: Policy and Charging Enforcement Function
+- **`PCRF`**: Policy and Charging Rules Function
+- **`AF`**: Application Function
+- **`OCS`**: Online Charging System
+- **`DSC`**: Diameter Signaling Controller
+
+## Entity Configuration
+
+### Standard Initialization
+```python
+# Create entity with network configuration
+pcef = PCEF(
+    origin_host="pcef.example.com",
+    realm_name="example.com",
+    ip_addresses=["192.168.1.100"],
+    tcp_port=3868,
+    sctp_port=3868,
+    vendor_ids=[10415]  # 3GPP vendor ID
+)
+```
+
+### Application Setup
+```python
+# Add peers for specific applications
+pcef.add_gx_peer("pcrf.example.com", "example.com")
+af.add_rx_peer("pcrf.example.com", "example.com")
+ocs.add_sy_peer("pcrf.example.com", "example.com")
+
+# Start applications
+pcef.start_gx_app()
+af.start_rx_app()
+ocs.start_sy_app()
+```
+
+## Session Manager Integration
+
+### Shared Session Manager
+```python
+# Create shared session manager
+session_manager = SessionManager()
+
+# Set for all entities
+pcef.gx_app.set_session_manager(session_manager)
+af.rx_app.set_session_manager(session_manager)
+ocs.sy_app.set_session_manager(session_manager)
+```
+
+## Key Files
+- [entities_3gpp/__init__.py](mdc:src/diameter_telecom/entities_3gpp/__init__.py) - Entity exports
+- [entities_3gpp/_entity.py](mdc:src/diameter_telecom/entities_3gpp/_entity.py) - Base entity class
+- [entities_3gpp/pcef.py](mdc:src/diameter_telecom/entities_3gpp/pcef.py) - PCEF implementation
+- [entities_3gpp/pcrf.py](mdc:src/diameter_telecom/entities_3gpp/pcrf.py) - PCRF implementation
+- [entities_3gpp/af.py](mdc:src/diameter_telecom/entities_3gpp/af.py) - AF implementation
+- [entities_3gpp/ocs.py](mdc:src/diameter_telecom/entities_3gpp/ocs.py) - OCS implementation

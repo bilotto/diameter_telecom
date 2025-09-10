@@ -1,0 +1,59 @@
+---
+globs: src/diameter_telecom/diameter/app/*.py
+---
+# Application Class Conventions
+
+## Standard Application Structure
+
+### Base Class Pattern
+```python
+class GxApplication(CustomSimpleThreadingApplication):
+    def __init__(self, max_threads=1, request_handler=None):
+        super().__init__(application_id=APP_3GPP_GX, is_acct_application=False, is_auth_application=True, max_threads=max_threads, request_handler=request_handler)
+```
+
+### Standard Properties
+```python
+@property
+def sessions(self) -> Dict[str, SessionType]:
+    """Get all sessions for this application"""
+    return self.session_manager.sessions.get(APP_ID, {})
+```
+
+## Method Naming Conventions
+
+### Session Access Methods
+All applications use consistent method names:
+
+```python
+# Standard method names (no app prefix)
+def get_session_by_id(self, session_id: str) -> Optional[SessionType]:
+    """Get session by ID"""
+    session = self.session_manager.sessions.get_session_by_id(APP_ID, session_id)
+    return session if isinstance(session, SessionType) else None
+
+# App-specific methods (with app prefix for clarity)
+def get_session_by_framed_ip_address(self, framed_ip_address: str) -> Optional[GxSession]:
+    """Get Gx session by framed IP address"""
+    session = self.session_manager.sessions.get_session_by_framed_ip(APP_3GPP_GX, framed_ip_address)
+    return session if isinstance(session, GxSession) else None
+```
+
+## Request Handling Pattern
+
+### Standard Request Flow
+```python
+def send_request_custom(self, request: DiameterMessage, timeout=5):
+    """Send request with session management handled by SessionManager"""
+    if not isinstance(request, DiameterMessage):
+        raise ValueError("request must be an instance of DiameterMessage")
+    
+    # All session management handled by SessionManager
+    return super().send_request_custom(request, timeout)
+```
+
+## Key Files
+- [custom_simple_threading_application.py](mdc:src/diameter_telecom/diameter/app/custom_simple_threading_application.py) - Base class
+- [gx.py](mdc:src/diameter_telecom/diameter/app/gx.py) - Gx application
+- [rx.py](mdc:src/diameter_telecom/diameter/app/rx.py) - Rx application
+- [sy.py](mdc:src/diameter_telecom/diameter/app/sy.py) - Sy application

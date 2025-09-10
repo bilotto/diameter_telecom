@@ -1,0 +1,130 @@
+---
+description: Request handling patterns and implementations
+---
+
+# Request Handling Patterns
+
+## Request Handler Structure
+
+### Main Handler Router
+```python
+def handle_request(app: CustomSimpleThreadingApplication, message: Message):
+    if app.application_id == APP_3GPP_GX:
+        return handle_request_gx(app, message)
+    elif app.application_id == APP_3GPP_RX:
+        return handle_request_rx(app, message)
+    elif app.application_id == APP_3GPP_SY:
+        return handle_request_sy(app, message)
+```
+
+## Gx Request Handling
+
+### Gx Handler
+```python
+def handle_request_gx(app: GxApplication, message: Message):
+    logger.info(f"Received message: {message}")
+    answer = None
+    
+    if isinstance(message, ReAuthRequest):
+        answer = handle_rar(app, message)
+    elif isinstance(message, AbortSessionRequest):
+        answer = handle_asr(app, message)
+    elif isinstance(message, CreditControlRequest):
+        answer = handle_ccr(app, message)
+    
+    return answer
+```
+
+### Re-Auth Request (RAR)
+```python
+def handle_rar(app: GxApplication, message: ReAuthRequest):
+    answer = message.to_answer()
+    answer.session_id = message.session_id
+    answer.origin_host = message.destination_host
+    answer.origin_realm = message.destination_realm
+    answer.destination_host = message.origin_host
+    answer.destination_realm = message.origin_realm
+    answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
+    return answer
+```
+
+### Abort Session Request (ASR)
+```python
+def handle_asr(app: GxApplication, message: AbortSessionRequest):
+    answer = message.to_answer()
+    answer.session_id = message.session_id
+    answer.origin_host = message.destination_host
+    answer.origin_realm = message.destination_realm
+    answer.destination_host = message.origin_host
+    answer.destination_realm = message.origin_realm
+    answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
+    return answer
+```
+
+### Credit Control Request (CCR)
+```python
+def handle_ccr(app: GxApplication, message: CreditControlRequest):
+    answer = message.to_answer()
+    answer.session_id = message.session_id
+    answer.origin_host = message.destination_host
+    answer.origin_realm = message.destination_realm
+    answer.destination_host = message.origin_host
+    answer.destination_realm = message.origin_realm
+    answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
+    return answer
+```
+
+## Rx Request Handling
+
+### Rx Handler
+```python
+def handle_request_rx(app: RxApplication, message: Message):
+    logger.info(f"Received message: {message}")
+    answer = None
+    rx_session = app.get_session_by_id(message.session_id)
+    
+    if not rx_session:
+        answer = message.to_answer()
+        answer.session_id = message.session_id
+        answer.origin_host = message.destination_host
+        answer.origin_realm = message.destination_realm
+        answer.destination_host = message.origin_host
+        answer.destination_realm = message.origin_realm
+        answer.result_code = E_RESULT_CODE_DIAMETER_UNKNOWN_SESSION_ID
+        return answer
+    
+    if isinstance(message, ReAuthRequest):
+        answer = handle_rar(app, message)
+    elif isinstance(message, AbortSessionRequest):
+        answer = handle_asr(app, message)
+    
+    return answer
+```
+
+## Sy Request Handling
+
+### Sy Handler
+```python
+def handle_request_sy(app: SyApplication, message: Message):
+    logger.info(f"Received message: {message}")
+    answer = None
+    
+    if isinstance(message, SpendingLimitRequest):
+        answer = message.to_answer()
+        answer.session_id = message.session_id
+        answer.origin_host = message.destination_host
+        answer.origin_realm = message.destination_realm
+        answer.destination_host = message.origin_host
+        answer.destination_realm = message.origin_realm
+        answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
+        return answer
+    
+    return answer
+```
+
+## Key Files
+- [handle_request/__init__.py](mdc:src/diameter_telecom/diameter/handle_request/__init__.py) - Handler exports
+- [handle_request/handle_request.py](mdc:src/diameter_telecom/diameter/handle_request/handle_request.py) - Main handler router
+- [handle_request/gx.py](mdc:src/diameter_telecom/diameter/handle_request/gx.py) - Gx handlers
+- [handle_request/rx.py](mdc:src/diameter_telecom/diameter/handle_request/rx.py) - Rx handlers
+- [handle_request/sy.py](mdc:src/diameter_telecom/diameter/handle_request/sy.py) - Sy handlers

@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+---
+# Diameter Telecom Architecture Overview
+
+This library extends the base [diameter](mdc:../diameter) library with telecom-specific functionality for 3GPP networks.
+
+## Core Architecture
+
+### Session Management
+- **`SessionManager`**: Centralized business logic and message processing
+- **`Sessions`**: Pure data management for session collections
+- **`Subscribers`**: Subscriber data management
+
+### Applications
+- **`GxApplication`**: Policy and Charging Control (PCRF-PCEF)
+- **`RxApplication`**: Application Function (PCRF-AF)  
+- **`SyApplication`**: Spending Limit Control (PCRF-OCS)
+
+### Session Types
+- **`GxSession`**: Gx-specific with framed IP, APN, SGSN info
+- **`RxSession`**: Rx-specific with `gx_session_id` for binding
+- **`SySession`**: Sy-specific with `gx_session_id` for binding
+
+## Key Files
+- [session_manager.py](mdc:src/diameter_telecom/diameter/session_manager.py) - Main business logic
+- [sessions.py](mdc:src/diameter_telecom/diameter/session/sessions.py) - Session data management
+- [custom_simple_threading_application.py](mdc:src/diameter_telecom/diameter/app/custom_simple_threading_application.py) - Base application class

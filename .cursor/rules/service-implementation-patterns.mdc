@@ -1,0 +1,72 @@
+---
+description: Service layer implementation patterns
+---
+
+# Service Implementation Patterns
+
+## Service Types
+
+### Core Services
+- **`DataService`**: Data service implementation (PCEF-OCS)
+- **`VoiceService`**: Voice service implementation (PCEF-AF-OCS)
+- **`Service`**: Base service class
+
+## Service Composition
+
+### Standard Service Structure
+```python
+@dataclass
+class Service:
+    pcef: PCEF
+    ocs: OCS = None
+    af: AF = None
+    diameter_config: dict = None
+    carrier: Carrier = None
+    csv_file: CsvFile = None
+```
+
+### Application Access
+```python
+# Access applications through service
+gx_app = service.gx_app  # PCEF's Gx application
+sy_app = service.sy_app  # OCS's Sy application (if available)
+rx_app = service.rx_app  # AF's Rx application (if available)
+```
+
+## Request Processing
+
+### Standard Request Flow
+```python
+def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
+    if not isinstance(request, DiameterMessage):
+        raise TypeError("request must be an instance of DiameterMessage")
+    
+    request.timestamp = time.time()
+    request = self.set_host_and_realm(request)
+    
+    if request.app_id == APP_3GPP_GX:
+        answer = self.gx_app.send_request_custom(request, timeout)
+    else:
+        raise ValueError(f"Invalid app_id: {request.app_id}")
+    
+    return (request, answer)
+```
+
+## Session Manager Integration
+
+### Service-Level Session Manager
+```python
+def set_session_manager(self, session_manager: SessionManager = None):
+    session_manager = session_manager if session_manager else SessionManager()
+    self.gx_app.set_session_manager(session_manager)
+    if self.ocs:
+        self.sy_app.set_session_manager(session_manager)
+    if self.af:
+        self.rx_app.set_session_manager(session_manager)
+```
+
+## Key Files
+- [services/__init__.py](mdc:src/diameter_telecom/services/__init__.py) - Service exports
+- [services/service.py](mdc:src/diameter_telecom/services/service.py) - Base service class
+- [services/data.py](mdc:src/diameter_telecom/services/data.py) - Data service
+- [services/voice.py](mdc:src/diameter_telecom/services/voice.py) - Voice service

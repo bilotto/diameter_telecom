@@ -1,0 +1,123 @@
+---
+description: Diameter message processing stages and flow
+---
+
+# Message Processing Stages
+
+## Main Processing Flow
+
+### Entry Point
+```python
+def process_diameter_message(self, dm: DiameterMessage):
+    """Main entry point for processing Diameter messages"""
+    # Set timestamp if not already set
+    if not dm.timestamp:
+        dm.timestamp = time.time()
+        
+    self.messages.append(dm)
+    if dm.is_request:
+        self.stage_parse_request(dm)
+    else:
+        self.stage_parse_response(dm)
+```
+
+## Request Processing Stages
+
+### Stage 1: Get Existing Session
+```python
+def stage_get_session(self, dm: DiameterMessage) -> Optional[DiameterSession]:
+    """Retrieve an existing session by app_id and session_id"""
+    app_id = dm.app_id
+    session_id = dm.session_id
+    
+    existing_session = self.sessions.get_session_by_id(app_id, session_id)
+    if existing_session:
+        existing_session.add_message(dm)
+        return existing_session
+    
+    return None
+```
+
+### Stage 2: Create New Session
+```python
+def stage_create_session(self, dm: DiameterMessage, subscriber: Optional[Subscriber] = None) -> DiameterSession:
+    """Create a new session for the given Diameter message"""
+    app_id = dm.app_id
+    session_id = dm.session_id
+
+    # Extract message attributes
+    framed_ip_address = getattr(dm.message, 'framed_ip_address', None)
+    framed_ipv6_prefix = getattr(dm.message, 'framed_ipv6_prefix', None)
+    called_station_id = getattr(dm.message, 'called_station_id', None)
+    sgsn_mcc_mnc = getattr(dm.message, 'sgsn_mcc_mnc', None)
+    
+    # Create appropriate session type
+    if app_id == APP_3GPP_GX:
+        session = GxSession(session_id=session_id, framed_ip_address=framed_ip_address, 
+                          framed_ipv6_prefix=framed_ipv6_prefix, called_station_id=called_station_id, 
+                          sgsn_mcc_mnc=sgsn_mcc_mnc, subscriber=subscriber)
+    elif app_id == APP_3GPP_RX:
+        session = RxSession(session_id=session_id, subscriber=subscriber)
+        # Bind RxSession to GxSession if this is an Rx request
+        self.stage_bind_rx_to_gx(session, dm)
+    elif app_id == APP_3GPP_SY:
+        session = SySession(session_id=session_id, subscriber=subscriber)
+    
+    self.sessions.add_session(app_id, session)
+    session.add_message(dm)
+    return session
+```
+
+### Stage 3: Identify Subscriber
+```python
+def stage_identify_subscriber(self, dm: DiameterMessage, session: Optional[DiameterSession] = None) -> Optional[Subscriber]:
+    if session:
+        return session.subscriber
+
+    if hasattr(dm.message, 'subscription_id') and dm.message.subscription_id:
+        msisdn, imsi, sip_uri, nai, private_id = parse_subscription_id(dm.message.subscription_id)
+        subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn) or self.subscribers.get_subscriber_by_imsi(imsi)
+        if not subscriber:
+            subscriber = Subscriber(msisdn=msisdn, imsi=imsi, sip_uri=sip_uri, nai=nai, private_id=private_id)
+            self.subscribers.add_subscriber(subscriber)
+        return subscriber
+
+    logger.warning(f"No subscriber found for message: {dm.name}")
+    return None
+```
+
+### Stage 4: Parse Request
+```python
+def stage_parse_request(self, dm: DiameterMessage):
+    session = self.stage_get_session(dm)
+    subscriber = self.stage_identify_subscriber(dm, session)
+
+    if subscriber and not dm.subscriber:
+        dm.subscriber = subscriber
+    
+    # If no existing session found, create a new one
+    if not session and dm.name in CREATE_SESSION_MESSAGES:
+        session = self.stage_create_session(dm, subscriber)
+    
+    # Associate subscriber with session if found
+    if subscriber and session and not session.subscriber:
+        session.subscriber = subscriber
+```
+
+## Response Processing
+
+### Response Stage
+```python
+def stage_parse_response(self, dm: DiameterMessage):
+    app_id = dm.app_id
+    session_id = dm.session_id
+    session = self.sessions.get_session_by_id(app_id, session_id)
+    if not session:
+        return
+    session.add_message(dm)
+```
+
+## Key Files
+- [session_manager.py](mdc:src/diameter_telecom/diameter/session_manager.py) - Processing stages
+- [message.py](mdc:src/diameter_telecom/diameter/message.py) - DiameterMessage class
+- [parse_avp.py](mdc:src/diameter_telecom/diameter/parse_avp.py) - AVP parsing utilities
