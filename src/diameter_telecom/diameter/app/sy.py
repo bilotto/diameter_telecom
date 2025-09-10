@@ -13,9 +13,9 @@ class SyApplication(CustomSimpleThreadingApplication):
         return self.session_manager.sessions.get(APP_3GPP_SY, {})
 
     # Convenience methods for Sy-specific session lookups
-    def get_sy_session_by_id(self, session_id: str) -> Optional[SySession]:
+    def get_session_by_id(self, session_id: str) -> Optional[SySession]:
         """Get Sy session by ID"""
-        session = self.get_session_by_id(session_id)
+        session = self.session_manager.sessions.get_session_by_id(APP_3GPP_SY, session_id)
         return session if isinstance(session, SySession) else None
 
     def send_request_custom(self, request: DiameterMessage, timeout=5):

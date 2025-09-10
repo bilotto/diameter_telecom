@@ -16,26 +16,27 @@ class GxApplication(CustomSimpleThreadingApplication):
     def sessions(self) -> Dict[str, GxSession]:
         """Get all Gx sessions"""
         return self.session_manager.sessions.get(APP_3GPP_GX, {})
+        
 
     # Convenience methods for Gx-specific session lookups
-    def get_gx_session_by_id(self, session_id: str) -> Optional[GxSession]:
+    def get_session_by_id(self, session_id: str) -> Optional[GxSession]:
         """Get Gx session by ID"""
-        session = self.get_session_by_id(session_id)
+        session = self.session_manager.sessions.get_session_by_id(APP_3GPP_GX, session_id)
         return session if isinstance(session, GxSession) else None
     
-    def get_gx_session_by_framed_ip_address(self, framed_ip_address: str) -> Optional[GxSession]:
+    def get_session_by_framed_ip_address(self, framed_ip_address: str) -> Optional[GxSession]:
         """Get Gx session by framed IP address"""
-        session = self.get_session_by_framed_ip(framed_ip_address)
+        session = self.session_manager.sessions.get_session_by_framed_ip(APP_3GPP_GX, framed_ip_address)
         return session if isinstance(session, GxSession) else None
     
-    def get_gx_session_by_framed_ipv6_prefix(self, framed_ipv6_prefix: str) -> Optional[GxSession]:
+    def get_session_by_framed_ipv6_prefix(self, framed_ipv6_prefix: str) -> Optional[GxSession]:
         """Get Gx session by framed IPv6 prefix"""
-        session = self.get_session_by_framed_ipv6(framed_ipv6_prefix)
+        session = self.session_manager.sessions.get_session_by_framed_ipv6(APP_3GPP_GX, framed_ipv6_prefix)
         return session if isinstance(session, GxSession) else None
     
-    def get_gx_session_by_msisdn(self, msisdn: str) -> Optional[GxSession]:
+    def get_session_by_msisdn(self, msisdn: str) -> Optional[GxSession]:
         """Get Gx session by MSISDN"""
-        session = self.get_session_by_msisdn(msisdn)
+        session = self.session_manager.sessions.get_session_by_msisdn(APP_3GPP_GX, msisdn)
         return session if isinstance(session, GxSession) else None
 
     def send_request_custom(self, request: DiameterMessage, timeout=5):

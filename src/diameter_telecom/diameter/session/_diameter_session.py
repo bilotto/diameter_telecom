@@ -44,6 +44,7 @@ class DiameterSession:
             else:
                 self.end_time = str(time.time())
             self.active = False
+            self.ended = True
             logger.info(f"Session {self.session_id} ended at {self.end_time}")
 
     def add_message(self, message) -> DiameterMessage:

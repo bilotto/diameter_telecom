@@ -16,9 +16,9 @@ class RxApplication(CustomSimpleThreadingApplication):
         return self.session_manager.sessions.get(APP_3GPP_RX, {})
 
     # Convenience methods for Rx-specific session lookups
-    def get_rx_session_by_id(self, session_id: str) -> Optional[RxSession]:
+    def get_session_by_id(self, session_id: str) -> Optional[RxSession]:
         """Get Rx session by ID"""
-        session = self.get_session_by_id(session_id)
+        session = self.session_manager.sessions.get_session_by_id(APP_3GPP_RX, session_id)
         return session if isinstance(session, RxSession) else None
 
     def get_active_sessions(self) -> List[RxSession]:
