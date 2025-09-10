@@ -1,8 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 from diameter.message.avp.grouped import SubscriptionId
 from .diameter.constants import *
 from .apn import APN
+from .diameter.message import DiameterMessage
 
 @dataclass
 class Subscriber:
@@ -26,6 +27,8 @@ class Subscriber:
                                   certain authentication scenarios.
         imei (str, optional): International Mobile Equipment Identity. A unique
                              identifier for the subscriber's mobile device.
+        apn (APN, optional): Access Point Name associated with the subscriber.
+        messages (List[DiameterMessage]): List of all Diameter messages associated with this subscriber.
     """
     msisdn: str
     imsi: str = None
@@ -34,6 +37,7 @@ class Subscriber:
     private_id: str = None
     imei: str = None
     apn: APN = None
+    messages: List[DiameterMessage] = field(default_factory=list)
 
     def __post_init__(self):
         """
@@ -46,16 +50,18 @@ class Subscriber:
             if val is not None:
                 setattr(self, attr, str(val))
 
-    def __repr__(self) -> str:
-        fields = []
-        for attr in ['msisdn', 'imsi', 'sip_uri', 'nai', 'private_id', 'imei', 'apn']:
-            val = getattr(self, attr)
-            if val is not None:
-                if attr == 'apn':
-                    fields.append(f"{attr}={val!r}")
-                else:
-                    fields.append(f"{attr}='{val}'")
-        return f"Subscriber({', '.join(fields)})"
+    # def __repr__(self) -> str:
+    #     fields = []
+    #     for attr in ['msisdn', 'imsi', 'sip_uri', 'nai', 'private_id', 'imei', 'apn']:
+    #         val = getattr(self, attr)
+    #         if val is not None:
+    #             if attr == 'apn':
+    #                 fields.append(f"{attr}={val!r}")
+    #             else:
+    #                 fields.append(f"{attr}='{val}'")
+    #     # Add message count
+    #     fields.append(f"messages={len(self.messages)}")
+    #     return f"Subscriber({', '.join(fields)})"
 
     @property
     def subscription_id(self) -> List[SubscriptionId]:
@@ -95,6 +101,14 @@ class Subscriber:
             ))
         return subscription_id
 
+    def add_message(self, message: DiameterMessage):
+        """
+        Add a Diameter message to the subscriber's message history.
+        
+        Args:
+            message: The DiameterMessage to add to the subscriber's history
+        """
+        self.messages.append(message)
 
 from dataclasses import dataclass, field
 from typing import Dict, Optional
@@ -115,3 +129,21 @@ class Subscribers:
             if subscriber.imsi == imsi:
                 return subscriber
         return None
+    
+    def get_subscribers_with_messages(self) -> List[Subscriber]:
+        """
+        Get all subscribers that have associated messages.
+        
+        Returns:
+            List of Subscriber objects that have messages
+        """
+        return [subscriber for subscriber in self.subscribers.values() if subscriber.messages]
+    
+    def get_total_messages(self) -> int:
+        """
+        Get the total number of messages across all subscribers.
+        
+        Returns:
+            Total count of messages for all subscribers
+        """
+        return sum(len(subscriber.messages) for subscriber in self.subscribers.values())

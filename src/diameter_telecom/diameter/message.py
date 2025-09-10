@@ -2,9 +2,12 @@ from diameter.message.commands import *
 from diameter.message.avp.grouped import *
 from diameter.message import Message, dump
 from .constants import *
-from . import Subscriber
+from typing import TYPE_CHECKING
 import datetime
 import logging
+
+if TYPE_CHECKING:
+    from ..subscriber import Subscriber
 logger = logging.getLogger(__name__)
 
 class DiameterMessage:
@@ -24,7 +27,7 @@ class DiameterMessage:
         
         # Initialize default attributes
         self.timestamp = None
-        self.subscriber: Subscriber = None
+        self.subscriber: 'Subscriber' = None
 
     def __getattr__(self, name):
         if hasattr(self.message, name):
@@ -83,7 +86,7 @@ class DiameterMessage:
     
     def __repr__(self):
         if self.subscriber:
-            return f"{self.time},{self.name},{self.subscriber}"
+            return f"{self.time},{self.name},{self.subscriber.msisdn}"
         else:
             return f"{self.time},{self.name}"
     

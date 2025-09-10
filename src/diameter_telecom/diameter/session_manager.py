@@ -125,9 +125,11 @@ class SessionManager:
         if not session and dm.name in CREATE_SESSION_MESSAGES:
             session = self.stage_create_session(dm, subscriber)
         
-        # Associate subscriber with session if found
-        if subscriber and session and not session.subscriber:
-            session.subscriber = subscriber
+        # # Associate subscriber with session if found
+        # if subscriber and session:
+        #     subscriber.add_message(dm)
+
+        return session, subscriber
         
     def stage_bind_rx_to_gx(self, rx_session: RxSession, dm: DiameterMessage):
         """Bind RxSession to existing GxSession based on framed IP address or other identifiers"""
@@ -162,22 +164,30 @@ class SessionManager:
     def stage_parse_response(self, dm: DiameterMessage):
         app_id = dm.app_id
         session_id = dm.session_id
+        session = None
+        subscriber = None
         session = self.sessions.get_session_by_id(app_id, session_id)
         if not session:
             return
         session.add_message(dm)
+        subscriber = session.subscriber
+        # if subscriber:
+        #     subscriber.add_message(dm)
+        return session, subscriber
 
     def process_diameter_message(self, dm: DiameterMessage):
         """Main entry point for processing Diameter messages"""
         # Set timestamp if not already set
         if not dm.timestamp:
             dm.timestamp = time.time()
-            
-        self.messages.append(dm)
+        # self.messages.append(dm)
         if dm.is_request:
-            self.stage_parse_request(dm)
+            session, subscriber = self.stage_parse_request(dm)
         else:
-            self.stage_parse_response(dm)
+            session, subscriber = self.stage_parse_response(dm)
+        
+        if session and subscriber:
+            subscriber.add_message(dm)
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
         """Process request message, send it, and process response with full session management"""
