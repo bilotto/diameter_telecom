@@ -46,13 +46,7 @@ class SessionManager:
         """
         app_id = dm.app_id
         session_id = dm.session_id
-        
-        existing_session = self.sessions.get_session_by_id(app_id, session_id)
-        if existing_session:
-            existing_session.add_message(dm)
-            return existing_session
-        
-        return None
+        return self.sessions.get_session_by_id(app_id, session_id)
 
     def stage_create_session(self, dm: DiameterMessage, subscriber: Optional[Subscriber] = None) -> DiameterSession:
         """Create a new session for the given Diameter message.
@@ -96,7 +90,7 @@ class SessionManager:
             raise ValueError(f"Unknown app_id: {app_id}")
         
         self.sessions.add_session(app_id, session)
-        session.add_message(dm)
+        # session.add_message(dm)
         return session
 
     def stage_identify_subscriber(self, dm: DiameterMessage, session: Optional[DiameterSession] = None) -> Optional[Subscriber]:
@@ -118,8 +112,8 @@ class SessionManager:
         session = self.stage_get_session(dm)
         subscriber = self.stage_identify_subscriber(dm, session)
 
-        if subscriber and not dm.subscriber:
-            dm.subscriber = subscriber
+        # if subscriber and not dm.subscriber:
+        #     dm.subscriber = subscriber
         
         # If no existing session found, create a new one
         if not session and dm.name in CREATE_SESSION_MESSAGES:
@@ -130,6 +124,30 @@ class SessionManager:
         #     subscriber.add_message(dm)
 
         return session, subscriber
+
+    def stage_parse_response(self, dm: DiameterMessage):
+        session = self.stage_get_session(dm)
+        if not session:
+            logger.warning(f"No session found for response: {dm.name},{dm.session_id}")
+        # session.add_message(dm)
+        return session
+
+    def process_diameter_message(self, dm: DiameterMessage):
+        """Main entry point for processing Diameter messages"""
+        # Set timestamp if not already set
+        if not dm.timestamp:
+            dm.timestamp = time.time()
+        # self.messages.append(dm)
+        if dm.is_request:
+            session, subscriber = self.stage_parse_request(dm)
+        else:
+            session, subscriber = self.stage_parse_response(dm)
+        
+        if session:
+            session.add_message(dm)
+            session.subscriber.add_message(dm)
+
+        self.messages.append(dm)
         
     def stage_bind_rx_to_gx(self, rx_session: RxSession, dm: DiameterMessage):
         """Bind RxSession to existing GxSession based on framed IP address or other identifiers"""
@@ -161,33 +179,9 @@ class SessionManager:
         # If no GxSession found, log a warning
         logger.warning(f"No GxSession found for RxSession {rx_session.session_id}")
 
-    def stage_parse_response(self, dm: DiameterMessage):
-        app_id = dm.app_id
-        session_id = dm.session_id
-        session = None
-        subscriber = None
-        session = self.sessions.get_session_by_id(app_id, session_id)
-        if not session:
-            return
-        session.add_message(dm)
-        subscriber = session.subscriber
-        # if subscriber:
-        #     subscriber.add_message(dm)
-        return session, subscriber
 
-    def process_diameter_message(self, dm: DiameterMessage):
-        """Main entry point for processing Diameter messages"""
-        # Set timestamp if not already set
-        if not dm.timestamp:
-            dm.timestamp = time.time()
-        # self.messages.append(dm)
-        if dm.is_request:
-            session, subscriber = self.stage_parse_request(dm)
-        else:
-            session, subscriber = self.stage_parse_response(dm)
-        
-        if session and subscriber:
-            subscriber.add_message(dm)
+
+
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
         """Process request message, send it, and process response with full session management"""
