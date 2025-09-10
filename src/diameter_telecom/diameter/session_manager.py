@@ -12,6 +12,8 @@ from .message import DiameterMessage
 
 logger = logging.getLogger(__name__)
 
+CREATE_SESSION_MESSAGES = [CCR_I, AAR, SLR]
+
 @dataclass
 class SessionManager:
     """Centralized session and subscriber management for Diameter applications.
@@ -33,11 +35,39 @@ class SessionManager:
     # - self.sessions.* for session operations
     # - self.subscribers.* for subscriber operations
 
-    def stage_create_session(self, dm: DiameterMessage):
+    def stage_get_session(self, dm: DiameterMessage) -> Optional[DiameterSession]:
+        """Retrieve an existing session by app_id and session_id.
+        
+        Args:
+            dm: DiameterMessage containing the session information
+            
+        Returns:
+            Existing session if found, None otherwise
+        """
         app_id = dm.app_id
         session_id = dm.session_id
-        # if dm.name not in [CCR_I, AAR, SLR]:
-        #     return
+        
+        existing_session = self.sessions.get_session_by_id(app_id, session_id)
+        if existing_session:
+            existing_session.add_message(dm)
+            return existing_session
+        
+        return None
+
+    def stage_create_session(self, dm: DiameterMessage, subscriber: Optional[Subscriber] = None) -> DiameterSession:
+        """Create a new session for the given Diameter message.
+        
+        Args:
+            dm: DiameterMessage containing the session information
+            
+        Returns:
+            The newly created session
+            
+        Raises:
+            ValueError: If app_id is not supported
+        """
+        app_id = dm.app_id
+        session_id = dm.session_id
 
         framed_ip_address = None
         framed_ipv6_prefix = None
@@ -53,57 +83,55 @@ class SessionManager:
         if hasattr(dm.message, 'sgsn_mcc_mnc'):
             sgsn_mcc_mnc = dm.message.sgsn_mcc_mnc
         
-        # Check if session already exists
-        existing_session = self.sessions.get_session_by_id(app_id, session_id)
-        if existing_session:
-            existing_session.add_message(dm)
-            return
-        
         # Create new session
         if app_id == APP_3GPP_GX:
-            session = GxSession(session_id=session_id, framed_ip_address=framed_ip_address, framed_ipv6_prefix=framed_ipv6_prefix, called_station_id=called_station_id, sgsn_mcc_mnc=sgsn_mcc_mnc)
+            session = GxSession(session_id=session_id, framed_ip_address=framed_ip_address, framed_ipv6_prefix=framed_ipv6_prefix, called_station_id=called_station_id, sgsn_mcc_mnc=sgsn_mcc_mnc, subscriber=subscriber)
         elif app_id == APP_3GPP_RX:
-            session = RxSession(session_id=session_id)
+            session = RxSession(session_id=session_id, subscriber=subscriber)
+            # Bind RxSession to GxSession if this is an Rx request
+            self.stage_bind_rx_to_gx(session, dm)
         elif app_id == APP_3GPP_SY:
-            session = SySession(session_id=session_id)
+            session = SySession(session_id=session_id, subscriber=subscriber)
         else:
             raise ValueError(f"Unknown app_id: {app_id}")
         
         self.sessions.add_session(app_id, session)
         session.add_message(dm)
+        return session
 
-    def stage_identify_subscriber(self, dm: DiameterMessage) -> Optional[Subscriber]:
+    def stage_identify_subscriber(self, dm: DiameterMessage, session: Optional[DiameterSession] = None) -> Optional[Subscriber]:
+        if session:
+            return session.subscriber
+
         if hasattr(dm.message, 'subscription_id') and dm.message.subscription_id:
             msisdn, imsi, sip_uri, nai, private_id = parse_subscription_id(dm.message.subscription_id)
-            subscriber = Subscriber(msisdn=msisdn, imsi=imsi, sip_uri=sip_uri, nai=nai, private_id=private_id)
-            self.subscribers.add_subscriber(subscriber)
+            subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn) or self.subscribers.get_subscriber_by_imsi(imsi)
+            if not subscriber:
+                subscriber = Subscriber(msisdn=msisdn, imsi=imsi, sip_uri=sip_uri, nai=nai, private_id=private_id)
+                self.subscribers.add_subscriber(subscriber)
             return subscriber
+
+        logger.warning(f"No subscriber found for message: {dm.name}")
         return None
 
     def stage_parse_request(self, dm: DiameterMessage):
-        self.stage_create_session(dm)
-        subscriber = self.stage_identify_subscriber(dm)
+        session = self.stage_get_session(dm)
+        subscriber = self.stage_identify_subscriber(dm, session)
+
+        if subscriber and not dm.subscriber:
+            dm.subscriber = subscriber
+        
+        # If no existing session found, create a new one
+        if not session and dm.name in CREATE_SESSION_MESSAGES:
+            session = self.stage_create_session(dm, subscriber)
         
         # Associate subscriber with session if found
-        if subscriber:
-            session = self.sessions.get_session_by_id(dm.app_id, dm.session_id)
-            if session and not session.subscriber:
-                session.subscriber = subscriber
+        if subscriber and session and not session.subscriber:
+            session.subscriber = subscriber
         
-        # Bind RxSession to GxSession if this is an Rx request
-        self.stage_bind_rx_to_gx(dm)
-
-    def stage_bind_rx_to_gx(self, dm: DiameterMessage):
+    def stage_bind_rx_to_gx(self, rx_session: RxSession, dm: DiameterMessage):
         """Bind RxSession to existing GxSession based on framed IP address or other identifiers"""
         if dm.app_id != APP_3GPP_RX:
-            return
-        
-        rx_session = self.sessions.get_session_by_id(APP_3GPP_RX, dm.session_id)
-        if not rx_session or not isinstance(rx_session, RxSession):
-            return
-        
-        # Skip if already bound
-        if rx_session.gx_session_id:
             return
 
         # Try to find GxSession by framed IP address first
@@ -112,6 +140,7 @@ class SessionManager:
             gx_session = self.sessions.get_session_by_framed_ip(APP_3GPP_GX, dm.message.framed_ip_address)
             if gx_session:
                 rx_session.gx_session_id = gx_session.session_id
+                rx_session.subscriber = gx_session.subscriber
                 logger.info(f"RxSession {rx_session.session_id} bound to GxSession {gx_session.session_id} via framed IP {dm.message.framed_ip_address}")
                 return
         
@@ -123,12 +152,10 @@ class SessionManager:
                 gx_session = self.sessions.get_session_by_msisdn(APP_3GPP_GX, msisdn)
                 if gx_session:
                     rx_session.gx_session_id = gx_session.session_id
+                    rx_session.subscriber = gx_session.subscriber
                     logger.info(f"RxSession {rx_session.session_id} bound to GxSession {gx_session.session_id} via MSISDN {msisdn}")
                     return
-        
-
-
-        
+                    
         # If no GxSession found, log a warning
         logger.warning(f"No GxSession found for RxSession {rx_session.session_id}")
 
