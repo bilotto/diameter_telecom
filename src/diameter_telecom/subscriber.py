@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict, Optional
 from diameter.message.avp.grouped import SubscriptionId
 from .diameter.constants import *
 from .apn import APN
@@ -31,13 +31,14 @@ class Subscriber:
         messages (List[DiameterMessage]): List of all Diameter messages associated with this subscriber.
     """
     msisdn: str
-    imsi: str = None
-    sip_uri: str = None
-    nai: str = None
-    private_id: str = None
-    imei: str = None
-    apn: APN = None
-    messages: List[DiameterMessage] = field(default_factory=list)
+    imsi: str = field(default=None, repr=False)
+    sip_uri: str = field(default=None, repr=False)
+    nai: str = field(default=None, repr=False)
+    private_id: str = field(default=None, repr=False)
+    imei: str = field(default=None, repr=False)
+    apn: APN = field(default=None, repr=False)
+    messages: List[DiameterMessage] = field(default_factory=list, repr=False)
+    session_ids: Dict[int, str] = field(default_factory=dict, repr=True)
 
     def __post_init__(self):
         """
@@ -110,8 +111,11 @@ class Subscriber:
         """
         self.messages.append(message)
 
-from dataclasses import dataclass, field
-from typing import Dict, Optional
+    def add_session_id(self, app_id: int, session_id: str):
+        self.session_ids[app_id] = session_id
+    
+    def get_session_id(self, app_id: int) -> Optional[str]:
+        return self.session_ids.get(app_id)
 
 
 @dataclass

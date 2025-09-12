@@ -35,3 +35,4 @@ from .constants import *
 from .handle_request import handle_request
 
 from .session_manager import SessionManager
+from .message_processing_pipeline import MessageProcessingPipeline

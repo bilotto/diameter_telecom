@@ -131,10 +131,21 @@ def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
             E_CC_REQUEST_TYPE_UPDATE_REQUEST: (CCR_U, CCA_U),
             E_CC_REQUEST_TYPE_TERMINATION_REQUEST: (CCR_T, CCA_T)
         }
-        cc_request_type = message.cc_request_type
-        if cc_request_type in cc_type_mapping:
+        
+        # Check if cc_request_type exists and is not None
+        cc_request_type = getattr(message, 'cc_request_type', None) if hasattr(message, 'cc_request_type') else None
+        
+        if cc_request_type is not None and cc_request_type in cc_type_mapping:
             return cc_type_mapping[cc_request_type][0 if isinstance(message, CreditControlRequest) else 1]
-        return None
+        
+        # Fallback for Credit Control messages without CC-Request-Type (common in error responses)
+        if isinstance(message, CreditControlRequest):
+            return "CCR"  # Generic CCR when type is unknown
+        else:
+            # For CCA, check if it's an error response
+            if hasattr(message, 'result_code') and message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+                return "CCA-ERROR"  # Specific name for error responses
+            return "CCA"  # Generic CCA when type is unknown
 
     # Map message types to their request/answer names
     message_type_mapping = {
