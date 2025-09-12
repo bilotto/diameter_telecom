@@ -38,7 +38,7 @@ class Subscriber:
     imei: str = field(default=None, repr=False)
     apn: APN = field(default=None, repr=False)
     messages: List[DiameterMessage] = field(default_factory=list, repr=False)
-    session_ids: Dict[int, str] = field(default_factory=dict, repr=True)
+    session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=True)
 
     def __post_init__(self):
         """
@@ -112,10 +112,13 @@ class Subscriber:
         self.messages.append(message)
 
     def add_session_id(self, app_id: int, session_id: str):
-        self.session_ids[app_id] = session_id
+        # self.session_ids[app_id] = session_id
+        if not app_id in self.session_ids:
+            self.session_ids[app_id] = []
+        self.session_ids[app_id].append(session_id)
     
     def get_session_id(self, app_id: int) -> Optional[str]:
-        return self.session_ids.get(app_id)
+        return self.session_ids.get(app_id, [])
 
     def to_json(self) -> dict:
         """

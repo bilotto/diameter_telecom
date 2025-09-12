@@ -10,6 +10,9 @@ if TYPE_CHECKING:
     from ..subscriber import Subscriber
 logger = logging.getLogger(__name__)
 
+def convert_timestamp(timestamp: str) -> str:
+    return datetime.datetime.fromtimestamp(float(timestamp), tz=datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
 class DiameterMessage:
     message: CreditControlRequest | ReAuthRequest | AbortSessionRequest | SpendingLimitRequest | SpendingStatusNotificationRequest | SessionTerminationRequest | AaRequest | CreditControlAnswer | ReAuthAnswer | AbortSessionAnswer | SpendingLimitAnswer | SpendingStatusNotificationAnswer | SessionTerminationAnswer | AaAnswer | DisconnectPeerRequest | DisconnectPeerAnswer
     def __init__(self, obj):

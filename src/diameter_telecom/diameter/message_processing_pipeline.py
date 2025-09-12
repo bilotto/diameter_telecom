@@ -65,15 +65,22 @@ class MessageProcessingPipeline:
 
         gv_stages['session'] = session
 
-        # Update subscriber's session_ids tracking if subscriber exists
-        if subscriber:
-            subscriber.session_ids[app_id] = session_id
-            logger.debug(f"Updated subscriber {subscriber.msisdn} session_ids: {subscriber.session_ids}")
 
+        # Bind Rx/Sy sessions to Gx sessions after creation
         if app_id == APP_3GPP_RX:
             self.stage_bind_rx_to_gx(gv_stages)
         elif app_id == APP_3GPP_SY:
             self.stage_bind_sy_to_gx(gv_stages)
+
+        if not gv_stages.get('subscriber'):
+            gv_stages['subscriber'] = session.subscriber
+
+        # Update subscriber's session_ids tracking if subscriber exists
+        if gv_stages.get('subscriber'):
+            subscriber = gv_stages['subscriber']
+            subscriber.add_session_id(app_id, session_id)
+            logger.debug(f"Updated subscriber {subscriber.msisdn} session_ids: {subscriber.session_ids}")
+
         
         self.sessions.add_session(app_id, session)
 
@@ -181,7 +188,7 @@ class MessageProcessingPipeline:
             subscriber.session_ids.pop(APP_3GPP_GX, None)
             return
         
-        # Check if the Gx session is active (preferred) or bind anyway
+        # Bind the Sy session to the Gx session
         sy_session.gx_session_id = gx_session.session_id
         sy_session.subscriber = gx_session.subscriber
         

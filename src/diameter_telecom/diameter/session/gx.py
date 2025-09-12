@@ -31,4 +31,5 @@ class GxSession(DiameterSession):
             session_data['framed_ipv6_prefix'] = self.framed_ipv6_prefix
         if self.called_station_id:
             session_data['called_station_id'] = self.called_station_id
+
         return session_data

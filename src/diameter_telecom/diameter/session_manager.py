@@ -33,8 +33,8 @@ class SessionManager:
             subscribers=self.subscribers
         )
 
-    def get_messages(self):
-        return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
+    # def get_messages(self):
+    #     return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
 
     def process_diameter_message(self, dm: DiameterMessage):
         """Main entry point for processing Diameter messages.
@@ -61,14 +61,14 @@ class SessionManager:
         self.pipeline.process_app_specific_logic(gv_stages)
         
         # Handle final message storage and association
-        session = gv_stages.get('session')
+        session: DiameterSession = gv_stages.get('session')
         if session:
             session.messages.append(dm)
             subscriber = gv_stages.get('subscriber')
             if subscriber:
                 dm.subscriber = subscriber
 
-        self.messages.append(dm)
+        # self.messages.append(dm)
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
         self.process_diameter_message(diameter_message)
@@ -96,18 +96,20 @@ class SessionManager:
             session_manager_data = dict()
             # Extract sessions data
             sessions_data = self.sessions.to_json()
+            session_manager_data['sessions'] = sessions_data
+
             
             # Extract subscribers data
             subscribers_data = self.subscribers.to_json()
-            
-            # Extract messages data
-            messages_data = []
-            # Sort by timestamp
-            messages_data = sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
-            messages_data = [message.to_json() for message in messages_data]
-            session_manager_data['sessions'] = sessions_data
             session_manager_data['subscribers'] = subscribers_data
-            session_manager_data['messages'] = messages_data
+
+            
+            # # Extract messages data
+            # messages_data = []
+            # # Sort by timestamp
+            # messages_data = sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
+            # messages_data = [message.to_json() for message in messages_data]
+            # session_manager_data['messages'] = messages_data
 
             return session_manager_data
             
@@ -124,48 +126,66 @@ class SessionManager:
         }
         return app_names.get(app_id, f"App_{app_id}")
 
-    def _calculate_statistics(self, sessions_data: dict, subscribers_data: dict, messages_data: list) -> dict:
-        """Calculate comprehensive statistics for the session manager."""
-        try:
-            stats = {
-                "total_sessions": 0,
-                "total_subscribers": len(subscribers_data),
-                "total_messages": len(messages_data),
-                "sessions_by_app": {},
-                "sessions_by_status": {"active": 0, "ended": 0, "error": 0},
-                "subscribers_with_messages": 0
-            }
+    def get_session_messages(self, app_id: int, session_id: str) -> List[DiameterMessage]:
+        return self.sessions.get_session_by_id(app_id, session_id).messages
+
+    def get_messages_by_msisdn(self, msisdn: str) -> List[DiameterMessage]:
+        subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn)
+        messages: List[DiameterMessage] = []
+        for app_id, session_id_list in subscriber.session_ids.items():
+            for session_id in session_id_list:
+                messages.extend(self.get_session_messages(app_id, session_id))
+        messages.sort(key=lambda x: x.timestamp if x.timestamp else float('inf'))
+        return messages
+
+    def get_subscriber_message_by_index(self, msisdn: str, index: int) -> DiameterMessage:
+        messages = self.get_messages_by_msisdn(msisdn)
+        return messages[index].dump()
+
+    # def _calculate_statistics(self, sessions_data: dict, subscribers_data: dict, messages_data: list) -> dict:
+    #     """Calculate comprehensive statistics for the session manager."""
+    #     try:
+    #         stats = {
+    #             "total_sessions": 0,
+    #             "total_subscribers": len(subscribers_data),
+    #             "total_messages": len(messages_data),
+    #             "sessions_by_app": {},
+    #             "sessions_by_status": {"active": 0, "ended": 0, "error": 0},
+    #             "subscribers_with_messages": 0
+    #         }
             
-            # Calculate session statistics
-            for app_name, app_data in sessions_data.items():
-                app_sessions = app_data.get("sessions", {})
-                app_total = len(app_sessions)
-                stats["total_sessions"] += app_total
-                stats["sessions_by_app"][app_name] = {
-                    "total": app_total,
-                    "active": 0,
-                    "ended": 0,
-                    "error": 0
-                }
+    #         # Calculate session statistics
+    #         for app_name, app_data in sessions_data.items():
+    #             app_sessions = app_data.get("sessions", {})
+    #             app_total = len(app_sessions)
+    #             stats["total_sessions"] += app_total
+    #             stats["sessions_by_app"][app_name] = {
+    #                 "total": app_total,
+    #                 "active": 0,
+    #                 "ended": 0,
+    #                 "error": 0
+    #             }
                 
-                for session in app_sessions.values():
-                    if session.get("active"):
-                        stats["sessions_by_status"]["active"] += 1
-                        stats["sessions_by_app"][app_name]["active"] += 1
-                    elif session.get("ended"):
-                        stats["sessions_by_status"]["ended"] += 1
-                        stats["sessions_by_app"][app_name]["ended"] += 1
-                    elif session.get("error"):
-                        stats["sessions_by_status"]["error"] += 1
-                        stats["sessions_by_app"][app_name]["error"] += 1
+    #             for session in app_sessions.values():
+    #                 if session.get("active"):
+    #                     stats["sessions_by_status"]["active"] += 1
+    #                     stats["sessions_by_app"][app_name]["active"] += 1
+    #                 elif session.get("ended"):
+    #                     stats["sessions_by_status"]["ended"] += 1
+    #                     stats["sessions_by_app"][app_name]["ended"] += 1
+    #                 elif session.get("error"):
+    #                     stats["sessions_by_status"]["error"] += 1
+    #                     stats["sessions_by_app"][app_name]["error"] += 1
             
-            # Calculate subscriber statistics
-            for subscriber in subscribers_data.values():
-                if subscriber.get("message_count", 0) > 0:
-                    stats["subscribers_with_messages"] += 1
+    #         # Calculate subscriber statistics
+    #         for subscriber in subscribers_data.values():
+    #             if subscriber.get("message_count", 0) > 0:
+    #                 stats["subscribers_with_messages"] += 1
             
-            return stats
+    #         return stats
             
-        except Exception as e:
-            logger.exception("Failed to calculate session manager statistics")
-            return {"error": f"Statistics calculation failed: {str(e)}"}
+    #     except Exception as e:
+    #         logger.exception("Failed to calculate session manager statistics")
+    #         return {"error": f"Statistics calculation failed: {str(e)}"}
+
+

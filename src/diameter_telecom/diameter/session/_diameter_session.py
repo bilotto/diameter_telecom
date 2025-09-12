@@ -1,5 +1,5 @@
 from .. import Subscriber
-from ..message import DiameterMessage, Message
+from ..message import DiameterMessage, Message, convert_timestamp
 from ..constants import *
 from typing import List, Optional
 import time
@@ -107,17 +107,22 @@ class DiameterSession:
             dict: JSON-serializable representation of the session
         """
         try:
-            session_data = {
-                "session_id": self.session_id,
-                "active": self.active,
-                "error": self.error,
-                "ended": self.ended,
-                "start_time": self.start_time,
-                "end_time": self.end_time,
-                "duration": self.duration,
-                "message_count": self.n_messages,
-                # "session_type": self.__class__.__name__
-            }
+
+            session_data = dict()
+
+            session_data["session_id"] = self.session_id
+            session_data["active"] = self.active
+            session_data["error"] = self.error
+            session_data["ended"] = self.ended
+            if self.start_time:
+                session_data["start_time"] = convert_timestamp(self.start_time)
+            if self.end_time:
+                session_data["end_time"] = convert_timestamp(self.end_time)
+            if self.duration:
+                session_data["duration"] = self.duration
+            # session_data["message_count"] = self.n_messages
+
+            # "session_type": self.__class__.__name__
             
             # # Add session-specific attributes for Gx sessions
             # if hasattr(self, "framed_ip_address"):
@@ -169,7 +174,7 @@ class DiameterSession:
             
             # Add subscriber reference if available
             if self.subscriber:
-                session_data["subscriber"] = self.subscriber.to_json()
+                session_data["msisdn"] = self.subscriber.msisdn
             
             # Add sample messages (limit to 5 for performance)
             # session_data["sample_messages"] = [
