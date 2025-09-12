@@ -1,0 +1,52 @@
+---
+description: "Diameter message processing patterns and best practices"
+---
+
+# Diameter Message Processing Patterns
+
+## Message Processing Pipeline Architecture
+The [MessageProcessingPipeline](mdc:src/diameter_telecom/diameter/message_processing_pipeline.py) handles all Diameter message processing through discrete stages:
+
+### Core Processing Flow
+1. **`stage_get_session`** - Retrieve existing session from storage
+2. **`stage_create_session`** - Create new session if not found
+3. **`stage_get_subscriber`** - Get subscriber from existing session
+4. **`stage_identify_subscriber`** - Identify subscriber from message content
+5. **Application-specific binding** - `stage_bind_rx_to_gx` or `stage_bind_sy_to_gx`
+6. **Business logic processing** - `stage_process_gx_message`, etc.
+
+### Key Patterns
+
+#### Session Creation Pattern
+```python
+# Always check for existing session first
+session = self.sessions.get_session_by_id(app_id, session_id)
+if not session:
+    # Create new session with extracted attributes
+    session = GxSession(session_id=session_id, ...)
+    # Update subscriber session tracking
+    subscriber.session_ids[app_id] = session_id
+```
+
+#### Session Binding Pattern
+```python
+# Use direct lookup for performance
+gx_session_id = subscriber.session_ids.get(APP_3GPP_GX)
+if gx_session_id:
+    gx_session = self.sessions.get_session_by_id(APP_3GPP_GX, gx_session_id)
+    # Bind sessions
+    sy_session.gx_session_id = gx_session.session_id
+```
+
+#### Session Cleanup Pattern
+```python
+# Clean up subscriber tracking when session ends
+def _cleanup_session_from_subscriber(self, session, app_id):
+    if session.subscriber:
+        session.subscriber.session_ids.pop(app_id, None)
+```
+
+## Error Handling
+- **Bounds checking**: Always validate array/list access in AVP parsing
+- **Session state tracking**: Maintain session.active, session.error, session.ended states
+- **Graceful degradation**: Log errors but continue processing other messages

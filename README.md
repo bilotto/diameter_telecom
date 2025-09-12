@@ -11,34 +11,46 @@ Diameter Telecom brings telecom intelligence to the powerful but low-level diame
 Diameter Telecom extends the base diameter library with telecom-specific functionality:
 
 - **Base Layer**: Uses the [diameter](https://github.com/mensonen/diameter) library for core Diameter protocol implementation
+- **Processing Layer**: High-performance message processing with:
+  - **SessionManager**: Centralized orchestration of message processing and data management
+  - **MessageProcessingPipeline**: Stage-based processing for scalability and maintainability
+  - **Optimized Session Binding**: Direct lookups using subscriber tracking for performance
 - **Telecom Layer**: Adds telecom-specific features like:
-  - 3GPP network element implementations (PCRF, PCEF, AF)
+  - 3GPP network element implementations (PCRF, PCEF, AF, OCS)
   - Telecom-specific message handling and parsing
-  - Session management for different Diameter applications
-  - Subscriber and carrier management
+  - Advanced session management for Gx, Rx, and Sy applications
+  - Subscriber and carrier management with intelligent session tracking
 
 ## Features
 
+- **High-Performance Processing Architecture**
+  - **SessionManager**: Central orchestrator for message processing and data management
+  - **MessageProcessingPipeline**: Stage-based processing for optimal performance and maintainability
+  - **Optimized Session Binding**: Direct lookups using `subscriber.session_ids` for O(1) performance
+  - **Memory-Efficient**: Prompt cleanup and optimized data structures for telecom-scale throughput
+
 - **Telecom-Specific Applications**
-  - Gx Application: Policy and Charging Control
-  - Rx Application: Application Function
-  - Sy Application: Spending Limit Control
+  - **Gx Application**: Policy and Charging Control (PCRF-PCEF)
+  - **Rx Application**: Application Function (PCRF-AF)  
+  - **Sy Application**: Spending Limit Control (PCRF-OCS)
 
-- **Enhanced Message Handling**
-  - Telecom-specific message parsing and formatting
-  - Support for various Diameter message types (CCR/CCA, RAR/RAA, etc.)
-  - Subscriber information management
-  - Session tracking and management
+- **Robust Message Handling**
+  - **Safe AVP Parsing**: Bounds checking prevents crashes from malformed data
+  - **Comprehensive Message Support**: CCR/CCA, RAR/RAA, AAR/AAA, SLR/SLA, STR/STA
+  - **Error Resilience**: Graceful handling of malformed or incomplete Diameter messages
+  - **Message State Tracking**: Complete message lifecycle management
 
-- **Entity Management**
-  - Support for 3GPP network elements (PCEF, PCRF, AF)
-  - Carrier and subscriber management
-  - APN (Access Point Name) handling
+- **Advanced Session Management**
+  - **Cross-Application Binding**: Intelligent Sy-to-Gx and Rx-to-Gx session binding
+  - **Session Lifecycle**: Full state tracking (creation → activation → termination)
+  - **Subscriber Tracking**: Efficient session-to-subscriber association with cleanup
+  - **Message History**: Complete session message history and context preservation
 
-- **Session Management**
-  - Per-application session tracking with message history and subscriber context
-  - Message history and state management
-  - Subscriber association with sessions
+- **Enterprise-Grade Entity Management**
+  - **3GPP Network Elements**: PCEF, PCRF, AF, OCS implementations
+  - **Subscriber Management**: MSISDN/IMSI-based identification and tracking
+  - **Carrier & APN Handling**: Comprehensive telecom network support
+  - **Service Layer**: Data and Voice service implementations
 
 ### Additional Capabilities
 
@@ -178,29 +190,117 @@ These handlers are automatically configured when using the entity classes (PCRF,
 
 ## Key Components
 
-### Applications
+### Core Processing Architecture
 
-The library provides implementations for three main Diameter applications:
+- **SessionManager**: The central orchestrator that manages all message processing, session storage, and subscriber tracking. Delegates processing logic to MessageProcessingPipeline while maintaining high-level data management.
 
-- **Gx Application**: Used for Policy and Charging Control
-- **Rx Application**: Used for Application Function
-- **Sy Application**: Used for Spending Limit Control
+- **MessageProcessingPipeline**: Handles stage-based message processing through discrete, testable stages:
+  - Session retrieval and creation
+  - Subscriber identification and management  
+  - Cross-application session binding
+  - Application-specific business logic
 
-### Sessions
+- **Sessions & Subscribers**: Optimized data management with efficient lookup patterns and memory cleanup.
 
-Session management is handled through specialized session classes:
+### Diameter Applications
 
-- GxSession: Manages Gx application sessions
-- RxSession: Manages Rx application sessions
-- SySession: Manages Sy application sessions
+The library provides complete implementations for 3GPP Diameter applications:
 
-### Entities
+- **GxApplication**: Policy and Charging Control (PCRF ↔ PCEF)
+- **RxApplication**: Application Function (PCRF ↔ AF)  
+- **SyApplication**: Spending Limit Control (PCRF ↔ OCS)
 
-The library includes implementations for common 3GPP network elements:
+### Session Management
 
-- PCEF: Policy and Charging Enforcement Function
-- PCRF: Policy and Charging Rules Function
-- AF: Application Function
+Advanced session handling through specialized session classes:
+
+- **GxSession**: Policy sessions with IP allocation, APN, and charging rule management
+- **RxSession**: Media sessions with Gx session binding for coordinated policy control
+- **SySession**: Spending limit sessions with Gx session binding for integrated charging
+
+Key features:
+- **Cross-application binding**: Sy and Rx sessions automatically bind to related Gx sessions
+- **Optimized lookups**: Direct session access via `subscriber.session_ids` dictionary  
+- **Lifecycle management**: Complete session state tracking with automatic cleanup
+
+### 3GPP Network Entities
+
+Production-ready implementations of telecom network elements:
+
+- **PCEF**: Policy and Charging Enforcement Function (with Gx application)
+- **PCRF**: Policy and Charging Rules Function (with Gx, Rx, Sy applications)
+- **AF**: Application Function (with Rx application)
+- **OCS**: Online Charging System (with Sy application)
+- **DSC**: Diameter Signaling Controller for routing and load balancing
+
+## Advanced Usage
+
+### SessionManager Integration
+
+For applications requiring centralized session management and message processing:
+
+```python
+from diameter_telecom.diameter.session_manager import SessionManager
+from diameter_telecom.diameter.message import DiameterMessage
+
+# Create centralized session manager
+session_manager = SessionManager()
+
+# Process messages through the pipeline
+diameter_message = DiameterMessage(hex_string_or_message_object)
+session_manager.process_diameter_message(diameter_message)
+
+# Access processed data
+sessions = session_manager.sessions
+subscribers = session_manager.subscribers
+all_messages = session_manager.get_messages()  # Sorted by timestamp
+```
+
+### Service Layer Usage
+
+For complete telecom service implementations:
+
+```python
+from diameter_telecom.services import DataService
+from diameter_telecom.entities_3gpp import PCEF, OCS
+
+# Create entities
+pcef = PCEF(origin_host="pcef.example.com", realm_name="example.com")
+ocs = OCS(origin_host="ocs.example.com", realm_name="example.com")
+
+# Create service with multiple entities
+data_service = DataService(pcef=pcef, ocs=ocs)
+
+# Automatic session manager integration
+data_service.set_session_manager()  # Creates shared SessionManager
+
+# Send requests through service layer
+request = create_ccr_initial()  # Your message creation
+response = data_service.send_request(request, timeout=10)
+```
+
+### Performance Optimization
+
+The library implements several performance optimizations:
+
+1. **Direct Session Lookups**: Uses `subscriber.session_ids[app_id]` for O(1) session access
+2. **Stage-Based Processing**: Breaks complex operations into discrete, optimized stages
+3. **Memory Management**: Automatic cleanup of terminated sessions and stale references
+4. **Safe AVP Parsing**: Bounds checking prevents crashes while maintaining performance
+
+### Session Binding Patterns
+
+The library automatically handles cross-application session binding:
+
+```python
+# When creating Sy session, it automatically binds to active Gx session
+sy_session = SySession(session_id="sy-123", subscriber=subscriber)
+# sy_session.gx_session_id is automatically set if Gx session exists
+
+# Same for Rx sessions  
+rx_session = RxSession(session_id="rx-456", subscriber=subscriber)
+# rx_session.gx_session_id is automatically set based on subscriber tracking
+```
 
 ## Acknowledgments
 

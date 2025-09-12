@@ -47,26 +47,3 @@ diameter_message.message.subscription_id = subscriber.subscription_id
 
 request, answer = pcef_service.send_request(diameter_message)
 
-# Access sessions through SessionManager
-print("PCEF Gx Sessions:", pcef_service.gx_app.session_manager.sessions[APP_3GPP_GX])
-print("PCRF Gx Sessions:", pcrf_service.gx_app.session_manager.sessions[APP_3GPP_GX])
-
-# Show session details
-for session_id, session in pcef_service.gx_app.session_manager.sessions[APP_3GPP_GX].items():
-    print(f"PCEF Session {session_id}:")
-    print(f"  - Active: {session.active}")
-    print(f"  - Subscriber: {session.subscriber}")
-    print(f"  - Messages: {len(session.messages)}")
-    if hasattr(session, 'framed_ip_address') and session.framed_ip_address:
-        print(f"  - Framed IP: {session.framed_ip_address}")
-
-# Show all messages processed by SessionManager
-print(f"Total messages processed by PCEF SessionManager: {len(pcef_service.gx_app.session_manager.messages)}")
-print(f"Total subscribers in PCEF SessionManager: {len(pcef_service.gx_app.session_manager.subscribers.subscribers)}")
-
-
-
-
-
-# pcef_service.stop()
-# pcrf_service.stop()

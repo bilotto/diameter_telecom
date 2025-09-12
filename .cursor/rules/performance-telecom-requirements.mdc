@@ -1,0 +1,27 @@
+---
+alwaysApply: true
+---
+
+# Performance Requirements for Telecom Systems
+
+When working with telecom/mission-critical systems in this codebase:
+
+## Performance-First Approach
+1. **Always evaluate performance impact** - Consider latency, throughput, memory usage, and concurrency for every change
+2. **Identify bottlenecks proactively** - Look for nested loops, blocking I/O, inefficient database queries, unnecessary allocations
+3. **Prefer efficient patterns** - Choose optimizations that maintain both efficiency and readability
+4. **Consider design-level changes** - When needed, suggest parallelization, batching, caching, async patterns, or data structure redesigns
+
+## Common Telecom Performance Patterns
+- **Session lookups**: Use direct ID-based lookups (`subscriber.session_ids[app_id]`) rather than scanning collections
+- **Message processing**: Process in pipeline stages to avoid monolithic functions
+- **Memory management**: Clean up session references promptly to prevent memory leaks
+- **Concurrency**: Design for high-throughput message processing
+
+## Trade-off Evaluation
+Always highlight trade-offs between:
+- Performance vs maintainability
+- Performance vs scalability  
+- Optimization complexity vs readability
+
+**Goal**: Treat performance as a first-class requirement in all telecom system modifications.

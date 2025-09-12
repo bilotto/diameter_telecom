@@ -95,14 +95,19 @@ def decode_framed_ipv6(raw_bytes: bytes) -> Optional[str]:
         '2001:db8::/64'
     """
     try:
+        # Bounds checking to prevent list index out of range
+        if not raw_bytes or len(raw_bytes) < 2:
+            logger.warning(f"Invalid framed IPv6 prefix data - too short: {len(raw_bytes) if raw_bytes else 0} bytes")
+            return None
+            
         reserved_byte = raw_bytes[0]
         prefix_length = raw_bytes[1]
         ipv6_prefix_bytes = raw_bytes[2:]
         ipv6_prefix_bytes_padded = ipv6_prefix_bytes.ljust(16, b'\x00')
         ipv6_address = ipaddress.IPv6Address(ipv6_prefix_bytes_padded)
         return f"{ipv6_address}/{prefix_length}"
-    except:
-        logger.error(f"Error decoding framed IPv6: {raw_bytes}")
+    except Exception as e:
+        logger.error(f"Error decoding framed IPv6: {raw_bytes}, error: {e}")
         return None
     
 
@@ -280,6 +285,11 @@ def parse_user_location_info_fixed(hex_string: str):
     #   - Digit 3: Byte 2 high nibble
     # This may differ from raw spec parsing (3GPP TS 24.008), but matches real-world tools.
     def decode_mcc_mnc(data):
+        # Bounds checking to prevent list index out of range
+        if not data or len(data) < 3:
+            logger.warning(f"Invalid MCC/MNC data - too short: {len(data) if data else 0} bytes")
+            return "000", "00"  # Return default values
+            
         # MCC
         mcc = f"{data[0] & 0x0F}{(data[0] & 0xF0) >> 4}{data[1] & 0x0F}"
 
@@ -295,18 +305,38 @@ def parse_user_location_info_fixed(hex_string: str):
 
         return mcc, mnc
 
-    data = bytes.fromhex(hex_string.replace(" ", ""))
+    try:
+        data = bytes.fromhex(hex_string.replace(" ", ""))
+        
+        # Bounds checking for main data
+        if not data or len(data) < 1:
+            logger.warning(f"Invalid location info data - empty")
+            return None
+            
+        if data[0] != 0x82:
+            logger.warning(f"Unsupported Location Type: {data[0] if data else 'None'}")
+            return None
+            
+        # Check if we have enough data for TAI part
+        if len(data) < 6:
+            logger.warning(f"Invalid location info data - too short for TAI: {len(data)} bytes")
+            return None
 
-    if data[0] != 0x82:
-        raise ValueError("Unsupported Location Type")
+        # --- TAI part (bytes 1–5) ---
+        mcc_tai, mnc_tai = decode_mcc_mnc(data[1:4])
+        tac = int.from_bytes(data[4:6], byteorder='big')
 
-    # --- TAI part (bytes 1–5) ---
-    mcc_tai, mnc_tai = decode_mcc_mnc(data[1:4])
-    tac = int.from_bytes(data[4:6], byteorder='big')
+        # Check if we have enough data for ECGI part
+        if len(data) < 13:
+            logger.warning(f"Invalid location info data - too short for ECGI: {len(data)} bytes")
+            return None
 
-    # --- ECGI part (bytes 6–10) ---
-    mcc_ecgi, mnc_ecgi = decode_mcc_mnc(data[6:9])
-    eci = int.from_bytes(data[9:13], byteorder='big')  # 4 full bytes
+        # --- ECGI part (bytes 6–12) ---
+        mcc_ecgi, mnc_ecgi = decode_mcc_mnc(data[6:9])
+        eci = int.from_bytes(data[9:13], byteorder='big')  # 4 full bytes
+    except Exception as e:
+        logger.error(f"Error parsing location info: {e}")
+        return None
 
     return {
         "TAI": {

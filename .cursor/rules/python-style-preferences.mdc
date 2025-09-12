@@ -1,0 +1,56 @@
+---
+globs: "*.py"
+---
+
+# Python Code Style Preferences
+
+## Object-Oriented Design Principles
+- **Single Responsibility Principle**: Each class should have one clear purpose
+- **Dependency Injection**: Pass dependencies to constructors rather than creating them internally
+- **Clean Separation**: Separate business logic, data management, and processing stages
+
+Example from [SessionManager](mdc:src/diameter_telecom/diameter/session_manager.py):
+```python
+@dataclass 
+class SessionManager:
+    sessions: Sessions = field(default_factory=Sessions)
+    subscribers: Subscribers = field(default_factory=Subscribers)
+    pipeline: MessageProcessingPipeline = field(init=False)
+    
+    def __post_init__(self):
+        self.pipeline = MessageProcessingPipeline(
+            sessions=self.sessions, 
+            subscribers=self.subscribers
+        )
+```
+
+## Code Organization Patterns
+- **Extract constants** into separate modules/variables
+- **Avoid rework** - prefer reusable, scalable solutions
+- **Model real-world objects** as Python classes
+- **Create reusable libraries** rather than one-off scripts
+
+## Preferred Patterns
+- Use `@dataclass` for data structures with `field()` for complex defaults
+- Use type hints consistently: `Dict[int, str]`, `Optional[Session]`
+- Use descriptive variable names: `gx_session_id`, `subscriber_session_ids`
+- Prefer composition over inheritance
+
+## Error Handling Philosophy  
+- **Don't just agree** - challenge assumptions and test logic
+- **Provide alternatives** - offer multiple approaches when appropriate
+- **Clean and minimal** - avoid verbose logging or complex error handling unless necessary
+- **Fail gracefully** - log errors but continue processing when possible
+
+## Performance Considerations
+- **Direct lookups** over scanning: `subscriber.session_ids.get(app_id)`  
+- **Early returns** to avoid nested logic
+- **Minimal allocations** in hot paths
+- **Pipeline processing** to break down complex operations
+
+## Anti-Patterns to Avoid
+- Monolithic classes that do everything
+- Global state or singletons unless absolutely necessary  
+- Complex inheritance hierarchies
+- Verbose logging that clutters the code
+- Creating temporary files or scripts when library solutions exist

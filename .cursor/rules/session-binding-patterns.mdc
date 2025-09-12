@@ -1,0 +1,66 @@
+---
+description: "Session binding and lifecycle management patterns"
+---
+
+# Session Binding and Lifecycle Patterns
+
+## Subscriber Session Tracking
+The [Subscriber](mdc:src/diameter_telecom/subscriber.py) class uses `session_ids: Dict[int, str]` for efficient session lookup:
+
+```python
+subscriber.session_ids = {
+    16777238: "gx-session-id-123",  # Gx session
+    16777236: "rx-session-id-456",  # Rx session  
+    16777302: "sy-session-id-789"   # Sy session
+}
+```
+
+## Application Binding Patterns
+
+### Sy-to-Gx Binding
+Sy sessions (spending limit control) must bind to active Gx sessions:
+```python
+def stage_bind_sy_to_gx(self, gv_stages):
+    # Direct lookup using subscriber.session_ids for performance
+    gx_session_id = subscriber.session_ids.get(APP_3GPP_GX)
+    if gx_session_id:
+        gx_session = self.sessions.get_session_by_id(APP_3GPP_GX, gx_session_id)
+        if gx_session:
+            sy_session.gx_session_id = gx_session.session_id
+```
+
+### Rx-to-Gx Binding  
+Rx sessions (media control) bind to Gx sessions with fallback to MSISDN lookup:
+```python
+def stage_bind_rx_to_gx(self, gv_stages):
+    # Try direct lookup first
+    gx_session_id = subscriber.session_ids.get(APP_3GPP_GX)
+    # Fallback to MSISDN-based search if needed
+```
+
+## Session Lifecycle Management
+
+### Session Creation
+- Extract attributes from initial request (CCR-I for Gx)
+- Update `subscriber.session_ids` immediately after creation
+- Perform application-specific binding if required
+
+### Session Activation
+- Set `session.active = True` on successful CCA-I
+- Track session state changes with timestamps
+
+### Session Termination
+- Set `session.active = False` and `session.ended = True` on CCA-T
+- Call `_cleanup_session_from_subscriber()` to remove from tracking
+- Maintain cleanup on error responses as well
+
+### Error Handling
+- Set `session.error = True` on non-success result codes
+- Clean up subscriber tracking on permanent errors
+- Log session state changes for debugging
+
+## Best Practices
+1. **Always use direct lookup** (`subscriber.session_ids`) before scanning collections
+2. **Update tracking immediately** when creating or destroying sessions  
+3. **Clean up promptly** to prevent memory leaks and stale references
+4. **Bind early** - perform binding during session creation, not later

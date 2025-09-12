@@ -1,0 +1,72 @@
+---
+description: "Safe AVP parsing patterns to prevent runtime errors"
+---
+
+# AVP Parsing Safety Patterns
+
+## Bounds Checking Requirements
+Always perform bounds checking when parsing AVP data to prevent "list index out of range" errors.
+
+### Pattern: Safe Array Access
+```python
+def safe_parse_function(raw_bytes):
+    # ALWAYS check bounds first
+    if not raw_bytes or len(raw_bytes) < minimum_required_length:
+        logger.warning(f"Invalid data - too short: {len(raw_bytes) if raw_bytes else 0} bytes")
+        return None
+    
+    # Now safe to access
+    first_byte = raw_bytes[0]
+    second_byte = raw_bytes[1]
+```
+
+## Common AVP Parsing Patterns
+
+### IPv6 Prefix Parsing
+From [parse_avp.py](mdc:src/diameter_telecom/diameter/parse_avp.py):
+```python
+def decode_framed_ipv6(raw_bytes):
+    # Bounds checking prevents crashes
+    if not raw_bytes or len(raw_bytes) < 2:
+        logger.warning(f"Invalid framed IPv6 prefix data - too short")
+        return None
+        
+    reserved_byte = raw_bytes[0]
+    prefix_length = raw_bytes[1]
+    # ... safe to proceed
+```
+
+### Location Info Parsing
+```python
+def parse_user_location_info_fixed(hex_string):
+    data = bytes.fromhex(hex_string.replace(" ", ""))
+    
+    # Bounds checking for MCC/MNC decoding
+    if not data or len(data) < 3:
+        logger.warning(f"Invalid MCC/MNC data - too short")
+        return None, None
+        
+    # Check sufficient data for ECGI
+    if len(data) < 13:
+        logger.warning(f"Invalid location info - insufficient data")
+        return None
+```
+
+## Error Handling Strategy
+1. **Validate early** - Check data length before any array access
+2. **Log warnings** - Always log what went wrong for debugging
+3. **Return None safely** - Don't crash, return None and let caller handle
+4. **Provide context** - Include actual vs expected lengths in error messages
+
+## Testing Pattern
+When modifying AVP parsing:
+1. Test with **empty data** (`[]` or `None`)
+2. Test with **short data** (1 byte when 3+ expected)  
+3. Test with **malformed data** from real PCAP files
+4. Verify **graceful degradation** - system continues processing other messages
+
+## Performance Considerations
+- Bounds checking adds minimal overhead
+- Early validation prevents expensive exception handling
+- Logging helps debug real-world parsing issues
+- Better to skip one malformed AVP than crash entire session
