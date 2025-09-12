@@ -1,0 +1,95 @@
+Great idea! Let's explore the business logic throughout the entire library to identify areas that might need attention, refactoring, or optimization. I'll search for complex logic patterns beyond the SessionManager.
+
+[11 tools called]
+
+## 🔍 **Business Logic Analysis Complete!**
+
+After exploring the entire library, I've found several areas with **significant business logic** that could benefit from refactoring and improvements:
+
+---
+
+## 📋 **Key Business Logic Areas Identified**
+
+### **1. 🏗️ Entity Classes (PCEF, PCRF, AF, OCS, DSC)**
+**Issue**: **Heavy code duplication** - almost identical implementations across entities
+```python
+# PCEF, PCRF, AF, OCS all have nearly identical:
+- __init__ patterns
+- peer management (add_node_as_peer, add_realm)  
+- setup_app logic
+- start/stop/wait_for_ready methods
+```
+
+### **2. 📨 Request Handlers (Gx, Rx, Sy)**
+**Issue**: **Inconsistent patterns** and **legacy code** mixing with modern patterns
+```python
+# In handle_ccr - mixing old and new approaches:
+gx_session = app.get_gx_session_by_id(message.session_id)  # Old way
+# vs SessionManager handling it automatically            # New way
+```
+
+### **3. 🎛️ Service Layer** 
+**Issue**: **Complex conditional logic** in `set_host_and_realm` - **58 lines** of repetitive code
+```python
+# Repeated pattern for each app_id:
+if diameter_message.app_id == APP_3GPP_GX:
+    diameter_message.message.origin_host = self.pcef.origin_host.encode()
+    # ... 15 more lines
+elif diameter_message.app_id == APP_3GPP_RX:
+    diameter_message.message.origin_host = self.af.origin_host.encode()
+    # ... same 15 lines repeated
+```
+
+### **4. 🔧 AVP Parsing Logic**
+**Issue**: **Complex nested functions** with similar patterns but different implementations  
+```python
+# Multiple parsing functions follow similar patterns:
+- parse_subscription_id (43 lines)
+- check_charging_rule_install (complex nested loops)
+- parse_user_location_info_fixed (75 lines with bounds checking)
+```
+
+### **5. 🌐 DSC Routing Logic**
+**Issue**: **Incomplete implementation** - complex routing logic is commented out
+```python
+# 30+ lines of commented routing logic indicates unfinished feature
+# peer_list = []
+# for peer in app.node.peers.values():
+#     # Complex peer selection logic...
+```
+
+---
+
+## 🎯 **Top Improvement Opportunities**
+
+### **Priority 1: Entity Class Duplication** 
+- **Impact**: High - affects maintainability across all network elements
+- **Effort**: Medium - extract common base class or composition pattern
+- **Benefit**: Eliminate ~200+ lines of duplicated code
+
+### **Priority 2: Service Layer Complexity**
+- **Impact**: High - affects every service request  
+- **Effort**: Low - use configuration-driven approach
+- **Benefit**: Simplify complex conditional logic, improve maintainability
+
+### **Priority 3: Request Handler Consistency**
+- **Impact**: Medium - affects message processing reliability
+- **Effort**: Medium - standardize patterns and remove legacy code
+- **Benefit**: Consistent error handling, cleaner code
+
+### **Priority 4: AVP Parsing Framework**
+- **Impact**: Medium - affects message parsing robustness
+- **Effort**: High - create common parsing patterns
+- **Benefit**: More consistent error handling, reusable patterns
+
+---
+
+## 🤔 **Which Area Would You Like to Tackle First?**
+
+I recommend starting with **Entity Class Duplication** since it:
+- Has the **highest impact** on code maintainability
+- Requires **medium effort** (manageable scope)
+- Will **eliminate the most duplicate code**
+- Sets a **foundation pattern** for other improvements
+
+Would you like me to start there, or would you prefer to focus on a different area first?

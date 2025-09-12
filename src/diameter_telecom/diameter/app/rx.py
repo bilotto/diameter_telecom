@@ -47,7 +47,7 @@ class RxApplication(CustomSimpleThreadingApplication):
     
     def terminate_session_after_successful_abort(self, session_id: str):
         """Terminate session after successful abort"""
-        rx_session = self.get_rx_session_by_id(session_id)
+        rx_session = self.get_session_by_id(session_id)
         if not rx_session:
             return
         last_message = rx_session.messages[-1]

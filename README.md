@@ -76,30 +76,54 @@ pip install -e .
 
 ## Quick Start
 
-Here's a simple example of setting up a PCRF-PCEF connection:
+> ⚡ **The recommended way to use diameter-telecom is through the Services layer**, which provides high-level abstractions over network entities and handles message routing automatically.
+
+### Services-First Approach (Recommended)
+
+```python
+from diameter_telecom import PCEF, PCRF, OCS, DataService, SessionManager
+from diameter_telecom.diameter.constants import APP_3GPP_GX
+
+# 1. Create and setup network entities
+pcef = PCEF("pcef.mobile.net", "mobile.net", ["127.0.0.1"], tcp_port=3868)
+pcrf = PCRF("pcrf.mobile.net", "mobile.net", ["127.0.0.1"], tcp_port=3869) 
+ocs = OCS("ocs.billing.net", "billing.net", ["127.0.0.1"], tcp_port=3870)
+
+# 2. Establish peer relationships
+pcef.add_node_as_peer(pcrf.node, app_id=APP_3GPP_GX, initiate_connection=True)
+pcrf.add_node_as_peer(pcef.node, app_id=APP_3GPP_GX, initiate_connection=False)
+
+# 3. Setup applications and start entities
+pcef.setup_gx_app()
+pcrf.setup_gx_app() 
+pcef.start()
+pcrf.start()
+
+# 4. Create high-level service (automatically handles message routing)
+data_service = DataService(pcef=pcef, ocs=ocs)
+data_service.set_session_manager(SessionManager())
+
+# 5. Send messages through unified service API
+from diameter_telecom import Subscriber, DiameterMessage
+subscriber = Subscriber(msisdn="1234567890", imsi="123456789012345")
+ccr_message = create_ccr_initial_message(subscriber)
+request, answer = data_service.send_request(ccr_message)
+```
+
+### Direct Entity Usage (Advanced)
 
 ```python
 from diameter_telecom.entities_3gpp import PCRF, PCEF
 
-# Create PCRF and PCEF nodes
-pcrf = PCRF(
-    origin_host="pcrf.python.realm",
-    realm_name="python.realm",
-    ip_addresses=["127.0.0.1"],
-    tcp_port=3868
-)
-pcef = PCEF(
-    origin_host="pcef.python.realm",
-    realm_name="python.realm",
-    ip_addresses=["127.0.0.1"],
-    tcp_port=3869
-)
+# For advanced use cases requiring direct entity control
+pcrf = PCRF("pcrf.python.realm", "python.realm", ["127.0.0.1"], tcp_port=3868)
+pcef = PCEF("pcef.python.realm", "python.realm", ["127.0.0.1"], tcp_port=3869)
 
-# Connect nodes
-pcrf.add_peer(pcef, initiate_connection=False)
-pcef.add_peer(pcrf, initiate_connection=True)
-
-# Start nodes
+# Manual setup required
+pcrf.add_node_as_peer(pcef.node, app_id=APP_3GPP_GX, initiate_connection=False)
+pcef.add_node_as_peer(pcrf.node, app_id=APP_3GPP_GX, initiate_connection=True)
+pcrf.setup_gx_app()
+pcef.setup_gx_app()
 pcrf.start()
 pcef.start()
 ```
@@ -233,6 +257,99 @@ Production-ready implementations of telecom network elements:
 - **OCS**: Online Charging System (with Sy application)
 - **DSC**: Diameter Signaling Controller for routing and load balancing
 
+## Services Architecture
+
+> 🏗️ **Services provide the highest level of abstraction** and are the recommended way to work with diameter-telecom for most use cases.
+
+### Service Layer Overview
+
+The Services layer sits above the entity layer and provides unified interfaces for common telecom scenarios:
+
+```
+📊 Services Layer (High-Level API)
+├─ DataService    → Data sessions (Gx + Sy)
+├─ VoiceService   → Voice/media sessions (Gx + Rx)
+└─ CustomService  → Your domain-specific logic
+
+🔧 Entity Layer (Network Elements) 
+├─ PCEF, PCRF, AF, OCS, DSC
+└─ Direct Diameter application management
+
+⚙️ Base Layer (diameter library)
+└─ Core Diameter protocol implementation
+```
+
+### DataService
+
+Manages data sessions across policy (Gx) and charging (Sy) interfaces:
+
+```python
+from diameter_telecom import DataService, PCEF, OCS
+
+# Service composes multiple entities
+data_service = DataService(pcef=pcef, ocs=ocs)
+
+# Unified message sending across multiple applications
+request, answer = data_service.send_request(ccr_message)
+# ↳ Automatically routes to Gx or Sy based on message type
+```
+
+**Key Features:**
+- **Unified API**: Single `send_request()` handles both Gx and Sy messages
+- **Automatic routing**: Messages routed to correct application based on app_id
+- **Session coordination**: Links Gx policy sessions with Sy charging sessions
+- **Host/realm management**: Automatically sets origin/destination headers
+
+### VoiceService
+
+Manages voice/media sessions across policy (Gx) and media (Rx) interfaces:
+
+```python
+from diameter_telecom import VoiceService, PCEF, AF
+
+# Service handles IMS voice call coordination
+voice_service = VoiceService(pcef=pcef, af=af)
+
+# Coordinates both policy and media reservations
+gx_req, gx_ans = voice_service.send_request(ccr_message)  # Policy
+rx_req, rx_ans = voice_service.send_request(aar_message)  # Media
+# ↳ Sessions automatically bound via framed IP addresses
+```
+
+**Key Features:**
+- **Gx-Rx coordination**: Links policy sessions with media reservations
+- **IMS integration**: Handles P-CSCF scenarios with media control
+- **QoS management**: Coordinates policy rules with media flows
+- **Session binding**: Automatic Rx-to-Gx session association
+
+### Service Benefits
+
+**🎯 Simplified Development:**
+```python
+# Without Services (manual entity management)
+pcef.setup_gx_app()
+pcef.start()
+pcef.wait_for_ready()
+gx_app = pcef.gx_app
+answer = gx_app.send_request_custom(message)
+
+# With Services (unified interface)  
+data_service = DataService(pcef=pcef)
+request, answer = data_service.send_request(message)
+```
+
+**⚡ Automatic Configuration:**
+- **Session Management**: Unified SessionManager across all applications
+- **Message Headers**: Automatic origin/destination host/realm setting
+- **Error Handling**: Consistent error handling and logging across services
+- **Lifecycle Management**: Coordinated start/stop/wait_for_ready operations
+
+**📊 Production Features:**
+- **Multi-threading**: Thread-safe operations across multiple applications
+- **Performance Monitoring**: Built-in statistics and performance tracking
+- **Configuration Management**: Centralized configuration for multiple entities
+- **Extension Points**: Easy to extend with custom service logic
+
 ## Advanced Usage
 
 ### SessionManager Integration
@@ -301,6 +418,59 @@ sy_session = SySession(session_id="sy-123", subscriber=subscriber)
 rx_session = RxSession(session_id="rx-456", subscriber=subscriber)
 # rx_session.gx_session_id is automatically set based on subscriber tracking
 ```
+
+## Examples
+
+The library includes comprehensive examples demonstrating real-world telecom scenarios:
+
+### Comprehensive Examples
+
+1. **`data_service_comprehensive.py`** - Complete DataService usage
+   - Multiple carriers with different APNs (internet, premium, IoT)
+   - 5 different subscriber scenarios (regular, premium, IoT, heavy usage, roaming)
+   - Full session lifecycle (Initial → Updates → Termination)
+   - PCEF-PCRF-OCS integration with Gx/Sy coordination
+
+2. **`voice_service_comprehensive.py`** - Complete VoiceService usage
+   - IMS network simulation with PCEF-PCRF-AF entities
+   - Voice call scenarios (voice, video, HD video, conference)
+   - Gx-Rx session binding and media resource management
+   - Real-world IMS call flows and modifications
+
+3. **`multi_service_advanced.py`** - Advanced multi-service network
+   - Concurrent DataService and VoiceService operations
+   - Multiple carriers (European, American, Asian) with realistic subscriber bases
+   - Performance simulation with 45+ subscribers and concurrent sessions
+   - Network-wide statistics and performance monitoring
+
+### Basic Examples
+
+4. **`pcef_pcrf_connection.py`** - Simple PCEF-PCRF connection
+   - Basic entity setup and message sending
+   - Shows direct entity usage (advanced pattern)
+
+5. **`pcef_pcrf_with_dsc.py`** - DSC-based routing
+   - Demonstrates DSC as Diameter Signaling Controller
+   - Multi-entity coordination through DSC
+
+6. **`subscriber_session.py`** - Subscriber management
+   - Carrier and subscriber setup
+   - APN assignment and session initialization
+
+### Running Examples
+
+```bash
+# Services-based examples (recommended)
+python examples/data_service_comprehensive.py
+python examples/voice_service_comprehensive.py
+python examples/multi_service_advanced.py
+
+# Entity-based examples (advanced usage)
+python examples/pcef_pcrf_connection.py
+python examples/pcef_pcrf_with_dsc.py
+```
+
+> 💡 **Start with the comprehensive examples** to see the Services architecture in action. They demonstrate real-world telecom scenarios and best practices.
 
 ## Acknowledgments
 

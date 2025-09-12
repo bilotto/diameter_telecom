@@ -27,39 +27,25 @@ class VoiceService(Service):
 
 
     def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
-        logger.debug(f"Sending request: {request}")
         request.timestamp = time.time()
         session_id = request.session_id
-        answer = None
+        logger.info(f"VoiceService sending {request.name} for session {session_id}")
+        
         request = self.set_host_and_realm(request)
+        
         if request.app_id == APP_3GPP_GX:
-            # gx_session = self.gx_app.get_session_by_id(session_id)
-            # if not gx_session:
-            #     gx_session = GxSession(session_id)
-            #     gx_session.add_message(request)
-            #     self.gx_app.add_session(gx_session)
-            # logger.debug(f"Sending Gx request: {request}")
+            logger.debug(f"Sending Gx request via PCEF {self.pcef.origin_host}")
             answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
-        elif request.app_id == APP_3GPP_RX:
-            # rx_session = self.rx_app.get_session_by_id(session_id)
-            # #
-            # if not rx_session:
-            #     logger.debug(f"No rx_session found for session_id: {session_id}. Will create a new one")
-            #     gx_session = None
-            #     if request.message.framed_ip_address:
-            #         gx_session = self.gx_app.get_session_by_framed_ip_address(request.message.framed_ip_address)
-            #         if gx_session:
-            #             logger.debug(f"Found gx_session that rx_session is bind to: {gx_session}")
-            #             rx_session = RxSession(session_id, gx_session_id=gx_session.session_id, subscriber=gx_session.subscriber)
-            #         rx_session.add_message(request)
-            #         self.rx_app.add_session(rx_session)
-            #
-            
+            logger.info(f"VoiceService received {answer.name} - Result: {getattr(answer.message, 'result_code', 'N/A')}")
+        elif request.app_id == APP_3GPP_RX and self.af:
+            logger.debug(f"Sending Rx request via AF {self.af.origin_host}")
             answer: DiameterMessage = self.rx_app.send_request_custom(request, timeout)
+            logger.info(f"VoiceService received Rx answer - Result: {getattr(answer.message, 'result_code', 'N/A')}")
         else:
-            raise ValueError(f"Invalid app_id: {request.app_id}")
-        logger.debug(f"Got answer: {answer}")
-        return answer
+            raise ValueError(f"VoiceService cannot handle app_id: {request.app_id}")
+            
+        logger.debug(f"VoiceService request-answer exchange completed for session {session_id}")
+        return (request, answer)
 
 
 # class VoiceService:

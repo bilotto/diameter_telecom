@@ -1,19 +1,10 @@
 from typing import *
 from diameter.message.constants import *
-from ..diameter.helpers import Node, Peer, create_node
+from ..diameter.helpers import Node, Peer, create_node, node_peer_uri
 from ..diameter.app import *
 from ..carrier import Carrier
 import logging
 logger = logging.getLogger(__name__)
-
-def node_peer_uri(node: Node):
-    if node.tcp_port:
-        return f"aaa://{node.origin_host}:{node.tcp_port};transport=tcp"
-    elif node.sctp_port:
-        return f"aaa://{node.origin_host}:{node.sctp_port};transport=sctp"
-    else:
-        raise ValueError(f"Node {node.origin_host} has no TCP or SCTP port")
-
 
 class DiameterEntity:
     def __init__(self, origin_host: str, realm_name: str,

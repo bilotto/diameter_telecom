@@ -13,6 +13,33 @@ from typing import List, Dict
 from diameter.node import Node
 from diameter.node.node import Peer
 
+def node_peer_uri(node: Node) -> str:
+    """
+    Generate a peer URI for a Diameter node.
+    
+    This function creates the appropriate peer URI based on the node's
+    transport configuration (TCP or SCTP).
+    
+    Args:
+        node (Node): The Diameter node
+        
+    Returns:
+        str: Peer URI in the format "aaa://host:port;transport=tcp|sctp"
+        
+    Raises:
+        ValueError: If node has no TCP or SCTP port configured
+        
+    Example:
+        >>> uri = node_peer_uri(my_node)
+        >>> print(uri)  # "aaa://pcrf.example.com:3868;transport=tcp"
+    """
+    if node.tcp_port:
+        return f"aaa://{node.origin_host}:{node.tcp_port};transport=tcp"
+    elif node.sctp_port:
+        return f"aaa://{node.origin_host}:{node.sctp_port};transport=sctp"
+    else:
+        raise ValueError(f"Node {node.origin_host} has no TCP or SCTP port")
+
 def create_node(origin_host: str,
                 realm_name: str,
                 ip_addresses: List[str],

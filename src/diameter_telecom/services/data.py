@@ -27,25 +27,25 @@ class DataService(Service):
     def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
         if not isinstance(request, DiameterMessage):
             raise TypeError("request must be an instance of DiameterMessage")
+        
         request.timestamp = time.time()
         session_id = request.session_id
-        answer = None
+        logger.info(f"DataService sending {request.name} for session {session_id}")
+        
         request = self.set_host_and_realm(request)
+        
         if request.app_id == APP_3GPP_GX:
-            # gx_session = self.gx_app.get_session_by_id(session_id)
-            # if not gx_session:
-            #     gx_session = GxSession(session_id)
-            #     gx_session.add_message(request)
-            #     self.gx_app.add_session(gx_session)
-            # logger.debug(f"Sending Gx request: {request}")
-            # if self.csv_file:
-            #     write_to_csv(self.csv_file, request)
+            logger.debug(f"Sending Gx request via PCEF {self.pcef.origin_host}")
             answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
-            # if self.csv_file:
-            #     write_to_csv(self.csv_file, answer)
+            logger.info(f"DataService received {answer.name} - Result: {getattr(answer.message, 'result_code', 'N/A')}")
+        elif request.app_id == APP_3GPP_SY and self.ocs:
+            logger.debug(f"Sending Sy request via OCS {self.ocs.origin_host}")
+            answer: DiameterMessage = self.sy_app.send_request_custom(request, timeout)
+            logger.info(f"DataService received Sy answer - Result: {getattr(answer.message, 'result_code', 'N/A')}")
         else:
-            raise ValueError(f"Invalid app_id: {request.app_id}")
-        logger.debug(f"Got answer: {answer}")
+            raise ValueError(f"DataService cannot handle app_id: {request.app_id}")
+        
+        logger.debug(f"DataService request-answer exchange completed for session {session_id}")
         return (request, answer)
 
 

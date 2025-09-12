@@ -49,7 +49,7 @@ class SessionManager:
         gv_stages['dm'] = dm
         gv_stages['session_id'] = dm.session_id
         gv_stages['app_id'] = dm.app_id
-        print(f"Processing {dm.name} - {dm.session_id}")
+        logger.info(f"Processing {dm.name} - {dm.session_id}")
         
         # Delegate to pipeline for processing
         if dm.is_request:

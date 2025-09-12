@@ -160,18 +160,26 @@ class DSC():
         if not self._setup_app_ran:
             logger.error("setup_app must be called before start")
             return
+        logger.info(f"Starting DSC entity {self.origin_host}")
         self.node.start()
+        logger.debug(f"DSC node started on {self.ip_addresses}:{self.tcp_port}")
 
     def stop(self):
+        logger.info(f"Stopping DSC entity {self.origin_host}")
         if self.node._started:
             self.node.stop()
+            logger.debug(f"DSC node stopped")
+        else:
+            logger.debug(f"DSC node was already stopped")
 
     def wait_for_ready(self):
         import time
+        logger.debug(f"Waiting for DSC {self.origin_host} to be ready...")
         for peer in self.node.peers.values():
             if peer.connection:
                 if not peer.connection.state in PEER_READY_STATES:
-                    logger.info(f"Peer {peer.node_name} is in state {peer.connection.state}")
+                    logger.debug(f"Peer {peer.node_name} is in state {peer.connection.state}")
                     time.sleep(0.5)
                 else:
-                    logger.info(f"Peer {peer.node_name} is in state {peer.connection.state}")
+                    logger.debug(f"Peer {peer.node_name} is in state {peer.connection.state}")
+        logger.info(f"DSC entity {self.origin_host} is ready")

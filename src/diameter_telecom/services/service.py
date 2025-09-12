@@ -4,8 +4,8 @@ from ..entities_3gpp import PCEF, OCS, AF
 from ..diameter.constants import *
 from ..diameter.session import GxSession, SySession
 from ..subscriber import Subscriber
-# import logging
-# logger = logging.getLogger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 import time
 from ..apn import *
 from ..carrier import Carrier
@@ -24,13 +24,17 @@ class Service:
     csv_file: CsvFile = None
 
     def __post_init__(self):
+        logger.info(f"Initializing Service with PCEF: {self.pcef.origin_host}")
         if self.diameter_config is None:
             self.diameter_config = {}
             self.diameter_config[APP_3GPP_GX] = {}
             if self.ocs:
                 self.diameter_config[APP_3GPP_SY] = {}
+                logger.debug(f"Added OCS configuration for Sy interface: {self.ocs.origin_host}")
             if self.af:
                 self.diameter_config[APP_3GPP_RX] = {}
+                logger.debug(f"Added AF configuration for Rx interface: {self.af.origin_host}")
+        logger.debug(f"Service diameter configuration: {list(self.diameter_config.keys())}")
 
     @property
     def gx_app(self):
@@ -47,11 +51,15 @@ class Service:
 
     def set_session_manager(self, session_manager: SessionManager = None):
         session_manager = session_manager if session_manager else SessionManager()
+        logger.info(f"Setting session manager on service applications")
         self.gx_app.set_session_manager(session_manager)
+        logger.debug(f"Session manager set on Gx application")
         if self.ocs:
             self.sy_app.set_session_manager(session_manager)
+            logger.debug(f"Session manager set on Sy application")
         if self.af:
             self.rx_app.set_session_manager(session_manager)
+            logger.debug(f"Session manager set on Rx application")
         
     def set_host_and_realm(self, diameter_message: DiameterMessage):
         if diameter_message.app_id == APP_3GPP_GX:
@@ -77,29 +85,44 @@ class Service:
         return diameter_message
         
     def start(self):
+        logger.info(f"Starting Service applications...")
         if not self.gx_app.node._started:
+            logger.debug(f"Starting Gx application node")
             self.gx_app.node.start()
         if self.sy_app:
             if not self.sy_app.node._started:
+                logger.debug(f"Starting Sy application node")
                 self.sy_app.node.start()
         if self.rx_app:
             if not self.rx_app.node._started:
+                logger.debug(f"Starting Rx application node")
                 self.rx_app.node.start()
+        logger.info(f"Service applications started successfully")
 
     def stop(self):
+        logger.info(f"Stopping Service applications...")
         if self.gx_app.node._started:
+            logger.debug(f"Stopping Gx application node")
             self.gx_app.node.stop()
         if self.sy_app:
             if self.sy_app.node._started:
+                logger.debug(f"Stopping Sy application node")
                 self.sy_app.node.stop()
         if self.rx_app:
             if self.rx_app.node._started:
+                logger.debug(f"Stopping Rx application node")
                 self.rx_app.node.stop()
+        logger.info(f"Service applications stopped successfully")
 
 
     def wait_for_ready(self):
+        logger.info(f"Waiting for Service applications to be ready...")
         self.gx_app.wait_for_ready()
+        logger.debug(f"Gx application ready")
         if self.sy_app:
             self.sy_app.wait_for_ready()
+            logger.debug(f"Sy application ready")
         if self.rx_app:
             self.rx_app.wait_for_ready()
+            logger.debug(f"Rx application ready")
+        logger.info(f"All Service applications ready")
