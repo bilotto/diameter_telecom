@@ -106,6 +106,53 @@ class DiameterMessage:
         if hasattr(self.message, 'session_id'):
             return self.message.session_id
 
+    def to_json(self) -> dict:
+        """
+        Convert DiameterMessage to JSON-serializable dictionary.
+        
+        Returns:
+            dict: JSON-serializable representation of the message
+        """
+        try:
+            # Safely extract attributes that might contain bytes or other non-serializable objects
+            message_data = {
+                "session_id": self.session_id,
+                "cmd_code": getattr(self.message.header, 'command_code', None) if hasattr(self.message, 'header') else None,
+                "app_id": self.app_id,
+                "is_request": self.is_request,
+                "timestamp": self.timestamp,
+                "name": self.name,
+                "result_code": getattr(self.message, 'result_code', None) if hasattr(self.message, 'result_code') else None,
+                "pcap_filepath": getattr(self, 'pcap_filepath', None),
+                "hop_by_hop_id": self.hop_by_hop_id,
+                "end_to_end_id": self.end_to_end_id,
+                "time": self.time,
+                "msisdn": self.msisdn,
+                "imsi": self.imsi
+            }
+            
+            # Convert any bytes objects to appropriate string format
+            for key, value in message_data.items():
+                if isinstance(value, bytes):
+                    # Try to decode as UTF-8 first, fallback to hex
+                    try:
+                        message_data[key] = value.decode('utf-8')
+                    except UnicodeDecodeError:
+                        message_data[key] = value.hex()
+                elif value is not None and not isinstance(value, (str, int, float, bool, list, dict)):
+                    # Convert other non-serializable objects to string
+                    message_data[key] = str(value)
+            
+            return message_data
+            
+        except Exception as e:
+            logger.exception(f"Failed to serialize DiameterMessage")
+            return {
+                "session_id": getattr(self, 'session_id', None),
+                "name": getattr(self, 'name', None),
+                "error": f"Serialization failed: {str(e)}"
+            }
+
 
 def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
     """

@@ -244,6 +244,28 @@ class APN:
         """
         return self.ip_queue.available_ips
 
+    def to_json(self) -> dict:
+        """
+        Convert APN to JSON-serializable dictionary.
+        
+        Returns:
+            dict: JSON-serializable representation of the APN
+        """
+        try:
+            return {
+                "apn_name": self.apn,
+                "apn_oi": None,  # Not available in this APN class
+                "apn_ni": None,  # Not available in this APN class
+                "ip_pool_cidr": self.ip_pool_cidr,
+                "allocated_ips": list(self.allocated_ips),
+                "available_ips": self.available_ips
+            }
+        except Exception as e:
+            return {
+                "apn_name": getattr(self, 'apn', None),
+                "error": f"APN serialization failed: {str(e)}"
+            }
+
 if __name__ == '__main__':
     # Example usage
     apn = APN("test.apn", "10.0.0.0/21")

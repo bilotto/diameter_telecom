@@ -117,6 +117,48 @@ class Subscriber:
     def get_session_id(self, app_id: int) -> Optional[str]:
         return self.session_ids.get(app_id)
 
+    def to_json(self) -> dict:
+        """
+        Convert Subscriber to JSON-serializable dictionary.
+        
+        Returns:
+            dict: JSON-serializable representation of the subscriber
+        """
+        try:
+            return {
+                "msisdn": self.msisdn,
+                "imsi": self.imsi,
+                "sip_uri": self.sip_uri,
+                "nai": self.nai,
+                "private_id": self.private_id,
+                "imei": self.imei,
+                "apn": self.apn.to_json() if self.apn and hasattr(self.apn, 'to_json') else {
+                    "apn_name": getattr(self.apn, "apn_name", None) if self.apn else None,
+                    "apn_oi": getattr(self.apn, "apn_oi", None) if self.apn else None,
+                    "apn_ni": getattr(self.apn, "apn_ni", None) if self.apn else None
+                } if self.apn else None,
+                "session_ids": self.session_ids,
+                "message_count": len(self.messages),
+                "sample_messages": [
+                    msg.to_json() if hasattr(msg, 'to_json') else {
+                        "session_id": getattr(msg, "session_id", None),
+                        "cmd_code": getattr(msg, "cmd_code", None),
+                        "app_id": getattr(msg, "app_id", None),
+                        "is_request": getattr(msg, "is_request", None),
+                        "timestamp": getattr(msg, "timestamp", None),
+                        "name": getattr(msg, "name", None),
+                        "result_code": getattr(msg, "result_code", None),
+                        "pcap_filepath": getattr(msg, "pcap_filepath", None)
+                    }
+                    for msg in self.messages[:3]
+                ]
+            }
+        except Exception as e:
+            return {
+                "msisdn": self.msisdn,
+                "error": f"Serialization failed: {str(e)}"
+            }
+
 
 @dataclass
 class Subscribers:
