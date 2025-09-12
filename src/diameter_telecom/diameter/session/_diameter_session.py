@@ -116,76 +116,76 @@ class DiameterSession:
                 "end_time": self.end_time,
                 "duration": self.duration,
                 "message_count": self.n_messages,
-                "session_type": self.__class__.__name__
+                # "session_type": self.__class__.__name__
             }
             
-            # Add session-specific attributes for Gx sessions
-            if hasattr(self, "framed_ip_address"):
-                framed_ip = getattr(self, "framed_ip_address", None)
-                # Convert bytes to string if necessary
-                if isinstance(framed_ip, bytes):
-                    try:
-                        import socket
-                        session_data["framed_ip_address"] = socket.inet_ntoa(framed_ip)
-                    except Exception:
-                        session_data["framed_ip_address"] = framed_ip.hex()
-                else:
-                    session_data["framed_ip_address"] = framed_ip
+            # # Add session-specific attributes for Gx sessions
+            # if hasattr(self, "framed_ip_address"):
+            #     framed_ip = getattr(self, "framed_ip_address", None)
+            #     # Convert bytes to string if necessary
+            #     if isinstance(framed_ip, bytes):
+            #         try:
+            #             import socket
+            #             session_data["framed_ip_address"] = socket.inet_ntoa(framed_ip)
+            #         except Exception:
+            #             session_data["framed_ip_address"] = framed_ip.hex()
+            #     else:
+            #         session_data["framed_ip_address"] = framed_ip
                     
-            if hasattr(self, "framed_ipv6_prefix"):
-                framed_ipv6 = getattr(self, "framed_ipv6_prefix", None)
-                # Convert bytes to string if necessary
-                if isinstance(framed_ipv6, bytes):
-                    try:
-                        import ipaddress
-                        # Try to decode as IPv6 prefix
-                        if len(framed_ipv6) >= 2:
-                            prefix_length = framed_ipv6[1]
-                            ipv6_bytes = framed_ipv6[2:].ljust(16, b'\x00')
-                            ipv6_address = ipaddress.IPv6Address(ipv6_bytes)
-                            session_data["framed_ipv6_prefix"] = f"{ipv6_address}/{prefix_length}"
-                        else:
-                            session_data["framed_ipv6_prefix"] = framed_ipv6.hex()
-                    except Exception:
-                        session_data["framed_ipv6_prefix"] = framed_ipv6.hex()
-                else:
-                    session_data["framed_ipv6_prefix"] = framed_ipv6
+            # if hasattr(self, "framed_ipv6_prefix"):
+            #     framed_ipv6 = getattr(self, "framed_ipv6_prefix", None)
+            #     # Convert bytes to string if necessary
+            #     if isinstance(framed_ipv6, bytes):
+            #         try:
+            #             import ipaddress
+            #             # Try to decode as IPv6 prefix
+            #             if len(framed_ipv6) >= 2:
+            #                 prefix_length = framed_ipv6[1]
+            #                 ipv6_bytes = framed_ipv6[2:].ljust(16, b'\x00')
+            #                 ipv6_address = ipaddress.IPv6Address(ipv6_bytes)
+            #                 session_data["framed_ipv6_prefix"] = f"{ipv6_address}/{prefix_length}"
+            #             else:
+            #                 session_data["framed_ipv6_prefix"] = framed_ipv6.hex()
+            #         except Exception:
+            #             session_data["framed_ipv6_prefix"] = framed_ipv6.hex()
+            #     else:
+            #         session_data["framed_ipv6_prefix"] = framed_ipv6
                     
-            if hasattr(self, "bearer_id"):
-                bearer_id = getattr(self, "bearer_id", None)
-                # Convert bytes to string if necessary
-                if isinstance(bearer_id, bytes):
-                    session_data["bearer_id"] = bearer_id.hex()
-                else:
-                    session_data["bearer_id"] = bearer_id
+            # if hasattr(self, "bearer_id"):
+            #     bearer_id = getattr(self, "bearer_id", None)
+            #     # Convert bytes to string if necessary
+            #     if isinstance(bearer_id, bytes):
+            #         session_data["bearer_id"] = bearer_id.hex()
+            #     else:
+            #         session_data["bearer_id"] = bearer_id
                     
-            if hasattr(self, "charging_rule_name"):
-                charging_rule = getattr(self, "charging_rule_name", None)
-                # Convert bytes to string if necessary
-                if isinstance(charging_rule, bytes):
-                    session_data["charging_rule_name"] = charging_rule.decode('utf-8', errors='replace')
-                else:
-                    session_data["charging_rule_name"] = charging_rule
+            # if hasattr(self, "charging_rule_name"):
+            #     charging_rule = getattr(self, "charging_rule_name", None)
+            #     # Convert bytes to string if necessary
+            #     if isinstance(charging_rule, bytes):
+            #         session_data["charging_rule_name"] = charging_rule.decode('utf-8', errors='replace')
+            #     else:
+            #         session_data["charging_rule_name"] = charging_rule
             
             # Add subscriber reference if available
             if self.subscriber:
-                session_data["subscriber_msisdn"] = getattr(self.subscriber, "msisdn", None)
-                session_data["subscriber_imsi"] = getattr(self.subscriber, "imsi", None)
+                session_data["subscriber"] = self.subscriber.to_json()
             
             # Add sample messages (limit to 5 for performance)
-            session_data["sample_messages"] = [
-                msg.to_json() if hasattr(msg, 'to_json') else {
-                    "session_id": getattr(msg, "session_id", None),
-                    "cmd_code": getattr(msg, "cmd_code", None),
-                    "app_id": getattr(msg, "app_id", None),
-                    "is_request": getattr(msg, "is_request", None),
-                    "timestamp": getattr(msg, "timestamp", None),
-                    "name": getattr(msg, "name", None),
-                    "result_code": getattr(msg, "result_code", None),
-                    "pcap_filepath": getattr(msg, "pcap_filepath", None)
-                }
-                for msg in self.messages[:5]
-            ]
+            # session_data["sample_messages"] = [
+            #     msg.to_json() if hasattr(msg, 'to_json') else {
+            #         "session_id": getattr(msg, "session_id", None),
+            #         "cmd_code": getattr(msg, "cmd_code", None),
+            #         "app_id": getattr(msg, "app_id", None),
+            #         "is_request": getattr(msg, "is_request", None),
+            #         "timestamp": getattr(msg, "timestamp", None),
+            #         "name": getattr(msg, "name", None),
+            #         "result_code": getattr(msg, "result_code", None),
+            #         "pcap_filepath": getattr(msg, "pcap_filepath", None)
+            #     }
+            #     for msg in self.messages[:5]
+            # ]
+            session_data['messages'] = [msg.to_json() for msg in self.messages]
             
             return session_data
             

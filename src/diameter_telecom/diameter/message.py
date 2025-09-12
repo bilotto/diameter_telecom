@@ -25,7 +25,6 @@ class DiameterMessage:
         else:
             raise TypeError(f"Parameter must be a hex string or a Message instance. Provided: {obj},{type(obj)}")
         
-        # Initialize default attributes
         self.timestamp = None
         self.subscriber: 'Subscriber' = None
 
@@ -114,33 +113,21 @@ class DiameterMessage:
             dict: JSON-serializable representation of the message
         """
         try:
-            # Safely extract attributes that might contain bytes or other non-serializable objects
-            message_data = {
-                "session_id": self.session_id,
-                "cmd_code": getattr(self.message.header, 'command_code', None) if hasattr(self.message, 'header') else None,
-                "app_id": self.app_id,
-                "is_request": self.is_request,
-                "timestamp": self.timestamp,
-                "name": self.name,
-                "result_code": getattr(self.message, 'result_code', None) if hasattr(self.message, 'result_code') else None,
-                "pcap_filepath": getattr(self, 'pcap_filepath', None),
-                "hop_by_hop_id": self.hop_by_hop_id,
-                "end_to_end_id": self.end_to_end_id,
-                "time": self.time,
-                "msisdn": self.msisdn,
-                "imsi": self.imsi
-            }
+            message_data = dict()
+            message_data['is_request'] = self.is_request
+            message_data['name'] = self.name
+            message_data['time'] = self.time
+            if hasattr(self.message, 'result_code') and self.message.result_code is not None:
+                message_data['result_code'] = self.message.result_code
             
             # Convert any bytes objects to appropriate string format
             for key, value in message_data.items():
                 if isinstance(value, bytes):
-                    # Try to decode as UTF-8 first, fallback to hex
                     try:
                         message_data[key] = value.decode('utf-8')
                     except UnicodeDecodeError:
                         message_data[key] = value.hex()
                 elif value is not None and not isinstance(value, (str, int, float, bool, list, dict)):
-                    # Convert other non-serializable objects to string
                     message_data[key] = str(value)
             
             return message_data
@@ -171,7 +158,6 @@ def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
     message = diameter_message.message
     is_request = message.header.is_request
 
-    # Handle Credit Control messages separately due to additional type check
     if isinstance(message, CreditControl):
         cc_type_mapping = {
             E_CC_REQUEST_TYPE_INITIAL_REQUEST: (CCR_I, CCA_I),
@@ -179,22 +165,18 @@ def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
             E_CC_REQUEST_TYPE_TERMINATION_REQUEST: (CCR_T, CCA_T)
         }
         
-        # Check if cc_request_type exists and is not None
         cc_request_type = getattr(message, 'cc_request_type', None) if hasattr(message, 'cc_request_type') else None
         
         if cc_request_type is not None and cc_request_type in cc_type_mapping:
             return cc_type_mapping[cc_request_type][0 if isinstance(message, CreditControlRequest) else 1]
         
-        # Fallback for Credit Control messages without CC-Request-Type (common in error responses)
         if isinstance(message, CreditControlRequest):
-            return "CCR"  # Generic CCR when type is unknown
+            return "CCR"
         else:
-            # For CCA, check if it's an error response
             if hasattr(message, 'result_code') and message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-                return "CCA-ERROR"  # Specific name for error responses
-            return "CCA"  # Generic CCA when type is unknown
+                return "CCA-ERROR"
+            return "CCA"
 
-    # Map message types to their request/answer names
     message_type_mapping = {
         ReAuth: (RAR, RAA),
         AbortSession: (ASR, ASA),
@@ -207,7 +189,6 @@ def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
         DisconnectPeer: (DPR, DPA)
     }
 
-    # Get the appropriate name based on message type and request/answer status
     for msg_type, (req_name, ans_name) in message_type_mapping.items():
         if isinstance(message, msg_type):
             return req_name if is_request else ans_name

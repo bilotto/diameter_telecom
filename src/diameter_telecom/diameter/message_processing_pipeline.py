@@ -213,7 +213,7 @@ class MessageProcessingPipeline:
             if hasattr(dm.message, 'result_code') and dm.message.result_code and dm.message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
                 session.error = True
                 # Clean up session ID from subscriber when session has error
-                self._cleanup_session_from_subscriber(session, APP_3GPP_GX)
+                # self._cleanup_session_from_subscriber(session, APP_3GPP_GX)
             
             if dm.name == CCA_I:
                 if dm.timestamp and dm.message.result_code == E_RESULT_CODE_DIAMETER_SUCCESS:
@@ -224,7 +224,7 @@ class MessageProcessingPipeline:
                     session.ended = True
                     session.end_time = dm.timestamp
                     # Clean up session ID from subscriber
-                    self._cleanup_session_from_subscriber(session, APP_3GPP_GX)
+                    # self._cleanup_session_from_subscriber(session, APP_3GPP_GX)
         
         # Update common attributes
         if hasattr(dm.message, 'cc_request_number') and dm.message.cc_request_number is not None:
@@ -256,7 +256,7 @@ class MessageProcessingPipeline:
             else:
                 session.end()
             # Clean up session ID from subscriber
-            self._cleanup_session_from_subscriber(session, APP_3GPP_RX)
+            # self._cleanup_session_from_subscriber(session, APP_3GPP_RX)
 
     def stage_process_sy_message(self, gv_stages: Dict):
         """Process Sy-specific message business logic"""
@@ -272,7 +272,7 @@ class MessageProcessingPipeline:
             else:
                 session.end()
             # Clean up session ID from subscriber
-            self._cleanup_session_from_subscriber(session, APP_3GPP_SY)
+            # self._cleanup_session_from_subscriber(session, APP_3GPP_SY)
 
     def process_app_specific_logic(self, gv_stages: Dict):
         """Route to application-specific processing"""

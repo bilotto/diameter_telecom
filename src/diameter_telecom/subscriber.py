@@ -124,41 +124,24 @@ class Subscriber:
         Returns:
             dict: JSON-serializable representation of the subscriber
         """
-        try:
-            return {
-                "msisdn": self.msisdn,
-                "imsi": self.imsi,
-                "sip_uri": self.sip_uri,
-                "nai": self.nai,
-                "private_id": self.private_id,
-                "imei": self.imei,
-                "apn": self.apn.to_json() if self.apn and hasattr(self.apn, 'to_json') else {
-                    "apn_name": getattr(self.apn, "apn_name", None) if self.apn else None,
-                    "apn_oi": getattr(self.apn, "apn_oi", None) if self.apn else None,
-                    "apn_ni": getattr(self.apn, "apn_ni", None) if self.apn else None
-                } if self.apn else None,
-                "session_ids": self.session_ids,
-                "message_count": len(self.messages),
-                "sample_messages": [
-                    msg.to_json() if hasattr(msg, 'to_json') else {
-                        "session_id": getattr(msg, "session_id", None),
-                        "cmd_code": getattr(msg, "cmd_code", None),
-                        "app_id": getattr(msg, "app_id", None),
-                        "is_request": getattr(msg, "is_request", None),
-                        "timestamp": getattr(msg, "timestamp", None),
-                        "name": getattr(msg, "name", None),
-                        "result_code": getattr(msg, "result_code", None),
-                        "pcap_filepath": getattr(msg, "pcap_filepath", None)
-                    }
-                    for msg in self.messages[:3]
-                ]
-            }
-        except Exception as e:
-            return {
-                "msisdn": self.msisdn,
-                "error": f"Serialization failed: {str(e)}"
-            }
-
+        subscriber_data = dict()
+        subscriber_data['msisdn'] = self.msisdn
+        if self.imsi:
+            subscriber_data['imsi'] = self.imsi
+        if self.sip_uri:
+            subscriber_data['sip_uri'] = self.sip_uri
+        if self.nai:
+            subscriber_data['nai'] = self.nai
+        if self.private_id:
+            subscriber_data['private_id'] = self.private_id
+        if self.imei:
+            subscriber_data['imei'] = self.imei
+        if self.apn:
+            subscriber_data['apn'] = self.apn.to_json()
+        subscriber_data['session_ids'] = self.session_ids
+        # subscriber_data['message_count'] = len(self.messages)
+        # subscriber_data['sample_messages'] = [msg.to_json() for msg in self.messages[:3]]
+        return subscriber_data
 
 @dataclass
 class Subscribers:
@@ -176,20 +159,23 @@ class Subscribers:
                 return subscriber
         return None
     
-    def get_subscribers_with_messages(self) -> List[Subscriber]:
-        """
-        Get all subscribers that have associated messages.
+    # def get_subscribers_with_messages(self) -> List[Subscriber]:
+    #     """
+    #     Get all subscribers that have associated messages.
         
-        Returns:
-            List of Subscriber objects that have messages
-        """
-        return [subscriber for subscriber in self.subscribers.values() if subscriber.messages]
+    #     Returns:
+    #         List of Subscriber objects that have messages
+    #     """
+    #     return [subscriber for subscriber in self.subscribers.values() if subscriber.messages]
     
-    def get_total_messages(self) -> int:
-        """
-        Get the total number of messages across all subscribers.
+    # def get_total_messages(self) -> int:
+    #     """
+    #     Get the total number of messages across all subscribers.
         
-        Returns:
-            Total count of messages for all subscribers
-        """
-        return sum(len(subscriber.messages) for subscriber in self.subscribers.values())
+    #     Returns:
+    #         Total count of messages for all subscribers
+    #     """
+    #     return sum(len(subscriber.messages) for subscriber in self.subscribers.values())
+
+    def to_json(self) -> dict:
+        return {msisdn: subscriber.to_json() for msisdn, subscriber in self.subscribers.items()}

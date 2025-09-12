@@ -66,7 +66,6 @@ class SessionManager:
             session.messages.append(dm)
             subscriber = gv_stages.get('subscriber')
             if subscriber:
-                subscriber.add_message(dm)
                 dm.subscriber = subscriber
 
         self.messages.append(dm)
@@ -94,65 +93,23 @@ class SessionManager:
             dict: JSON-serializable representation of the session manager
         """
         try:
+            session_manager_data = dict()
             # Extract sessions data
-            sessions_data = {}
-            if hasattr(self.sessions, 'sessions'):
-                for app_id, app_sessions in self.sessions.sessions.items():
-                    app_name = self._get_app_name(app_id)
-                    sessions_data[app_name] = {
-                        "app_id": app_id,
-                        "total_sessions": len(app_sessions),
-                        "sessions": {}
-                    }
-                    
-                    for session_id, session in app_sessions.items():
-                        if hasattr(session, 'to_json'):
-                            sessions_data[app_name]["sessions"][session_id] = session.to_json()
-                        else:
-                            # Fallback for sessions without to_json method
-                            sessions_data[app_name]["sessions"][session_id] = {
-                                "session_id": session_id,
-                                "error": "Session serialization not available"
-                            }
+            sessions_data = self.sessions.to_json()
             
             # Extract subscribers data
-            subscribers_data = {}
-            if hasattr(self.subscribers, 'subscribers'):
-                for msisdn, subscriber in self.subscribers.subscribers.items():
-                    if hasattr(subscriber, 'to_json'):
-                        subscribers_data[msisdn] = subscriber.to_json()
-                    else:
-                        # Fallback for subscribers without to_json method
-                        subscribers_data[msisdn] = {
-                            "msisdn": msisdn,
-                            "error": "Subscriber serialization not available"
-                        }
+            subscribers_data = self.subscribers.to_json()
             
             # Extract messages data
             messages_data = []
-            for message in self.messages[:100]:  # Limit to first 100 messages for performance
-                if hasattr(message, 'to_json'):
-                    messages_data.append(message.to_json())
-                else:
-                    # Fallback for messages without to_json method
-                    messages_data.append({
-                        "session_id": getattr(message, "session_id", None),
-                        "name": getattr(message, "name", None),
-                        "error": "Message serialization not available"
-                    })
-            
-            # Calculate comprehensive statistics
-            stats = self._calculate_statistics(sessions_data, subscribers_data, messages_data)
-            
-            return {
-                "statistics": stats,
-                "sessions": sessions_data,
-                "subscribers": subscribers_data,
-                "messages": {
-                    "total_count": len(self.messages),
-                    "sample_messages": messages_data
-                }
-            }
+            # Sort by timestamp
+            messages_data = sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
+            messages_data = [message.to_json() for message in messages_data]
+            session_manager_data['sessions'] = sessions_data
+            session_manager_data['subscribers'] = subscribers_data
+            session_manager_data['messages'] = messages_data
+
+            return session_manager_data
             
         except Exception as e:
             logger.exception("SessionManager JSON serialization failed")

@@ -307,3 +307,18 @@ class Sessions:
         for app_id in [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]:
             self.clear_all_sessions(app_id)
         logger.info("Cleared all sessions for all applications")
+
+
+    def to_json(self) -> dict:
+        all_sessions = {}
+        if self.sessions.get(APP_3GPP_GX):
+            # It should be a list of sessions ordered by start_time
+            all_sessions['gx_sessions'] = sorted(self.sessions.get(APP_3GPP_GX, {}).values(), key=lambda x: x.start_time)
+            all_sessions['gx_sessions'] = [session.to_json() for session in all_sessions['gx_sessions']]
+        if self.sessions.get(APP_3GPP_RX):
+            all_sessions['rx_sessions'] = sorted(self.sessions.get(APP_3GPP_RX, {}).values(), key=lambda x: x.start_time)
+            all_sessions['rx_sessions'] = [session.to_json() for session in all_sessions['rx_sessions']]
+        if self.sessions.get(APP_3GPP_SY):
+            all_sessions['sy_sessions'] = sorted(self.sessions.get(APP_3GPP_SY, {}).values(), key=lambda x: x.start_time)
+            all_sessions['sy_sessions'] = [session.to_json() for session in all_sessions['sy_sessions']]
+        return all_sessions

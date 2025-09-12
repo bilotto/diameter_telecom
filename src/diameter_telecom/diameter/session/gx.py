@@ -19,3 +19,16 @@ class GxSession(DiameterSession):
     def add_message(self, message: DiameterMessage):
         """Add message to session - business logic now handled by SessionManager"""
         return super().add_message(message)
+
+    def to_json(self) -> dict:
+        """
+        Convert GxSession to JSON-serializable dictionary.
+        """
+        session_data = super().to_json()
+        if self.framed_ip_address:
+            session_data['framed_ip_address'] = self.framed_ip_address
+        if self.framed_ipv6_prefix:
+            session_data['framed_ipv6_prefix'] = self.framed_ipv6_prefix
+        if self.called_station_id:
+            session_data['called_station_id'] = self.called_station_id
+        return session_data
