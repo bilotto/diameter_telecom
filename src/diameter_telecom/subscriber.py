@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
+import threading
 from diameter.message.avp.grouped import SubscriptionId
 from .diameter.constants import *
 from .apn import APN
@@ -39,6 +40,7 @@ class Subscriber:
     apn: APN = field(default=None, repr=False)
     messages: List[DiameterMessage] = field(default_factory=list, repr=False)
     session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=True)
+    _session_ids_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     def __post_init__(self):
         """
@@ -112,13 +114,24 @@ class Subscriber:
         self.messages.append(message)
 
     def add_session_id(self, app_id: int, session_id: str):
-        # self.session_ids[app_id] = session_id
-        if not app_id in self.session_ids:
-            self.session_ids[app_id] = []
-        self.session_ids[app_id].append(session_id)
+        """Add a session ID for an application.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._session_ids_lock:
+            if not app_id in self.session_ids:
+                self.session_ids[app_id] = []
+            self.session_ids[app_id].append(session_id)
     
     def get_session_id(self, app_id: int) -> Optional[str]:
-        return self.session_ids.get(app_id, [])
+        """Get session IDs for an application.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._session_ids_lock:
+            return self.session_ids.get(app_id, []).copy()
 
     def to_json(self) -> dict:
         """
@@ -148,19 +161,44 @@ class Subscriber:
 
 @dataclass
 class Subscribers:
+    """Thread-safe collection for managing subscribers.
+    
+    Thread Safety:
+    This class is thread-safe and can be safely shared across multiple threads.
+    It uses a single RLock to protect all subscriber operations.
+    """
     subscribers: Dict[str, Subscriber] = field(default_factory=dict)
+    _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     def add_subscriber(self, subscriber: Subscriber):
-        self.subscribers[subscriber.msisdn] = subscriber
+        """Add a subscriber to the collection.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._lock:
+            self.subscribers[subscriber.msisdn] = subscriber
     
     def get_subscriber_by_msisdn(self, msisdn: str) -> Optional[Subscriber]:
-        return self.subscribers.get(msisdn)
+        """Get subscriber by MSISDN.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._lock:
+            return self.subscribers.get(msisdn)
     
     def get_subscriber_by_imsi(self, imsi: str) -> Optional[Subscriber]:
-        for subscriber in self.subscribers.values():
-            if subscriber.imsi == imsi:
-                return subscriber
-        return None
+        """Get subscriber by IMSI.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._lock:
+            for subscriber in self.subscribers.values():
+                if subscriber.imsi == imsi:
+                    return subscriber
+            return None
     
     # def get_subscribers_with_messages(self) -> List[Subscriber]:
     #     """
@@ -181,4 +219,10 @@ class Subscribers:
     #     return sum(len(subscriber.messages) for subscriber in self.subscribers.values())
 
     def to_json(self) -> dict:
-        return {msisdn: subscriber.to_json() for msisdn, subscriber in self.subscribers.items()}
+        """Convert subscribers to JSON.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._lock:
+            return {msisdn: subscriber.to_json() for msisdn, subscriber in self.subscribers.items()}

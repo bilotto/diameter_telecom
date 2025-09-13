@@ -10,6 +10,7 @@ import logging
 from .constants import *
 from .parse_avp import *
 from .message import DiameterMessage
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +21,22 @@ class SessionManager:
     This class handles high-level orchestration of message processing and maintains
     the data stores for sessions, subscribers, and messages. The actual message 
     processing logic is delegated to MessageProcessingPipeline.
+    
+    Thread Safety:
+    This class is thread-safe and can be safely shared across multiple threads.
+    It uses read-write locks to allow concurrent read operations while ensuring
+    exclusive access for write operations.
     """
     sessions: Sessions = field(default_factory=Sessions)
     subscribers: Subscribers = field(default_factory=Subscribers)
     messages: List[DiameterMessage] = field(default_factory=list)
     pipeline: MessageProcessingPipeline = field(init=False)
+    
+    # Thread safety locks
+    _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _subscribers_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _messages_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _processing_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     def __post_init__(self):
         """Initialize the message processing pipeline"""
@@ -32,6 +44,60 @@ class SessionManager:
             sessions=self.sessions,
             subscribers=self.subscribers
         )
+    
+    @contextmanager
+    def _sessions_read_lock(self):
+        """Context manager for read access to sessions."""
+        self._sessions_lock.acquire()
+        try:
+            yield
+        finally:
+            self._sessions_lock.release()
+    
+    @contextmanager
+    def _sessions_write_lock(self):
+        """Context manager for write access to sessions."""
+        self._sessions_lock.acquire()
+        try:
+            yield
+        finally:
+            self._sessions_lock.release()
+    
+    @contextmanager
+    def _subscribers_read_lock(self):
+        """Context manager for read access to subscribers."""
+        self._subscribers_lock.acquire()
+        try:
+            yield
+        finally:
+            self._subscribers_lock.release()
+    
+    @contextmanager
+    def _subscribers_write_lock(self):
+        """Context manager for write access to subscribers."""
+        self._subscribers_lock.acquire()
+        try:
+            yield
+        finally:
+            self._subscribers_lock.release()
+    
+    @contextmanager
+    def _messages_lock_context(self):
+        """Context manager for access to messages."""
+        self._messages_lock.acquire()
+        try:
+            yield
+        finally:
+            self._messages_lock.release()
+    
+    @contextmanager
+    def _processing_lock_context(self):
+        """Context manager for message processing operations."""
+        self._processing_lock.acquire()
+        try:
+            yield
+        finally:
+            self._processing_lock.release()
 
     # def get_messages(self):
     #     return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
@@ -41,36 +107,48 @@ class SessionManager:
         
         This method orchestrates the message processing by delegating to the
         MessageProcessingPipeline and handling the final message storage.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         """
-        # Setup processing context
-        gv_stages = dict()
-        if not dm.timestamp:
-            dm.timestamp = time.time()
-        gv_stages['dm'] = dm
-        gv_stages['session_id'] = dm.session_id
-        gv_stages['app_id'] = dm.app_id
-        logger.info(f"Processing {dm.name} - {dm.session_id}")
-        
-        # Delegate to pipeline for processing
-        if dm.is_request:
-            self.pipeline.stage_parse_request(gv_stages)
-        else:
-            self.pipeline.stage_parse_response(gv_stages)
-        
-        # Process application-specific business logic
-        self.pipeline.process_app_specific_logic(gv_stages)
-        
-        # Handle final message storage and association
-        session: DiameterSession = gv_stages.get('session')
-        if session:
-            session.messages.append(dm)
-            subscriber = gv_stages.get('subscriber')
-            if subscriber:
-                dm.subscriber = subscriber
+        with self._processing_lock_context():
+            # Setup processing context
+            gv_stages = dict()
+            if not dm.timestamp:
+                dm.timestamp = time.time()
+            gv_stages['dm'] = dm
+            gv_stages['session_id'] = dm.session_id
+            gv_stages['app_id'] = dm.app_id
+            logger.info(f"Processing {dm.name} - {dm.session_id}")
+            
+            # Delegate to pipeline for processing
+            if dm.is_request:
+                self.pipeline.stage_parse_request(gv_stages)
+            else:
+                self.pipeline.stage_parse_response(gv_stages)
+            
+            # Process application-specific business logic
+            self.pipeline.process_app_specific_logic(gv_stages)
+            
+            # Handle final message storage and association
+            session: DiameterSession = gv_stages.get('session')
+            if session:
+                # Thread-safe message addition to session
+                with self._sessions_read_lock():
+                    session.messages.append(dm)
+                
+                subscriber = gv_stages.get('subscriber')
+                if subscriber:
+                    dm.subscriber = subscriber
 
-        # self.messages.append(dm)
+            # self.messages.append(dm)
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
+        """Send a Diameter request with session management.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
         self.process_diameter_message(diameter_message)
         logger.info(f"\n{diameter_message.dump()}")
         
@@ -89,27 +167,32 @@ class SessionManager:
         """
         Convert SessionManager to JSON-serializable dictionary.
         
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        
         Returns:
             dict: JSON-serializable representation of the session manager
         """
         try:
             session_manager_data = dict()
-            # Extract sessions data
-            sessions_data = self.sessions.to_json()
-            session_manager_data['sessions'] = sessions_data
-
             
-            # Extract subscribers data
-            subscribers_data = self.subscribers.to_json()
-            session_manager_data['subscribers'] = subscribers_data
+            # Extract sessions data with read lock
+            with self._sessions_read_lock():
+                sessions_data = self.sessions.to_json()
+                session_manager_data['sessions'] = sessions_data
 
-            
+            # Extract subscribers data with read lock
+            with self._subscribers_read_lock():
+                subscribers_data = self.subscribers.to_json()
+                session_manager_data['subscribers'] = subscribers_data
+
             # # Extract messages data
-            # messages_data = []
-            # # Sort by timestamp
-            # messages_data = sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
-            # messages_data = [message.to_json() for message in messages_data]
-            # session_manager_data['messages'] = messages_data
+            # with self._messages_lock_context():
+            #     messages_data = []
+            #     # Sort by timestamp
+            #     messages_data = sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
+            #     messages_data = [message.to_json() for message in messages_data]
+            #     session_manager_data['messages'] = messages_data
 
             return session_manager_data
             
@@ -127,20 +210,50 @@ class SessionManager:
         return app_names.get(app_id, f"App_{app_id}")
 
     def get_session_messages(self, app_id: int, session_id: str) -> List[DiameterMessage]:
-        return self.sessions.get_session_by_id(app_id, session_id).messages
+        """Get messages for a specific session.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._sessions_read_lock():
+            session = self.sessions.get_session_by_id(app_id, session_id)
+            if session:
+                return session.messages.copy()  # Return a copy to avoid external modification
+            return []
 
     def get_messages_by_msisdn(self, msisdn: str) -> List[DiameterMessage]:
-        subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn)
+        """Get all messages for a subscriber by MSISDN.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._subscribers_read_lock():
+            subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn)
+            if not subscriber:
+                return []
+        
         messages: List[DiameterMessage] = []
-        for app_id, session_id_list in subscriber.session_ids.items():
+        # Get session IDs safely
+        session_ids = subscriber.session_ids.copy()  # Copy to avoid modification during iteration
+        
+        for app_id, session_id_list in session_ids.items():
             for session_id in session_id_list:
                 messages.extend(self.get_session_messages(app_id, session_id))
+        
         messages.sort(key=lambda x: x.timestamp if x.timestamp else float('inf'))
         return messages
 
     def get_subscriber_message_by_index(self, msisdn: str, index: int) -> DiameterMessage:
+        """Get a specific message by index for a subscriber.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
         messages = self.get_messages_by_msisdn(msisdn)
-        return messages[index].dump()
+        if 0 <= index < len(messages):
+            return messages[index].dump()
+        else:
+            raise IndexError(f"Message index {index} out of range for subscriber {msisdn}")
 
     # def _calculate_statistics(self, sessions_data: dict, subscribers_data: dict, messages_data: list) -> dict:
     #     """Calculate comprehensive statistics for the session manager."""

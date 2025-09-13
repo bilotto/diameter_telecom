@@ -1,6 +1,7 @@
 from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 import logging
+import threading
 from ._diameter_session import DiameterSession
 from .gx import GxSession
 from ..constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
@@ -16,11 +17,16 @@ class Sessions:
     - Indexing for fast lookups
     - Bulk operations and statistics
     - Session lifecycle management
+    
+    Thread Safety:
+    This class is thread-safe and can be safely shared across multiple threads.
+    It uses a single RLock to protect all session operations.
     """
     sessions: Dict[int, Dict[str, DiameterSession]] = field(default_factory=dict)
     sessions_by_framed_ip: Dict[int, Dict[str, str]] = field(default_factory=dict)
     sessions_by_framed_ipv6: Dict[int, Dict[str, str]] = field(default_factory=dict)
     sessions_by_msisdn: Dict[int, Dict[str, str]] = field(default_factory=dict)
+    _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
     
     def __post_init__(self):
         """Initialize all app_id dictionaries for supported applications."""
@@ -35,25 +41,32 @@ class Sessions:
     def add_session(self, app_id: int, session: DiameterSession):
         """Add session and update all indexes.
         
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        
         Args:
             app_id: Application ID (APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY)
             session: Session instance to add
         """
-        self.sessions[app_id][session.session_id] = session
-        
-        # Update indexes for Gx sessions (only Gx has these attributes)
-        if app_id == APP_3GPP_GX and isinstance(session, GxSession):
-            if session.framed_ip_address:
-                self.sessions_by_framed_ip[app_id][session.framed_ip_address] = session.session_id
-            if session.framed_ipv6_prefix:
-                self.sessions_by_framed_ipv6[app_id][session.framed_ipv6_prefix] = session.session_id
-            if session.subscriber and session.subscriber.msisdn:
-                self.sessions_by_msisdn[app_id][session.subscriber.msisdn] = session.session_id
-        
-        logger.debug(f"Added session {session.session_id} for app_id {app_id}")
+        with self._lock:
+            self.sessions[app_id][session.session_id] = session
+            
+            # Update indexes for Gx sessions (only Gx has these attributes)
+            if app_id == APP_3GPP_GX and isinstance(session, GxSession):
+                if session.framed_ip_address:
+                    self.sessions_by_framed_ip[app_id][session.framed_ip_address] = session.session_id
+                if session.framed_ipv6_prefix:
+                    self.sessions_by_framed_ipv6[app_id][session.framed_ipv6_prefix] = session.session_id
+                if session.subscriber and session.subscriber.msisdn:
+                    self.sessions_by_msisdn[app_id][session.subscriber.msisdn] = session.session_id
+            
+            logger.debug(f"Added session {session.session_id} for app_id {app_id}")
     
     def remove_session(self, app_id: int, session_id: str) -> Optional[DiameterSession]:
         """Remove session and clean up indexes.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         
         Args:
             app_id: Application ID
@@ -62,25 +75,29 @@ class Sessions:
         Returns:
             The removed session if found, None otherwise
         """
-        session = self.sessions[app_id].pop(session_id, None)
-        if not session:
-            return None
+        with self._lock:
+            session = self.sessions[app_id].pop(session_id, None)
+            if not session:
+                return None
+                
+            # Clean up indexes for Gx sessions
+            if app_id == APP_3GPP_GX and isinstance(session, GxSession):
+                if session.framed_ip_address:
+                    self.sessions_by_framed_ip[app_id].pop(session.framed_ip_address, None)
+                if session.framed_ipv6_prefix:
+                    self.sessions_by_framed_ipv6[app_id].pop(session.framed_ipv6_prefix, None)
+                if session.subscriber and session.subscriber.msisdn:
+                    self.sessions_by_msisdn[app_id].pop(session.subscriber.msisdn, None)
             
-        # Clean up indexes for Gx sessions
-        if app_id == APP_3GPP_GX and isinstance(session, GxSession):
-            if session.framed_ip_address:
-                self.sessions_by_framed_ip[app_id].pop(session.framed_ip_address, None)
-            if session.framed_ipv6_prefix:
-                self.sessions_by_framed_ipv6[app_id].pop(session.framed_ipv6_prefix, None)
-            if session.subscriber and session.subscriber.msisdn:
-                self.sessions_by_msisdn[app_id].pop(session.subscriber.msisdn, None)
-        
-        logger.debug(f"Removed session {session_id} for app_id {app_id}")
-        return session
+            logger.debug(f"Removed session {session_id} for app_id {app_id}")
+            return session
     
     # Lookup methods
     def get_session_by_id(self, app_id: int, session_id: str) -> Optional[DiameterSession]:
         """Get session by application ID and session ID.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         
         Args:
             app_id: Application ID
@@ -89,10 +106,14 @@ class Sessions:
         Returns:
             Session instance if found, None otherwise
         """
-        return self.sessions.get(app_id, {}).get(session_id)
+        with self._lock:
+            return self.sessions.get(app_id, {}).get(session_id)
     
     def get_session_by_framed_ip(self, app_id: int, ip_address: str) -> Optional[DiameterSession]:
         """Get session by framed IP address.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         
         Args:
             app_id: Application ID
@@ -101,13 +122,17 @@ class Sessions:
         Returns:
             Session instance if found, None otherwise
         """
-        session_id = self.sessions_by_framed_ip.get(app_id, {}).get(ip_address)
-        if session_id:
-            return self.get_session_by_id(app_id, session_id)
-        return None
+        with self._lock:
+            session_id = self.sessions_by_framed_ip.get(app_id, {}).get(ip_address)
+            if session_id:
+                return self.sessions.get(app_id, {}).get(session_id)
+            return None
     
     def get_session_by_framed_ipv6(self, app_id: int, ipv6_prefix: str) -> Optional[DiameterSession]:
         """Get session by framed IPv6 prefix.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         
         Args:
             app_id: Application ID
@@ -116,13 +141,17 @@ class Sessions:
         Returns:
             Session instance if found, None otherwise
         """
-        session_id = self.sessions_by_framed_ipv6.get(app_id, {}).get(ipv6_prefix)
-        if session_id:
-            return self.get_session_by_id(app_id, session_id)
-        return None
+        with self._lock:
+            session_id = self.sessions_by_framed_ipv6.get(app_id, {}).get(ipv6_prefix)
+            if session_id:
+                return self.sessions.get(app_id, {}).get(session_id)
+            return None
     
     def get_session_by_msisdn(self, app_id: int, msisdn: str) -> Optional[DiameterSession]:
         """Get session by MSISDN.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         
         Args:
             app_id: Application ID
@@ -131,14 +160,18 @@ class Sessions:
         Returns:
             Session instance if found, None otherwise
         """
-        session_id = self.sessions_by_msisdn.get(app_id, {}).get(msisdn)
-        if session_id:
-            return self.get_session_by_id(app_id, session_id)
-        return None
+        with self._lock:
+            session_id = self.sessions_by_msisdn.get(app_id, {}).get(msisdn)
+            if session_id:
+                return self.sessions.get(app_id, {}).get(session_id)
+            return None
     
     # Bulk operations
     def get_all_sessions(self, app_id: int) -> Dict[str, DiameterSession]:
         """Get all sessions for an application.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         
         Args:
             app_id: Application ID
@@ -146,10 +179,14 @@ class Sessions:
         Returns:
             Dictionary of session_id -> session for the application
         """
-        return self.sessions.get(app_id, {})
+        with self._lock:
+            return self.sessions.get(app_id, {}).copy()
     
     def get(self, app_id: int, default=None) -> Dict[str, DiameterSession]:
         """Get sessions for an application (backward compatibility method).
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
         
         This method provides backward compatibility with the old API where
         session_manager.sessions.get(APP_3GPP_GX, {}) was used.
@@ -161,7 +198,8 @@ class Sessions:
         Returns:
             Dictionary of session_id -> session for the application
         """
-        return self.sessions.get(app_id, default or {})
+        with self._lock:
+            return self.sessions.get(app_id, default or {}).copy()
     
     def get_active_sessions(self, app_id: int) -> Dict[str, DiameterSession]:
         """Get only active sessions for an application.
