@@ -1,7 +1,8 @@
 from ..subscriber import Subscriber, Subscribers
 from .session import GxSession, RxSession, SySession, DiameterSession
 from .session.sessions import Sessions
-from typing import Dict, Optional
+from .message_processing_context import MessageProcessingContext
+from typing import Optional
 from dataclasses import dataclass
 import logging
 from .constants import *
@@ -19,26 +20,26 @@ class MessageProcessingPipeline:
     
     This class contains the pipeline logic for processing Diameter messages,
     including session management, subscriber identification, and application-specific
-    business logic. It operates on a context dictionary (gv_stages) that flows
+    business logic. It operates on a MessageProcessingContext that flows
     through all processing stages.
     """
     sessions: Sessions
     subscribers: Subscribers
 
-    def stage_get_session(self, gv_stages: Dict):
+    def stage_get_session(self, context: MessageProcessingContext):
         """Retrieve existing session from storage"""
-        app_id = gv_stages['app_id']
-        session_id = gv_stages['session_id']
+        app_id = context.app_id
+        session_id = context.session_id
         session = self.sessions.get_session_by_id(app_id, session_id)
         if session:
-            gv_stages['session'] = session
+            context.session = session
 
-    def stage_create_session(self, gv_stages: Dict):
+    def stage_create_session(self, context: MessageProcessingContext):
         """Create a new session for the message"""
-        dm: DiameterMessage = gv_stages['dm']
-        app_id = dm.app_id
-        session_id = dm.session_id
-        subscriber = gv_stages.get('subscriber')
+        dm: DiameterMessage = context.message
+        app_id = context.app_id
+        session_id = context.session_id
+        subscriber = context.subscriber
 
         framed_ip_address = None
         framed_ipv6_prefix = None
@@ -63,68 +64,66 @@ class MessageProcessingPipeline:
         else:
             raise ValueError(f"Unknown app_id: {app_id}")
 
-        gv_stages['session'] = session
-
+        context.session = session
 
         # Bind Rx/Sy sessions to Gx sessions after creation
         if app_id == APP_3GPP_RX:
-            self.stage_bind_rx_to_gx(gv_stages)
+            self.stage_bind_rx_to_gx(context)
         elif app_id == APP_3GPP_SY:
-            self.stage_bind_sy_to_gx(gv_stages)
+            self.stage_bind_sy_to_gx(context)
 
-        if not gv_stages.get('subscriber'):
-            gv_stages['subscriber'] = session.subscriber
+        if not context.subscriber:
+            context.subscriber = session.subscriber
 
         # Update subscriber's session_ids tracking if subscriber exists
-        if gv_stages.get('subscriber'):
-            subscriber = gv_stages['subscriber']
+        if context.subscriber:
+            subscriber = context.subscriber
             subscriber.add_session_id(app_id, session_id)
             logger.debug(f"Updated subscriber {subscriber.msisdn} session_ids: {subscriber.session_ids}")
 
-        
         self.sessions.add_session(app_id, session)
 
-    def stage_get_subscriber(self, gv_stages: Dict):
+    def stage_get_subscriber(self, context: MessageProcessingContext):
         """Get subscriber from existing session if available"""
-        if gv_stages.get('session') and gv_stages['session'].subscriber:
-            subscriber = gv_stages['session'].subscriber
-            gv_stages['subscriber'] = subscriber
+        if context.session and context.session.subscriber:
+            subscriber = context.session.subscriber
+            context.subscriber = subscriber
 
-    def stage_identify_subscriber(self, gv_stages: Dict):
+    def stage_identify_subscriber(self, context: MessageProcessingContext):
         """Identify subscriber from message content"""
-        dm = gv_stages['dm']
+        dm = context.message
         if hasattr(dm.message, 'subscription_id') and dm.message.subscription_id:
             msisdn, imsi, sip_uri, nai, private_id = parse_subscription_id(dm.message.subscription_id)
             subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn) or self.subscribers.get_subscriber_by_imsi(imsi)
             if not subscriber:
                 subscriber = Subscriber(msisdn=msisdn, imsi=imsi, sip_uri=sip_uri, nai=nai, private_id=private_id)
                 self.subscribers.add_subscriber(subscriber)
-            gv_stages['subscriber'] = subscriber
+            context.subscriber = subscriber
         else:
             logger.warning(f"No subscriber found for message: {dm.name}")
 
-    def stage_parse_request(self, gv_stages: Dict):
+    def stage_parse_request(self, context: MessageProcessingContext):
         """Process request message through the pipeline stages"""
-        dm = gv_stages['dm']
-        self.stage_get_session(gv_stages)
-        self.stage_get_subscriber(gv_stages)
-        if not gv_stages.get('subscriber'):
-            self.stage_identify_subscriber(gv_stages)
-        if not gv_stages.get('session') and dm.name in CREATE_SESSION_MESSAGES:
-            self.stage_create_session(gv_stages)
+        dm = context.message
+        self.stage_get_session(context)
+        self.stage_get_subscriber(context)
+        if not context.subscriber:
+            self.stage_identify_subscriber(context)
+        if not context.session and dm.name in CREATE_SESSION_MESSAGES:
+            self.stage_create_session(context)
 
-    def stage_parse_response(self, gv_stages: Dict):
+    def stage_parse_response(self, context: MessageProcessingContext):
         """Process response message through the pipeline stages"""
-        dm = gv_stages['dm']
-        self.stage_get_session(gv_stages)
-        self.stage_get_subscriber(gv_stages)
-        if not gv_stages.get('session'):
+        dm = context.message
+        self.stage_get_session(context)
+        self.stage_get_subscriber(context)
+        if not context.session:
             logger.warning(f"No session found for response: {dm.name},{dm.session_id}")
 
-    def stage_bind_rx_to_gx(self, gv_stages: Dict):
+    def stage_bind_rx_to_gx(self, context: MessageProcessingContext):
         """Bind RxSession to existing GxSession based on identifiers"""
-        dm: DiameterMessage = gv_stages['dm']
-        rx_session = gv_stages['session']
+        dm: DiameterMessage = context.message
+        rx_session = context.session
 
         if hasattr(dm.message, 'framed_ip_address') and dm.message.framed_ip_address:
             logger.debug(f"Trying to find GxSession by framed IP address: {dm.message.framed_ip_address}")
@@ -136,7 +135,7 @@ class MessageProcessingPipeline:
                 return
         
         # Try to find GxSession via subscriber if available
-        subscriber = gv_stages.get('subscriber')
+        subscriber = context.subscriber
         if subscriber:
             gx_session_id = subscriber.session_ids.get(APP_3GPP_GX)
             if gx_session_id:
@@ -164,11 +163,11 @@ class MessageProcessingPipeline:
                     
         logger.warning(f"No GxSession found for RxSession {rx_session.session_id}")
 
-    def stage_bind_sy_to_gx(self, gv_stages: Dict):
+    def stage_bind_sy_to_gx(self, context: MessageProcessingContext):
         """Bind SySession to existing active GxSession for the same subscriber"""
-        dm: DiameterMessage = gv_stages['dm']
-        sy_session = gv_stages['session']
-        subscriber = gv_stages.get('subscriber')
+        dm: DiameterMessage = context.message
+        sy_session = context.session
+        subscriber = context.subscriber
         
         if not subscriber:
             logger.warning(f"No subscriber found for SySession {sy_session.session_id}, cannot bind to GxSession")
@@ -197,10 +196,10 @@ class MessageProcessingPipeline:
         else:
             logger.info(f"SySession {sy_session.session_id} bound to GxSession {gx_session.session_id} (not active) for subscriber {subscriber.msisdn}")
 
-    def stage_process_gx_message(self, gv_stages: Dict):
+    def stage_process_gx_message(self, context: MessageProcessingContext):
         """Process Gx-specific message business logic"""
-        dm: DiameterMessage = gv_stages['dm']
-        session: GxSession = gv_stages['session']
+        dm: DiameterMessage = context.message
+        session: GxSession = context.session
         
         if dm.is_request:
             if dm.name == CCR_I:
@@ -247,10 +246,10 @@ class MessageProcessingPipeline:
             if removed_session_id:
                 logger.debug(f"Cleaned up session {removed_session_id} from subscriber {session.subscriber.msisdn} session_ids: {session.subscriber.session_ids}")
 
-    def stage_process_rx_message(self, gv_stages: Dict):
+    def stage_process_rx_message(self, context: MessageProcessingContext):
         """Process Rx-specific message business logic"""
-        dm: DiameterMessage = gv_stages['dm']
-        session: RxSession = gv_stages['session']
+        dm: DiameterMessage = context.message
+        session: RxSession = context.session
         
         if dm.name == AAR:
             if dm.timestamp:
@@ -265,10 +264,10 @@ class MessageProcessingPipeline:
             # Clean up session ID from subscriber
             # self._cleanup_session_from_subscriber(session, APP_3GPP_RX)
 
-    def stage_process_sy_message(self, gv_stages: Dict):
+    def stage_process_sy_message(self, context: MessageProcessingContext):
         """Process Sy-specific message business logic"""
-        dm: DiameterMessage = gv_stages['dm']
-        session: SySession = gv_stages['session']
+        dm: DiameterMessage = context.message
+        session: SySession = context.session
         
         if dm.name == SLR:
             if dm.timestamp:
@@ -281,15 +280,15 @@ class MessageProcessingPipeline:
             # Clean up session ID from subscriber
             # self._cleanup_session_from_subscriber(session, APP_3GPP_SY)
 
-    def process_app_specific_logic(self, gv_stages: Dict):
+    def process_app_specific_logic(self, context: MessageProcessingContext):
         """Route to application-specific processing"""
-        dm = gv_stages['dm']
-        session = gv_stages.get('session')
+        dm = context.message
+        session = context.session
         
         if session:
             if dm.app_id == APP_3GPP_GX:
-                self.stage_process_gx_message(gv_stages)
+                self.stage_process_gx_message(context)
             elif dm.app_id == APP_3GPP_RX:
-                self.stage_process_rx_message(gv_stages)
+                self.stage_process_rx_message(context)
             elif dm.app_id == APP_3GPP_SY:
-                self.stage_process_sy_message(gv_stages)
+                self.stage_process_sy_message(context)

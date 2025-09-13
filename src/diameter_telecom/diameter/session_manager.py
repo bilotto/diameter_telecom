@@ -1,7 +1,10 @@
+from diameter_telecom.diameter.message_processing_context import MessageProcessingContext
 from ..subscriber import Subscriber, Subscribers
 from .session import GxSession, RxSession, SySession, DiameterSession
 from .session.sessions import Sessions
 from .message_processing_pipeline import MessageProcessingPipeline
+from .message_processing_context import MessageProcessingContext
+from ..csv_file import CsvFile
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 import threading
@@ -22,6 +25,10 @@ class SessionManager:
     the data stores for sessions, subscribers, and messages. The actual message 
     processing logic is delegated to MessageProcessingPipeline.
     
+    CSV Integration:
+    If a csv_file is provided, every processed message will be automatically
+    written to the CSV file during processing using smart attribute resolution.
+    
     Thread Safety:
     This class is thread-safe and can be safely shared across multiple threads.
     It uses read-write locks to allow concurrent read operations while ensuring
@@ -30,6 +37,7 @@ class SessionManager:
     sessions: Sessions = field(default_factory=Sessions)
     subscribers: Subscribers = field(default_factory=Subscribers)
     messages: List[DiameterMessage] = field(default_factory=list)
+    csv_file: Optional[CsvFile] = field(default=None)
     pipeline: MessageProcessingPipeline = field(init=False)
     
     # Thread safety locks
@@ -37,6 +45,7 @@ class SessionManager:
     _subscribers_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
     _messages_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
     _processing_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _csv_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     def __post_init__(self):
         """Initialize the message processing pipeline"""
@@ -98,11 +107,20 @@ class SessionManager:
             yield
         finally:
             self._processing_lock.release()
+    
+    @contextmanager
+    def _csv_lock_context(self):
+        """Context manager for CSV file operations."""
+        self._csv_lock.acquire()
+        try:
+            yield
+        finally:
+            self._csv_lock.release()
 
     # def get_messages(self):
     #     return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
 
-    def process_diameter_message(self, dm: DiameterMessage):
+    def process_diameter_message(self, dm: DiameterMessage) -> MessageProcessingContext:
         """Main entry point for processing Diameter messages.
         
         This method orchestrates the message processing by delegating to the
@@ -110,38 +128,108 @@ class SessionManager:
         
         Thread Safety: This method is thread-safe and can be called concurrently
         from multiple threads.
+        
+        Returns:
+            MessageProcessingContext: The processing context containing all processed data
         """
         with self._processing_lock_context():
             # Setup processing context
-            gv_stages = dict()
             if not dm.timestamp:
                 dm.timestamp = time.time()
-            gv_stages['dm'] = dm
-            gv_stages['session_id'] = dm.session_id
-            gv_stages['app_id'] = dm.app_id
+            
+            context: MessageProcessingContext = MessageProcessingContext.from_diameter_message(dm)
             logger.info(f"Processing {dm.name} - {dm.session_id}")
             
             # Delegate to pipeline for processing
             if dm.is_request:
-                self.pipeline.stage_parse_request(gv_stages)
+                self.pipeline.stage_parse_request(context)
             else:
-                self.pipeline.stage_parse_response(gv_stages)
+                self.pipeline.stage_parse_response(context)
             
             # Process application-specific business logic
-            self.pipeline.process_app_specific_logic(gv_stages)
+            self.pipeline.process_app_specific_logic(context)
             
             # Handle final message storage and association
-            session: DiameterSession = gv_stages.get('session')
+            session: DiameterSession = context.session
             if session:
                 # Thread-safe message addition to session
                 with self._sessions_read_lock():
                     session.messages.append(dm)
                 
-                subscriber = gv_stages.get('subscriber')
+                subscriber = context.subscriber
                 if subscriber:
                     dm.subscriber = subscriber
 
-            # self.messages.append(dm)
+                # Auto-write to CSV if configured
+                if self.csv_file:
+                    with self._csv_lock_context():
+                        success = self._write_context_to_csv(context)
+                        if success:
+                            logger.debug(f"Auto-wrote CSV entry for {dm.name} - {dm.session_id}")
+                        else:
+                            logger.warning(f"Failed to write CSV entry for {dm.name} - {dm.session_id}")
+
+            return context
+
+    def _write_context_to_csv(self, context: MessageProcessingContext) -> bool:
+        """
+        Internal method to write context to the configured CSV file.
+        
+        This method uses the MessageProcessingContext's smart attribute resolution
+        to populate CSV columns from DiameterMessage, Session, and Subscriber objects.
+        
+        Args:
+            context: MessageProcessingContext containing all processed data
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            row = {}
+            for column in self.csv_file.get_csv_columns():
+                value = context.resolve_attribute(column)
+                row[column] = value if value else ""
+            
+            self.csv_file.write_row(row)
+            self.csv_file.flush()
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error auto-writing to CSV for message {context.message.name if context.message else 'unknown'} - {context.session_id}: {e}")
+            return False
+    
+
+    def configure_csv_logging(self, csv_file: CsvFile):
+        """
+        Configure automatic CSV logging for all processed messages.
+        
+        When configured, every message processed through process_diameter_message()
+        will be automatically written to the CSV file using smart attribute resolution.
+        
+        Args:
+            csv_file: CsvFile instance to use for automatic logging
+            
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._csv_lock_context():
+            self.csv_file = csv_file
+            logger.info(f"Configured automatic CSV logging to: {csv_file.filename}")
+    
+    def disable_csv_logging(self):
+        """
+        Disable automatic CSV logging.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._csv_lock_context():
+            if self.csv_file:
+                logger.info(f"Disabled automatic CSV logging from: {self.csv_file.filename}")
+                self.csv_file = None
+            else:
+                logger.info("CSV logging was not enabled")
+
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
         """Send a Diameter request with session management.
@@ -149,13 +237,13 @@ class SessionManager:
         Thread Safety: This method is thread-safe and can be called concurrently
         from multiple threads.
         """
-        self.process_diameter_message(diameter_message)
+        request_context = self.process_diameter_message(diameter_message)
         logger.info(f"\n{diameter_message.dump()}")
         
         answer = send_request_func(diameter_message.message, timeout=timeout)
         diameter_message_answer = DiameterMessage(answer)
         
-        self.process_diameter_message(diameter_message_answer)
+        answer_context = self.process_diameter_message(diameter_message_answer)
         
         if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             logger.error(f"Answer with error: \n {diameter_message_answer}")
@@ -255,50 +343,50 @@ class SessionManager:
         else:
             raise IndexError(f"Message index {index} out of range for subscriber {msisdn}")
 
-    # def _calculate_statistics(self, sessions_data: dict, subscribers_data: dict, messages_data: list) -> dict:
-    #     """Calculate comprehensive statistics for the session manager."""
-    #     try:
-    #         stats = {
-    #             "total_sessions": 0,
-    #             "total_subscribers": len(subscribers_data),
-    #             "total_messages": len(messages_data),
-    #             "sessions_by_app": {},
-    #             "sessions_by_status": {"active": 0, "ended": 0, "error": 0},
-    #             "subscribers_with_messages": 0
-    #         }
+    def _calculate_statistics(self, sessions_data: dict, subscribers_data: dict, messages_data: list) -> dict:
+        """Calculate comprehensive statistics for the session manager."""
+        try:
+            stats = {
+                "total_sessions": 0,
+                "total_subscribers": len(subscribers_data),
+                "total_messages": len(messages_data),
+                "sessions_by_app": {},
+                "sessions_by_status": {"active": 0, "ended": 0, "error": 0},
+                "subscribers_with_messages": 0
+            }
             
-    #         # Calculate session statistics
-    #         for app_name, app_data in sessions_data.items():
-    #             app_sessions = app_data.get("sessions", {})
-    #             app_total = len(app_sessions)
-    #             stats["total_sessions"] += app_total
-    #             stats["sessions_by_app"][app_name] = {
-    #                 "total": app_total,
-    #                 "active": 0,
-    #                 "ended": 0,
-    #                 "error": 0
-    #             }
+            # Calculate session statistics
+            for app_name, app_data in sessions_data.items():
+                app_sessions = app_data.get("sessions", {})
+                app_total = len(app_sessions)
+                stats["total_sessions"] += app_total
+                stats["sessions_by_app"][app_name] = {
+                    "total": app_total,
+                    "active": 0,
+                    "ended": 0,
+                    "error": 0
+                }
                 
-    #             for session in app_sessions.values():
-    #                 if session.get("active"):
-    #                     stats["sessions_by_status"]["active"] += 1
-    #                     stats["sessions_by_app"][app_name]["active"] += 1
-    #                 elif session.get("ended"):
-    #                     stats["sessions_by_status"]["ended"] += 1
-    #                     stats["sessions_by_app"][app_name]["ended"] += 1
-    #                 elif session.get("error"):
-    #                     stats["sessions_by_status"]["error"] += 1
-    #                     stats["sessions_by_app"][app_name]["error"] += 1
+                for session in app_sessions.values():
+                    if session.get("active"):
+                        stats["sessions_by_status"]["active"] += 1
+                        stats["sessions_by_app"][app_name]["active"] += 1
+                    elif session.get("ended"):
+                        stats["sessions_by_status"]["ended"] += 1
+                        stats["sessions_by_app"][app_name]["ended"] += 1
+                    elif session.get("error"):
+                        stats["sessions_by_status"]["error"] += 1
+                        stats["sessions_by_app"][app_name]["error"] += 1
             
-    #         # Calculate subscriber statistics
-    #         for subscriber in subscribers_data.values():
-    #             if subscriber.get("message_count", 0) > 0:
-    #                 stats["subscribers_with_messages"] += 1
+            # Calculate subscriber statistics
+            for subscriber in subscribers_data.values():
+                if subscriber.get("message_count", 0) > 0:
+                    stats["subscribers_with_messages"] += 1
             
-    #         return stats
+            return stats
             
-    #     except Exception as e:
-    #         logger.exception("Failed to calculate session manager statistics")
-    #         return {"error": f"Statistics calculation failed: {str(e)}"}
+        except Exception as e:
+            logger.exception("Failed to calculate session manager statistics")
+            return {"error": f"Statistics calculation failed: {str(e)}"}
 
 
