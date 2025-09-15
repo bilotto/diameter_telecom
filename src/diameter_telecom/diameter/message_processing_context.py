@@ -24,13 +24,17 @@ class MessageProcessingContext:
     message: DiameterMessage
     session_id: str
     app_id: int
-    
+    framed_ip_address: Optional[str] = None
+    framed_ipv6_prefix: Optional[str] = None
+    called_station_id: Optional[str] = None
+    sgsn_mcc_mnc: Optional[str] = None
     # Processing results (populated by pipeline)
     session: Optional[DiameterSession] = None
     subscriber: Optional[Subscriber] = None
     
     # Extensible data storage for pipeline stages
     _additional_data: Dict[str, Any] = field(default_factory=dict)
+    stop_processing: bool = False
 
     def __getitem__(self, key: str) -> Any:
         """Dict-like access for backward compatibility with existing pipeline code."""
@@ -93,21 +97,24 @@ class MessageProcessingContext:
             str: String representation of the attribute value, or empty string if not found
         """
         try:
+
+            if self.session and hasattr(self.session, attr_name):
+                value = getattr(self.session, attr_name)
+                if value is not None:
+                    return str(value).strip()
+
             # 1. Try DiameterMessage first (includes properties like msisdn, imsi via subscriber)
             if hasattr(self.message, attr_name):
                 value = getattr(self.message, attr_name)
                 if value is not None:
                     return str(value).strip()
             
-            # Handle special case for 'dm' key (backward compatibility)
-            if attr_name == 'dm':
-                return str(self.message).strip() if self.message else ""
+            # # Handle special case for 'dm' key (backward compatibility)
+            # if attr_name == 'dm':
+            #     return str(self.message).strip() if self.message else ""
             
             # 2. Try Session attributes (e.g., GxSession.apn, framed_ip_address, sgsn_mcc_mnc)
-            if self.session and hasattr(self.session, attr_name):
-                value = getattr(self.session, attr_name)
-                if value is not None:
-                    return str(value).strip()
+
             
             # 3. Try Subscriber attributes (direct access)
             if self.subscriber and hasattr(self.subscriber, attr_name):
@@ -126,6 +133,8 @@ class MessageProcessingContext:
                 value = getattr(self, attr_name)
                 if value is not None:
                     return str(value).strip()
+
+
             
             # 6. Default to empty string
             return ""

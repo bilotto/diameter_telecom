@@ -1,3 +1,6 @@
+from diameter_telecom.diameter.session._diameter_session import DiameterSession
+
+
 from ..subscriber import Subscriber, Subscribers
 from .session import GxSession, RxSession, SySession, DiameterSession
 from .session.sessions import Sessions
@@ -12,6 +15,34 @@ from .message import DiameterMessage
 logger = logging.getLogger(__name__)
 
 CREATE_SESSION_MESSAGES = [CCR_I, AAR, SLR]
+END_SESSION_MESSAGES = [STA, CCA_T]
+
+import time
+import functools
+
+import time
+import functools
+
+def timing_decorator(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        elapsed_microseconds = (end - start) * 1_000_000  # Convert seconds to microseconds
+        
+        # If this is process_diameter_message, set processing time on DiameterMessage
+        if func.__name__ == 'main_pipeline' and len(args) >= 2:
+            context = args[1]
+            diameter_message = context.message
+            diameter_message.processing_time_microseconds = elapsed_microseconds
+            logger.debug(f"Processed {diameter_message.name} ({diameter_message.session_id}) in {elapsed_microseconds:.0f}μs")
+        elif func.__name__ == '_write_context_to_csv':
+            logger.debug(f"CSV write completed in {elapsed_microseconds:.0f}μs")
+        else:
+            logger.debug(f"{func.__name__} completed in {elapsed_microseconds:.0f}μs")
+        return result
+    return wrapper
 
 @dataclass
 class MessageProcessingPipeline:
@@ -25,12 +56,44 @@ class MessageProcessingPipeline:
     """
     sessions: Sessions
     subscribers: Subscribers
+    
+    @timing_decorator
+    def main_pipeline(self, context: MessageProcessingContext):
+        """Main pipeline for processing Diameter messages"""
+        self.stage_get_session(context)
+        if not context.session:
+            if context.message.name not in CREATE_SESSION_MESSAGES:
+                return False
+
+        self.stage_get_subscriber(context)
+
+        # Delegate to pipeline for processing (uses fine-grained locks internally)
+        if context.message.is_request:
+            self.stage_parse_request(context)
+        else:
+            self.stage_parse_response(context)
+        
+        # Process application-specific business logic (uses fine-grained locks internally)
+        self.process_app_specific_logic(context)
+        
+        # Handle final message storage and association
+        session: DiameterSession = context.session
+        if session:
+            # Session.messages is per-session - no contention between different sessions
+            session.messages.append(context.message)
+            
+            subscriber = context.subscriber
+            if subscriber:
+                context.message.subscriber = subscriber
+
+        return True
+
 
     def stage_get_session(self, context: MessageProcessingContext):
         """Retrieve existing session from storage"""
         app_id = context.app_id
         session_id = context.session_id
-        session = self.sessions.get_session_by_id(app_id, session_id)
+        session: DiameterSession | None = self.sessions.get_session_by_id(app_id, session_id)
         if session:
             context.session = session
 
@@ -46,13 +109,16 @@ class MessageProcessingPipeline:
         called_station_id = None
         sgsn_mcc_mnc = None
 
-        if hasattr(dm.message, 'framed_ip_address'):
+        if hasattr(dm.message, 'framed_ip_address') and dm.message.framed_ip_address:
             framed_ip_address = dm.message.framed_ip_address
-        if hasattr(dm.message, 'framed_ipv6_prefix'):
+            # if isinstance(framed_ip_address, bytes):
+            framed_ip_address = bytes_to_ip(framed_ip_address)
+            context.framed_ip_address = framed_ip_address
+        if hasattr(dm.message, 'framed_ipv6_prefix') and dm.message.framed_ipv6_prefix:
             framed_ipv6_prefix = dm.message.framed_ipv6_prefix
-        if hasattr(dm.message, 'called_station_id'):
+        if hasattr(dm.message, 'called_station_id') and dm.message.called_station_id:
             called_station_id = dm.message.called_station_id
-        if hasattr(dm.message, 'sgsn_mcc_mnc'):
+        if hasattr(dm.message, 'sgsn_mcc_mnc') and dm.message.sgsn_mcc_mnc:
             sgsn_mcc_mnc = dm.message.sgsn_mcc_mnc
         
         if app_id == APP_3GPP_GX:
@@ -71,6 +137,8 @@ class MessageProcessingPipeline:
             self.stage_bind_rx_to_gx(context)
         elif app_id == APP_3GPP_SY:
             self.stage_bind_sy_to_gx(context)
+
+        session.start(dm.timestamp)
 
         if not context.subscriber:
             context.subscriber = session.subscriber
@@ -104,12 +172,9 @@ class MessageProcessingPipeline:
 
     def stage_parse_request(self, context: MessageProcessingContext):
         """Process request message through the pipeline stages"""
-        dm = context.message
-        self.stage_get_session(context)
-        self.stage_get_subscriber(context)
         if not context.subscriber:
             self.stage_identify_subscriber(context)
-        if not context.session and dm.name in CREATE_SESSION_MESSAGES:
+        if not context.session:
             self.stage_create_session(context)
 
     def stage_parse_response(self, context: MessageProcessingContext):
@@ -215,11 +280,8 @@ class MessageProcessingPipeline:
                 if hasattr(dm.message, 'sgsn_mcc_mnc') and dm.message.sgsn_mcc_mnc and not session.sgsn_mcc_mnc:
                     session.sgsn_mcc_mnc = dm.message.sgsn_mcc_mnc
         else:
-            # Process response messages
-            if hasattr(dm.message, 'result_code') and dm.message.result_code and dm.message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-                session.error = True
-                # Clean up session ID from subscriber when session has error
-                # self._cleanup_session_from_subscriber(session, APP_3GPP_GX)
+            # Process response messages - use common error handling
+            self._handle_result_code_errors(session, dm)
             
             if dm.name == CCA_I:
                 if dm.timestamp and dm.message.result_code == E_RESULT_CODE_DIAMETER_SUCCESS:
@@ -229,8 +291,8 @@ class MessageProcessingPipeline:
                     session.active = False
                     session.ended = True
                     session.end_time = dm.timestamp
-                    # Clean up session ID from subscriber
-                    # self._cleanup_session_from_subscriber(session, APP_3GPP_GX)
+                    # Clean up session from both subscriber tracking and session manager
+                    self._cleanup_session_from_subscriber(session, APP_3GPP_GX)
         
         # Update common attributes
         if hasattr(dm.message, 'cc_request_number') and dm.message.cc_request_number is not None:
@@ -245,40 +307,66 @@ class MessageProcessingPipeline:
             removed_session_id = session.subscriber.session_ids.pop(app_id, None)
             if removed_session_id:
                 logger.debug(f"Cleaned up session {removed_session_id} from subscriber {session.subscriber.msisdn} session_ids: {session.subscriber.session_ids}")
+        
+        # Also remove the session from the Sessions collection
+        self.sessions.remove_session(app_id, session.session_id)
+        logger.info(f"Session {session.session_id} removed from session manager")
+
+    def _handle_session_start(self, session: DiameterSession, message: DiameterMessage, start_message_type: str):
+        """Common logic for session start with timestamp handling"""
+        if message.name == start_message_type:
+            if message.timestamp:
+                session.start(message.timestamp)
+            else:
+                session.start()
+
+    def _handle_session_end(self, session: DiameterSession, message: DiameterMessage, context: MessageProcessingContext):
+        """Common logic for session end with cleanup"""
+        if message.name == STR:
+            if message.timestamp:
+                session.end(message.timestamp)
+            else:
+                session.end()
+            # Clean up session from both subscriber tracking and session manager
+            self._cleanup_session_from_subscriber(session, message.app_id)
+
+    def _handle_result_code_errors(self, session: DiameterSession, message: DiameterMessage):
+        """Common error handling for all session types"""
+        if (hasattr(message.message, 'result_code') and 
+            message.message.result_code and 
+            message.message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS):
+            session.error = True
+            logger.warning(f"Session {session.session_id} marked as error due to result code: {message.message.result_code}")
+            # Clean up error sessions from both subscriber tracking and session manager
+            self._cleanup_session_from_subscriber(session, message.app_id)
 
     def stage_process_rx_message(self, context: MessageProcessingContext):
         """Process Rx-specific message business logic"""
         dm: DiameterMessage = context.message
         session: RxSession = context.session
         
-        if dm.name == AAR:
-            if dm.timestamp:
-                session.start(dm.timestamp)
-            else:
-                session.start()
-        elif dm.name == STR:
-            if dm.timestamp:
-                session.end(dm.timestamp)
-            else:
-                session.end()
-            # Clean up session ID from subscriber
-            # self._cleanup_session_from_subscriber(session, APP_3GPP_RX)
+        if dm.is_request:
+            # Handle session start
+            self._handle_session_start(session, dm, AAR)
+            # Handle session end
+            self._handle_session_end(session, dm, context)
+        else:
+            # Handle response errors (NEW for Rx sessions)
+            self._handle_result_code_errors(session, dm)
 
     def stage_process_sy_message(self, context: MessageProcessingContext):
         """Process Sy-specific message business logic"""
         dm: DiameterMessage = context.message
         session: SySession = context.session
         
-        if dm.name == SLR:
-            if dm.timestamp:
-                session.start(dm.timestamp)
-        elif dm.name == STR:
-            if dm.timestamp:
-                session.end(dm.timestamp)
-            else:
-                session.end()
-            # Clean up session ID from subscriber
-            # self._cleanup_session_from_subscriber(session, APP_3GPP_SY)
+        if dm.is_request:
+            # Handle session start
+            self._handle_session_start(session, dm, SLR)
+            # Handle session end
+            self._handle_session_end(session, dm, context)
+        else:
+            # Handle response errors (NEW for Sy sessions)
+            self._handle_result_code_errors(session, dm)
 
     def process_app_specific_logic(self, context: MessageProcessingContext):
         """Route to application-specific processing"""

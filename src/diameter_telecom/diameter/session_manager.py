@@ -2,7 +2,7 @@ from diameter_telecom.diameter.message_processing_context import MessageProcessi
 from ..subscriber import Subscriber, Subscribers
 from .session import GxSession, RxSession, SySession, DiameterSession
 from .session.sessions import Sessions
-from .message_processing_pipeline import MessageProcessingPipeline
+from .message_processing_pipeline import MessageProcessingPipeline, CREATE_SESSION_MESSAGES
 from .message_processing_context import MessageProcessingContext
 from ..csv_file import CsvFile
 from typing import List, Dict, Optional
@@ -17,6 +17,7 @@ from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class SessionManager:
     """Centralized session and subscriber management for Diameter applications.
@@ -30,9 +31,10 @@ class SessionManager:
     written to the CSV file during processing using smart attribute resolution.
     
     Thread Safety:
-    This class is thread-safe and can be safely shared across multiple threads.
-    It uses read-write locks to allow concurrent read operations while ensuring
-    exclusive access for write operations.
+    This class is thread-safe and supports true parallel message processing.
+    Multiple threads can process different messages simultaneously. Fine-grained
+    locks protect shared data structures only when necessary, maximizing throughput
+    for high-performance telecom applications.
     """
     sessions: Sessions = field(default_factory=Sessions)
     subscribers: Subscribers = field(default_factory=Subscribers)
@@ -44,7 +46,6 @@ class SessionManager:
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
     _subscribers_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
     _messages_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
-    _processing_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
     _csv_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     def __post_init__(self):
@@ -99,14 +100,6 @@ class SessionManager:
         finally:
             self._messages_lock.release()
     
-    @contextmanager
-    def _processing_lock_context(self):
-        """Context manager for message processing operations."""
-        self._processing_lock.acquire()
-        try:
-            yield
-        finally:
-            self._processing_lock.release()
     
     @contextmanager
     def _csv_lock_context(self):
@@ -120,58 +113,33 @@ class SessionManager:
     # def get_messages(self):
     #     return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
 
-    def process_diameter_message(self, dm: DiameterMessage) -> MessageProcessingContext:
+    def process_diameter_message(self, dm: DiameterMessage) -> Optional[MessageProcessingContext]:
         """Main entry point for processing Diameter messages.
         
         This method orchestrates the message processing by delegating to the
         MessageProcessingPipeline and handling the final message storage.
         
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
+        Thread Safety: This method supports true parallel processing. Multiple threads
+        can process different messages simultaneously without blocking each other.
+        Fine-grained locks are used only when updating shared data structures.
         
         Returns:
-            MessageProcessingContext: The processing context containing all processed data
+            Optional[MessageProcessingContext]: The processing context containing all processed data,
+            or None if the message was filtered out
         """
-        with self._processing_lock_context():
-            # Setup processing context
-            if not dm.timestamp:
-                dm.timestamp = time.time()
-            
-            context: MessageProcessingContext = MessageProcessingContext.from_diameter_message(dm)
-            logger.info(f"Processing {dm.name} - {dm.session_id}")
-            
-            # Delegate to pipeline for processing
-            if dm.is_request:
-                self.pipeline.stage_parse_request(context)
-            else:
-                self.pipeline.stage_parse_response(context)
-            
-            # Process application-specific business logic
-            self.pipeline.process_app_specific_logic(context)
-            
-            # Handle final message storage and association
-            session: DiameterSession = context.session
-            if session:
-                # Thread-safe message addition to session
-                with self._sessions_read_lock():
-                    session.messages.append(dm)
-                
-                subscriber = context.subscriber
-                if subscriber:
-                    dm.subscriber = subscriber
 
-                # Auto-write to CSV if configured
-                if self.csv_file:
-                    with self._csv_lock_context():
-                        success = self._write_context_to_csv(context)
-                        if success:
-                            logger.debug(f"Auto-wrote CSV entry for {dm.name} - {dm.session_id}")
-                        else:
-                            logger.warning(f"Failed to write CSV entry for {dm.name} - {dm.session_id}")
+        context: MessageProcessingContext = MessageProcessingContext.from_diameter_message(dm)
+        logger.info(f"Processing {dm.name} - {dm.session_id}")
 
-            return context
+        result = self.pipeline.main_pipeline(context)
+        if not result:
+            return None
+        # Auto-write to CSV if configured (still needs synchronization for file operations)
+        if self.csv_file:
+            self._write_context_to_csv(context)
+        return context
 
-    def _write_context_to_csv(self, context: MessageProcessingContext) -> bool:
+    def _write_context_to_csv(self, context: MessageProcessingContext):
         """
         Internal method to write context to the configured CSV file.
         
@@ -237,6 +205,9 @@ class SessionManager:
         Thread Safety: This method is thread-safe and can be called concurrently
         from multiple threads.
         """
+        if not diameter_message.timestamp:
+            diameter_message.timestamp = time.time()
+
         request_context = self.process_diameter_message(diameter_message)
         logger.info(f"\n{diameter_message.dump()}")
         

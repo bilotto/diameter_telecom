@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 CSV_COLUMNS = [
-    'timestamp',
+    'time',
     'app_id',
     'pcap_filepath',
     'pkt_number',
@@ -15,7 +15,8 @@ CSV_COLUMNS = [
     'apn',
     'framed_ip_address',
     'sgsn_mcc_mnc',
-    'result_code'
+    'result_code',
+    'processing_time_microseconds'
 ]
 
 class CsvFile:

@@ -30,6 +30,7 @@ class DiameterMessage:
         
         self.timestamp = None
         self.subscriber: 'Subscriber' = None
+        self.processing_time_microseconds = None # in microseconds (more precise)
 
     def __getattr__(self, name):
         if hasattr(self.message, name):
@@ -59,6 +60,13 @@ class DiameterMessage:
     @property
     def msisdn(self):
         return self.subscriber.msisdn if self.subscriber else None
+    
+    @property
+    def processing_time(self):
+        """Processing time in milliseconds (calculated from microseconds)"""
+        if self.processing_time_microseconds is not None:
+            return self.processing_time_microseconds / 1000.0
+        return None
     
     @property
     def imsi(self):
