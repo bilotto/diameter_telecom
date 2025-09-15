@@ -39,8 +39,8 @@ class Subscriber:
     imei: str = field(default=None, repr=False)
     apn: APN = field(default=None, repr=False)
     messages: List[DiameterMessage] = field(default_factory=list, repr=False)
-    session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=True)
-    _session_ids_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=False)
+    _session_ids_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
 
     def __post_init__(self):
         """
@@ -168,7 +168,7 @@ class Subscribers:
     It uses a single RLock to protect all subscriber operations.
     """
     subscribers: Dict[str, Subscriber] = field(default_factory=dict)
-    _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
 
     def add_subscriber(self, subscriber: Subscriber):
         """Add a subscriber to the collection.

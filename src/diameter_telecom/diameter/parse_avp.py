@@ -54,7 +54,7 @@ def parse_subscription_id(subscription_id: List[SubscriptionId]) -> Tuple[Option
     return (msisdn, imsi, sip_uri, nai, private)
 
 import socket
-def bytes_to_ip(ip_bytes: bytes) -> Optional[str]:
+def decode_framed_ip_address(ip_bytes: bytes) -> Optional[str]:
     """
     Convert IP address bytes to string representation.
     
@@ -419,7 +419,7 @@ def parse_usage_monitoring_information(umi_list: List[UsageMonitoringInformation
 
 __all__ = [
     'parse_subscription_id',
-    'bytes_to_ip',
+    'decode_framed_ip_address',
     'decode_framed_ipv6',
     'check_charging_rule_remove',
     'check_charging_rule_install',

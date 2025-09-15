@@ -1,8 +1,8 @@
-from diameter_telecom.diameter.message_processing_context import MessageProcessingContext
+# from diameter_telecom.diameter.message_processing_context import MessageProcessingContext
 from ..subscriber import Subscriber, Subscribers
 from .session import GxSession, RxSession, SySession, DiameterSession
 from .session.sessions import Sessions
-from .message_processing_pipeline import MessageProcessingPipeline, CREATE_SESSION_MESSAGES
+from .message_processing_pipeline import MessageProcessingPipeline
 from .message_processing_context import MessageProcessingContext
 from ..csv_file import CsvFile
 from typing import List, Dict, Optional
@@ -41,18 +41,22 @@ class SessionManager:
     messages: List[DiameterMessage] = field(default_factory=list)
     csv_file: Optional[CsvFile] = field(default=None)
     pipeline: MessageProcessingPipeline = field(init=False)
+
+    # Options
+    clear_sessions_after_termination: bool = field(default=False, repr=False)
     
     # Thread safety locks
-    _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
-    _subscribers_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
-    _messages_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
-    _csv_lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    _subscribers_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    _messages_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    _csv_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
 
     def __post_init__(self):
         """Initialize the message processing pipeline"""
         self.pipeline = MessageProcessingPipeline(
             sessions=self.sessions,
-            subscribers=self.subscribers
+            subscribers=self.subscribers,
+            clear_sessions_after_termination=self.clear_sessions_after_termination,
         )
     
     @contextmanager
@@ -129,7 +133,7 @@ class SessionManager:
         """
 
         context: MessageProcessingContext = MessageProcessingContext.from_diameter_message(dm)
-        logger.info(f"Processing {dm.name} - {dm.session_id}")
+        # logger.info(f"Processing {dm.name} - {dm.session_id}")
 
         result = self.pipeline.main_pipeline(context)
         if not result:
@@ -152,6 +156,7 @@ class SessionManager:
         Returns:
             bool: True if successful, False otherwise
         """
+        logger.info(f"Writing context to CSV: {context}")
         try:
             row = {}
             for column in self.csv_file.get_csv_columns():
@@ -167,36 +172,6 @@ class SessionManager:
             return False
     
 
-    def configure_csv_logging(self, csv_file: CsvFile):
-        """
-        Configure automatic CSV logging for all processed messages.
-        
-        When configured, every message processed through process_diameter_message()
-        will be automatically written to the CSV file using smart attribute resolution.
-        
-        Args:
-            csv_file: CsvFile instance to use for automatic logging
-            
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
-        with self._csv_lock_context():
-            self.csv_file = csv_file
-            logger.info(f"Configured automatic CSV logging to: {csv_file.filename}")
-    
-    def disable_csv_logging(self):
-        """
-        Disable automatic CSV logging.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
-        with self._csv_lock_context():
-            if self.csv_file:
-                logger.info(f"Disabled automatic CSV logging from: {self.csv_file.filename}")
-                self.csv_file = None
-            else:
-                logger.info("CSV logging was not enabled")
 
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:

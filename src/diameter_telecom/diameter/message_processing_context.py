@@ -5,6 +5,8 @@ from .message import DiameterMessage
 from .session import DiameterSession
 from ..subscriber import Subscriber
 
+from .parse_avp import *
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,10 +33,22 @@ class MessageProcessingContext:
     # Processing results (populated by pipeline)
     session: Optional[DiameterSession] = None
     subscriber: Optional[Subscriber] = None
+    msisdn: Optional[str] = None
+    imsi: Optional[str] = None
+    result_code: Optional[int] = None
     
     # Extensible data storage for pipeline stages
     _additional_data: Dict[str, Any] = field(default_factory=dict)
     stop_processing: bool = False
+
+    # @property
+    # def session_id(self):
+    #     return self.message.session_id
+
+    # @property
+    # def app_id(self):
+    #     return self.message.app_id
+
 
     def __getitem__(self, key: str) -> Any:
         """Dict-like access for backward compatibility with existing pipeline code."""
@@ -144,54 +158,72 @@ class MessageProcessingContext:
             return ""
     
     @classmethod
-    def from_diameter_message(cls, diameter_message: DiameterMessage) -> 'MessageProcessingContext':
+    def from_diameter_message(cls, dm: DiameterMessage) -> 'MessageProcessingContext':
         """
         Factory method to create MessageProcessingContext from DiameterMessage.
         
         Args:
-            diameter_message: The DiameterMessage to process
+            dm: The DiameterMessage to process
             
         Returns:
             MessageProcessingContext: New context initialized with the message
         """
-        return cls(
-            message=diameter_message,
-            session_id=diameter_message.session_id,
-            app_id=diameter_message.app_id
-        )
+        context = cls(message=dm, session_id=dm.session_id, app_id=dm.app_id)
+        if hasattr(dm.message, 'framed_ip_address') and dm.message.framed_ip_address:
+            framed_ip_address = decode_framed_ip_address(dm.message.framed_ip_address)
+            context.framed_ip_address = framed_ip_address
+        if hasattr(dm.message, 'framed_ipv6_prefix') and dm.message.framed_ipv6_prefix:
+            framed_ipv6_prefix = dm.message.framed_ipv6_prefix
+            context.framed_ipv6_prefix = framed_ipv6_prefix
+        if hasattr(dm.message, 'called_station_id') and dm.message.called_station_id:
+            called_station_id = dm.message.called_station_id
+            context.called_station_id = called_station_id
+        if hasattr(dm.message, 'sgsn_mcc_mnc') and dm.message.sgsn_mcc_mnc:
+            sgsn_mcc_mnc = dm.message.sgsn_mcc_mnc
+            context.sgsn_mcc_mnc = sgsn_mcc_mnc
+        if hasattr(dm.message, 'subscription_id') and dm.message.subscription_id:
+            msisdn, imsi, sip_uri, nai, private_id = parse_subscription_id(dm.message.subscription_id)
+            if msisdn:
+                context.msisdn = msisdn
+            if imsi:
+                context.imsi = imsi
+        if hasattr(dm.message, 'result_code') and dm.message.result_code:
+            context.result_code = dm.message.result_code
+
+        return context
     
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert context to dictionary for logging/debugging purposes.
+    # def to_dict(self) -> Dict[str, Any]:
+    #     """
+    #     Convert context to dictionary for logging/debugging purposes.
         
-        Returns:
-            Dict containing all context data
-        """
-        result = {
-            'session_id': self.session_id,
-            'app_id': self.app_id,
-            'message_name': self.message.name if self.message else None,
-            'has_session': self.session is not None,
-            'has_subscriber': self.subscriber is not None,
-            'additional_data_keys': list(self._additional_data.keys())
-        }
+    #     Returns:
+    #         Dict containing all context data
+    #     """
+    #     result = {
+    #         'session_id': self.session_id,
+    #         'app_id': self.app_id,
+    #         'message_name': self.message.name if self.message else None,
+    #         'has_session': self.session is not None,
+    #         'has_subscriber': self.subscriber is not None,
+    #         'additional_data_keys': list(self._additional_data.keys())
+    #     }
         
-        if self.session:
-            result['session_type'] = type(self.session).__name__
-            result['session_active'] = getattr(self.session, 'active', None)
+    #     if self.session:
+    #         result['session_type'] = type(self.session).__name__
+    #         result['session_active'] = getattr(self.session, 'active', None)
         
-        if self.subscriber:
-            result['subscriber_msisdn'] = self.subscriber.msisdn
-            result['subscriber_imsi'] = getattr(self.subscriber, 'imsi', None)
+    #     if self.subscriber:
+    #         result['subscriber_msisdn'] = self.subscriber.msisdn
+    #         result['subscriber_imsi'] = getattr(self.subscriber, 'imsi', None)
         
-        return result
+    #     return result
     
-    def __repr__(self) -> str:
-        """String representation for debugging."""
-        return (f"MessageProcessingContext("
-                f"message={self.message.name if self.message else None}, "
-                f"session_id={self.session_id}, "
-                f"app_id={self.app_id}, "
-                f"has_session={self.session is not None}, "
-                f"has_subscriber={self.subscriber is not None}"
-                f")")
+    # def __repr__(self) -> str:
+    #     """String representation for debugging."""
+    #     return (f"MessageProcessingContext("
+    #             f"message={self.message.name if self.message else None}, "
+    #             f"session_id={self.session_id}, "
+    #             f"app_id={self.app_id}, "
+    #             f"has_session={self.session is not None}, "
+    #             f"has_subscriber={self.subscriber is not None}"
+    #             f")")

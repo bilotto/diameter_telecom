@@ -28,6 +28,8 @@ CCR_T = "CCR-T"  # Credit Control Request - Termination
 CCA_T = "CCA-T"  # Credit Control Answer - Termination
 CCR_E = "CCR-E"  # Credit Control Request - Event
 CCA_E = "CCA-E"  # Credit Control Answer - Event
+CCR = "CCR"  # Credit Control Request
+CCA = "CCA"  # Credit Control Answer
 
 # Re-Auth Messages
 RAR = "RAR"  # Re-Auth Request
@@ -65,4 +67,5 @@ DPR = "DPR"  # Disconnect Peer Request
 DPA = "DPA"  # Disconnect Peer Answer
 
 
-create_session_messages = [CCR_I, AAR, SLR]
+REQUESTS_CREATE_SESSION = [CCR_I, AAR, SLR]
+RESPONSES_END_SESSION = [STA, CCA_T]
