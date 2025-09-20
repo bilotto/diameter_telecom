@@ -32,7 +32,7 @@ from .message import DiameterMessage
 
 from .constants import *
 
-from .handle_request import handle_request
+from .handle_request import handle_request, handle_request_dsc
 
 from .session_manager import SessionManager
 from .message_processing_pipeline import MessageProcessingPipeline

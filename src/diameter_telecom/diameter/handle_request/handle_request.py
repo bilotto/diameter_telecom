@@ -21,3 +21,13 @@ def handle_request(app: CustomSimpleThreadingApplication, message: Message):
     elif app.application_id == APP_3GPP_SY:
         return handle_request_sy(app, message)
 
+
+def handle_request_dsc(app: CustomSimpleThreadingApplication, message: Message):
+    origin_host = message.origin_host
+    origin_realm = message.origin_realm
+    destination_host = message.destination_host
+    destination_realm = message.destination_realm
+    #
+    message.route_record.append(origin_host)
+    answer = app.send_request(message)
+    return answer

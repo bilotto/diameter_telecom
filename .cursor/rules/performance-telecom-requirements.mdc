@@ -1,7 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
 ---
-
 # Performance Requirements for Telecom Systems
 
 When working with telecom/mission-critical systems in this codebase:
