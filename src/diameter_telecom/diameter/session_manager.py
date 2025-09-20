@@ -40,10 +40,11 @@ class SessionManager:
     subscribers: Subscribers = field(default_factory=Subscribers)
     messages: List[DiameterMessage] = field(default_factory=list)
     csv_file: Optional[CsvFile] = field(default=None)
+    statistics: dict = field(default_factory=dict)
     pipeline: MessageProcessingPipeline = field(init=False)
 
     # Options
-    clear_sessions_after_termination: bool = field(default=False, repr=False)
+    clear_sessions_after_termination: bool = field(default=True, repr=False)
     
     # Thread safety locks
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
@@ -57,6 +58,7 @@ class SessionManager:
             sessions=self.sessions,
             subscribers=self.subscribers,
             clear_sessions_after_termination=self.clear_sessions_after_termination,
+            statistics=self.statistics,
         )
     
     @contextmanager

@@ -1,5 +1,7 @@
 # from diameter_telecom.diameter.session._diameter_session import DiameterSession
 
+from dataclasses import field
+
 
 from ..subscriber import Subscriber, Subscribers
 from .session import GxSession, RxSession, SySession, DiameterSession
@@ -43,6 +45,7 @@ class MessageProcessingPipeline:
     subscribers: Subscribers
     clear_sessions_after_termination: bool = False
     save_messages_to_session: bool = True
+    statistics: dict = field(default_factory=dict)
     
     @timing_decorator
     def main_pipeline(self, context: MessageProcessingContext):
@@ -63,6 +66,7 @@ class MessageProcessingPipeline:
             self.stage_parse_response(context)
         
         # self.process_app_specific_logic(context)
+        logger.debug(f"✅ [MAIN PIPELINE] Message {context} processed")
         
         session: DiameterSession = context.session
         if session and self.save_messages_to_session:
@@ -193,6 +197,8 @@ class MessageProcessingPipeline:
             if gx_session:
                 rx_session.gx_session_id = gx_session.session_id
                 rx_session.subscriber = gx_session.subscriber
+                gx_session.add_bound_session(APP_3GPP_RX, rx_session.session_id)
+                rx_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
                 logger.info(f"✅ [BINDING] RxSession {rx_session.session_id} bound to GxSession {gx_session.session_id} via framed IP {context.framed_ip_address}")
                 return
             else:
@@ -207,6 +213,8 @@ class MessageProcessingPipeline:
                 if gx_session:
                     rx_session.gx_session_id = gx_session.session_id
                     rx_session.subscriber = gx_session.subscriber
+                    gx_session.add_bound_session(APP_3GPP_RX, rx_session.session_id)
+                    rx_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
                     logger.info(f"✅ [BINDING] RxSession {rx_session.session_id} bound to GxSession {gx_session.session_id} via subscriber {subscriber.msisdn}")
                     return
                 else:
@@ -215,7 +223,36 @@ class MessageProcessingPipeline:
         
 
     def stage_bind_sy_to_gx(self, context: MessageProcessingContext):
-        pass
+        # The Sy session is bound using the subscription_id which is already in the context
+        sy_session = context.session
+        msisdn, imsi = context.msisdn, context.imsi
+        if msisdn:
+            gx_session = self.sessions.get_session_by_msisdn(APP_3GPP_GX, msisdn)
+            if gx_session:
+                sy_session.gx_session_id = gx_session.session_id
+                sy_session.subscriber = gx_session.subscriber
+                gx_session.add_bound_session(APP_3GPP_SY, sy_session.session_id)
+                sy_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
+                logger.info(f"✅ [BINDING] SySession {sy_session.session_id} bound to GxSession {gx_session.session_id} via msisdn {msisdn}")
+                return
+            else:
+                pass
+        elif imsi:
+            gx_session = self.sessions.get_session_by_imsi(APP_3GPP_GX, imsi)
+            if gx_session:
+                sy_session.gx_session_id = gx_session.session_id
+                sy_session.subscriber = gx_session.subscriber
+                gx_session.add_bound_session(APP_3GPP_SY, sy_session.session_id)
+                sy_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
+                logger.info(f"✅ [BINDING] SySession {sy_session.session_id} bound to GxSession {gx_session.session_id} via imsi {imsi}")
+                return
+            else:
+                pass
+        else:
+            pass
+
+        logger.warning(f"❌ [BINDING] SySession {sy_session.session_id} not bound to GxSession")
+    
     
     # def stage_process_gx_message(self, context: MessageProcessingContext):
     #     dm: DiameterMessage = context.message

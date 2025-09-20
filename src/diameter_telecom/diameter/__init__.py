@@ -37,3 +37,11 @@ from .handle_request import handle_request
 from .session_manager import SessionManager
 from .message_processing_pipeline import MessageProcessingPipeline
 from .message_processing_context import MessageProcessingContext
+
+# JSON conversion utilities
+from .json_utils import (
+    message_to_json,
+    message_to_compact_json,
+    avp_to_json,
+    avp_to_compact_json
+)

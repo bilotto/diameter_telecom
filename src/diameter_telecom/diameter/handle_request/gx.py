@@ -7,7 +7,37 @@ from ..session import GxSession
 from .. import Subscriber
 from ..parse_avp import *
 import logging
+import functools
 logger = logging.getLogger(__name__)
+
+
+def auto_session_management(func):
+    """
+    Decorator that automatically processes incoming Diameter requests through SessionManager
+    before calling the business logic handler. This ensures sessions and subscribers are 
+    created/updated automatically for incoming CCR-I, AAR, SLR messages.
+    
+    This is the stable solution that eliminates the need to manually manage sessions
+    in every request handler.
+    """
+    @functools.wraps(func)
+    def wrapper(app, message):
+        # Create DiameterMessage wrapper for SessionManager processing
+        if hasattr(message, 'header') and hasattr(message.header, 'application_id'):
+            app_id = message.header.application_id
+        else:
+            app_id = app.app_id
+            
+        dm = DiameterMessage(message, app_id)
+        
+        # Process through SessionManager (creates session, identifies subscriber) 
+        app.session_manager.process_diameter_message(dm)
+        logger.debug(f"🔄 Auto-processed {dm.name} through SessionManager for session {dm.session_id}")
+        
+        # Now call the original business logic handler - session will exist
+        return func(app, message)
+    
+    return wrapper
 
 def handle_request_gx(app: GxApplication, message: Message):
     answer = None
@@ -19,6 +49,7 @@ def handle_request_gx(app: GxApplication, message: Message):
         answer = handle_ccr(app, message)
     return answer
 
+@auto_session_management  
 def handle_rar(app: GxApplication, message: ReAuthRequest):
     answer = message.to_answer()
     if not isinstance(answer, ReAuthAnswer):
@@ -38,6 +69,7 @@ def handle_rar(app: GxApplication, message: ReAuthRequest):
         answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
     return answer
 
+@auto_session_management
 def handle_asr(app: GxApplication, message: AbortSessionRequest):
     answer = message.to_answer()
     if not isinstance(answer, AbortSessionAnswer):
@@ -56,6 +88,7 @@ def handle_asr(app: GxApplication, message: AbortSessionRequest):
     return answer
 
 
+@auto_session_management
 def handle_ccr(app: GxApplication, message: CreditControlRequest):
     answer = message.to_answer()
     answer.cc_request_number = message.cc_request_number

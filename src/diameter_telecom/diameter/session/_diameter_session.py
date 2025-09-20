@@ -1,7 +1,7 @@
 from .. import Subscriber
 from ..message import DiameterMessage, Message, convert_timestamp
 from ..constants import *
-from typing import List, Optional
+from typing import List, Optional, Dict
 import time
 from dataclasses import dataclass, field
 import logging
@@ -17,6 +17,10 @@ class DiameterSession:
     start_time: Optional[str] = field(default=None)
     end_time: Optional[str] = field(default=None)
     subscriber: Optional[Subscriber] = field(default=None)
+    bound_sessions: Dict[int, List[str]] = field(default_factory=lambda: {app_id: [] for app_id in [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]})
+
+    def add_bound_session(self, app_id: int, session_id: str):
+        self.bound_sessions[app_id].append(session_id)
 
     def __post_init__(self):
         if not isinstance(self.session_id, str):
@@ -35,7 +39,6 @@ class DiameterSession:
             else:
                 self.start_time = str(time.time())
             self.active = True
-            logger.info(f"Session {self.session_id} started at {self.start_time}")
 
     def end(self, timestamp: str = None):
         if self.active:
@@ -45,7 +48,6 @@ class DiameterSession:
                 self.end_time = str(time.time())
             self.active = False
             self.ended = True
-            logger.info(f"Session {self.session_id} ended at {self.end_time}")
 
     def add_message(self, message) -> DiameterMessage:
         if isinstance(message, DiameterMessage):
@@ -54,8 +56,9 @@ class DiameterSession:
             dm = DiameterMessage(message)
         else:
             raise ValueError("message must be an instance of Message or DiameterMessage")
-        if not dm.timestamp:
-            dm.timestamp = time.time()
+        # if not dm.timestamp:
+        #     dm.timestamp = time.time()
+        dm.session_id = None
         self.messages.append(dm)
         return dm
 

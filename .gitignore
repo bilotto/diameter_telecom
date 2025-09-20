@@ -1,2 +1,6 @@
 *.pyc
 *.log
+diameter_telecom.code-workspace
+dsc_api_spec.yaml
+dsc_create_api_spec.yaml
+dsc_mcp_spec.yaml
