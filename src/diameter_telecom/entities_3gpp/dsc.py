@@ -1,5 +1,5 @@
 from ..diameter.app import *
-from typing import List, Callable
+from typing import List, Callable, Optional
 from ._entity import DiameterEntity
 from ..diameter.helpers import Node, Peer, create_node
 from diameter.message import Message
@@ -62,21 +62,64 @@ def node_peer_uri(node: Node):
 
 # class DSC(DiameterEntity):
 class DSC():
-    def __init__(self, origin_host: str, realm_name: str,
-                 ip_addresses: List[str],
-                 tcp_port: int = None, sctp_port: int = None,
-                 vendor_ids: List[int] = None,):
-        # super().__init__(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
-        self.origin_host = origin_host
-        self.realm_name = realm_name
-        self.ip_addresses = ip_addresses
-        self.tcp_port = tcp_port
-        self.sctp_port = sctp_port
-        self.vendor_ids = vendor_ids
-        self.node: Node = create_node(origin_host, realm_name, ip_addresses, tcp_port, sctp_port, vendor_ids)
-        # self.gx_app: GxApplication = GxApplication(max_threads=max_threads, request_handler=request_handler)
-        # self.rx_app: RxApplication = RxApplication(max_threads=max_threads, request_handler=request_handler)
-        # self.sy_app: SyApplication = SyApplication(max_threads=max_threads, request_handler=request_handler)
+    def __init__(self, 
+                 # Traditional parameters (for backwards compatibility)
+                 origin_host: str = None, 
+                 realm_name: str = None,
+                 ip_addresses: List[str] = None,
+                 tcp_port: int = None, 
+                 sctp_port: int = None,
+                 vendor_ids: List[int] = None,
+                 # New node injection parameter
+                 node: Optional[Node] = None):
+        """
+        Initialize DSC with either traditional parameters or node injection.
+        
+        Args:
+            origin_host: Node hostname (required if node not provided)
+            realm_name: Node realm (required if node not provided)
+            ip_addresses: Node IP addresses (required if node not provided)
+            tcp_port: TCP port (optional)
+            sctp_port: SCTP port (optional)
+            vendor_ids: Vendor IDs (optional)
+            node: Pre-created Node object (alternative to above parameters)
+            
+        Raises:
+            ValueError: If neither node nor required parameters are provided
+        """
+        
+        # Validate input parameters
+        if node is not None:
+            # Node injection pattern
+            if not isinstance(node, Node):
+                raise TypeError("node must be a Node instance")
+            self.node = node
+            self.origin_host = node.origin_host
+            self.realm_name = node.realm_name
+            self.ip_addresses = node.ip_addresses
+            self.tcp_port = node.tcp_port
+            self.sctp_port = node.sctp_port
+            self.vendor_ids = node.vendor_ids
+            logger.info(f"DSC initialized with injected node: {self.origin_host}")
+            
+        elif origin_host and realm_name and ip_addresses:
+            # Traditional pattern (backwards compatible)
+            self.origin_host = origin_host
+            self.realm_name = realm_name
+            self.ip_addresses = ip_addresses
+            self.tcp_port = tcp_port
+            self.sctp_port = sctp_port
+            self.vendor_ids = vendor_ids or [10415]
+            self.node = create_node(origin_host, realm_name, ip_addresses, tcp_port, sctp_port, vendor_ids)
+            logger.info(f"DSC initialized with created node: {self.origin_host}")
+            
+        else:
+            raise ValueError(
+                "Either 'node' parameter or ('origin_host', 'realm_name', 'ip_addresses') "
+                "parameters must be provided"
+            )
+        
+        # Initialize common attributes
         self.all_peers: Dict[str, List[Peer]] = {}
         self.all_realms: Dict[str, List[str]] = {}
         self._setup_app_ran = False

@@ -18,11 +18,37 @@ class PCEF(DSC):
     Diameter infrastructure for all applications.
     """
     
-    def __init__(self, origin_host: str, realm_name: str,
-                 ip_addresses: List[str],
-                 tcp_port: int = None, sctp_port: int = None,
-                 vendor_ids: List[int] = None):
-        super().__init__(origin_host, realm_name, ip_addresses, tcp_port, sctp_port, vendor_ids)
+    def __init__(self, 
+                 # Traditional parameters (for backwards compatibility)
+                 origin_host: str = None, 
+                 realm_name: str = None,
+                 ip_addresses: List[str] = None,
+                 tcp_port: int = None, 
+                 sctp_port: int = None,
+                 vendor_ids: List[int] = None,
+                 # New node injection parameter
+                 node: Optional[Node] = None):
+        """
+        Initialize PCEF with either traditional parameters or node injection.
+        
+        Args:
+            origin_host: Node hostname (required if node not provided)
+            realm_name: Node realm (required if node not provided)
+            ip_addresses: Node IP addresses (required if node not provided)
+            tcp_port: TCP port (optional)
+            sctp_port: SCTP port (optional)
+            vendor_ids: Vendor IDs (optional)
+            node: Pre-created Node object (alternative to above parameters)
+        """
+        super().__init__(
+            origin_host=origin_host,
+            realm_name=realm_name,
+            ip_addresses=ip_addresses,
+            tcp_port=tcp_port,
+            sctp_port=sctp_port,
+            vendor_ids=vendor_ids,
+            node=node
+        )
         # PCEF-specific initialization: add its own realm to Gx  
         self.add_gx_realm(self.realm_name)
 

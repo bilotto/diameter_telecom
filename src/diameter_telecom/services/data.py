@@ -12,13 +12,12 @@ from ..carrier import Carrier
 from dataclasses import dataclass
 from ..csv_file import CsvFile, write_to_csv
 from .service import Service
-from .diameter_config import DiameterConfig
 
 @dataclass
 class DataService(Service):
     pcef: PCEF
     ocs: OCS = None
-    diameter_config: DiameterConfig = None
+    diameter_config: dict = None
     carrier: Carrier = None
     csv_file: CsvFile = None
 
