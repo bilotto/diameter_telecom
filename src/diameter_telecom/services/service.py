@@ -12,6 +12,8 @@ from ..carrier import Carrier
 from dataclasses import dataclass
 from ..csv_file import CsvFile, write_to_csv
 from ..diameter.session_manager import SessionManager
+from .diameter_config import DiameterConfig, create_diameter_config_from_entities
+import warnings
 
 
 @dataclass
@@ -19,22 +21,40 @@ class Service:
     pcef: PCEF
     ocs: OCS = None
     af: AF = None
-    diameter_config: dict = None
+    diameter_config: object = None
     carrier: Carrier = None
     csv_file: CsvFile = None
 
     def __post_init__(self):
         logger.info(f"Initializing Service with PCEF: {self.pcef.origin_host}")
         if self.diameter_config is None:
-            self.diameter_config = {}
-            self.diameter_config[APP_3GPP_GX] = {}
-            if self.ocs:
-                self.diameter_config[APP_3GPP_SY] = {}
-                logger.debug(f"Added OCS configuration for Sy interface: {self.ocs.origin_host}")
-            if self.af:
-                self.diameter_config[APP_3GPP_RX] = {}
-                logger.debug(f"Added AF configuration for Rx interface: {self.af.origin_host}")
-        logger.debug(f"Service diameter configuration: {list(self.diameter_config.keys())}")
+            # Auto-create configuration from entities
+            self.diameter_config = create_diameter_config_from_entities(self.pcef, self.ocs, self.af)
+            logger.info(f"Auto-created DiameterConfig from entities")
+        else:
+            # Accept dict or DiameterConfig for backward compatibility
+            if isinstance(self.diameter_config, DiameterConfig):
+                logger.info(f"Using provided DiameterConfig object")
+            elif isinstance(self.diameter_config, dict):
+                warnings.warn(
+                    "Passing raw dict for diameter_config is deprecated; it will continue to work but may be removed in a future release.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                self.diameter_config = DiameterConfig(self.diameter_config)
+                logger.info(f"Wrapped legacy dict into DiameterConfig")
+            else:
+                # Last resort: try to coerce unknown types via dict()
+                try:
+                    self.diameter_config = DiameterConfig(dict(self.diameter_config))
+                    logger.info(f"Coerced provided config into DiameterConfig via dict()")
+                except Exception:
+                    logger.warning(f"Unsupported diameter_config type; falling back to empty config")
+                    self.diameter_config = DiameterConfig()
+        
+        # Convert DiameterConfig to internal format for compatibility
+        self._internal_config = self.diameter_config.get_config()
+        logger.debug(f"Service diameter configuration: {list(self._internal_config.keys())}")
 
     @property
     def gx_app(self):
@@ -64,22 +84,22 @@ class Service:
     def set_host_and_realm(self, diameter_message: DiameterMessage):
         if diameter_message.app_id == APP_3GPP_GX:
             diameter_message.message.origin_host = self.pcef.origin_host.encode()
-            diameter_message.message.origin_realm = (self.diameter_config[APP_3GPP_GX].get('origin_realm') or self.pcef.realm_name).encode()
-            diameter_message.message.destination_realm = (self.diameter_config[APP_3GPP_GX].get('destination_realm') or self.pcef.realm_name).encode()
+            diameter_message.message.origin_realm = (self._internal_config[APP_3GPP_GX].get('origin_realm') or self.pcef.realm_name).encode()
+            diameter_message.message.destination_realm = (self._internal_config[APP_3GPP_GX].get('destination_realm') or self.pcef.realm_name).encode()
             if diameter_message.message.destination_host:
-                diameter_message.message.destination_host = (self.diameter_config[APP_3GPP_GX].get('destination_host') or self.pcef.realm_name).encode()
+                diameter_message.message.destination_host = (self._internal_config[APP_3GPP_GX].get('destination_host') or self.pcef.realm_name).encode()
         elif diameter_message.app_id == APP_3GPP_RX:
             diameter_message.message.origin_host = self.af.origin_host.encode()
-            diameter_message.message.origin_realm = (self.diameter_config[APP_3GPP_RX].get('origin_realm') or self.af.realm_name).encode()
-            diameter_message.message.destination_realm = (self.diameter_config[APP_3GPP_RX].get('destination_realm') or self.af.realm_name).encode()
+            diameter_message.message.origin_realm = (self._internal_config[APP_3GPP_RX].get('origin_realm') or self.af.realm_name).encode()
+            diameter_message.message.destination_realm = (self._internal_config[APP_3GPP_RX].get('destination_realm') or self.af.realm_name).encode()
             if diameter_message.message.destination_host:
-                diameter_message.message.destination_host = (self.diameter_config[APP_3GPP_RX].get('destination_host') or self.af.realm_name).encode()
+                diameter_message.message.destination_host = (self._internal_config[APP_3GPP_RX].get('destination_host') or self.af.realm_name).encode()
         elif diameter_message.app_id == APP_3GPP_SY:
             diameter_message.message.origin_host = self.ocs.origin_host.encode()
-            diameter_message.message.origin_realm = (self.diameter_config[APP_3GPP_SY].get('origin_realm') or self.ocs.realm_name).encode()
-            diameter_message.message.destination_realm = (self.diameter_config[APP_3GPP_SY].get('destination_realm') or self.ocs.realm_name).encode()
+            diameter_message.message.origin_realm = (self._internal_config[APP_3GPP_SY].get('origin_realm') or self.ocs.realm_name).encode()
+            diameter_message.message.destination_realm = (self._internal_config[APP_3GPP_SY].get('destination_realm') or self.ocs.realm_name).encode()
             if diameter_message.message.destination_host:
-                diameter_message.message.destination_host = (self.diameter_config[APP_3GPP_SY].get('destination_host') or self.ocs.realm_name).encode()
+                diameter_message.message.destination_host = (self._internal_config[APP_3GPP_SY].get('destination_host') or self.ocs.realm_name).encode()
         else:
             raise ValueError(f"Invalid app_id: {diameter_message.app_id}. Maybe missing to set the header?")
         return diameter_message

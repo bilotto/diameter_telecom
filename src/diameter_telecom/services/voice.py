@@ -9,13 +9,14 @@ import time
 from ..carrier import Carrier
 from .service import Service
 from dataclasses import dataclass
+from .diameter_config import DiameterConfig
 # from ..diameter.session_manager import SessionManager
 
 @dataclass
 class VoiceService(Service):
     pcef: PCEF
     af: AF = None
-    diameter_config: dict = None
+    diameter_config: DiameterConfig = None
     carrier: Carrier = None
 
     def __post_init__(self):
