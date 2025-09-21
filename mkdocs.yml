@@ -1,0 +1,111 @@
+site_name: Diameter Telecom
+repo_url: https://github.com/bilotto/diameter_telecom
+theme:
+  name: "material"
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.indexes
+    - toc.integrate
+    - content.code.copy
+    - content.code.annotate
+  custom_dir: overrides
+nav:
+  - Home: index.md
+  - Installation: setup.md
+  - User Guide:
+    - guide/index.md
+    - Services Architecture: guide/services.md
+    - Network Entities: guide/entities.md
+    - Session Management: guide/sessions.md
+    - Message Processing: guide/message_processing.md
+    - Advanced Usage: guide/advanced.md
+  - Examples:
+    - Comprehensive Examples:
+      - Data Service: examples/data_service_comprehensive.md
+      - Voice Service: examples/voice_service_comprehensive.md
+      - Multi-Service: examples/multi_service_advanced.md
+    - Basic Examples:
+      - PCEF-PCRF Connection: examples/pcef_pcrf_connection.md
+      - DSC Routing: examples/pcef_pcrf_with_dsc.md
+      - Subscriber Management: examples/subscriber_session.md
+      - Debug Routing: examples/debug_routing.md
+  - API Reference:
+    - Services:
+      - DataService: api/services/data.md
+      - VoiceService: api/services/voice.md
+      - Service Base: api/services/service.md
+    - Entities:
+      - PCEF: api/entities/pcef.md
+      - PCRF: api/entities/pcrf.md
+      - AF: api/entities/af.md
+      - OCS: api/entities/ocs.md
+      - DSC: api/entities/dsc.md
+    - Diameter Applications:
+      - Gx Application: api/applications/gx.md
+      - Rx Application: api/applications/rx.md
+      - Sy Application: api/applications/sy.md
+    - Session Management:
+      - SessionManager: api/session/session_manager.md
+      - GxSession: api/session/gx_session.md
+      - RxSession: api/session/rx_session.md
+      - SySession: api/session/sy_session.md
+    - Message Processing:
+      - MessageProcessingPipeline: api/processing/pipeline.md
+      - MessageProcessingContext: api/processing/context.md
+      - AVP Parsing: api/processing/avp_parsing.md
+    - Core Classes:
+      - Subscriber: api/core/subscriber.md
+      - Carrier: api/core/carrier.md
+      - APN: api/core/apn.md
+      - DiameterMessage: api/core/diameter_message.md
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            docstring_style: google
+            show_source: false
+            separate_signature: true
+            show_signature_annotations: true
+            line_length: 70
+            signature_crossrefs: true
+watch:
+  - src
+markdown_extensions:
+  - def_list
+  - pymdownx.highlight:
+      guess_lang: true
+      stripnl: false
+      line_spans: __span
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

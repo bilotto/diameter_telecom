@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,7 +13,8 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "python-diameter",
+    # Note: python-diameter is not available on PyPI
+    # Install it separately from: https://github.com/mensonen/diameter
 ]
 
 [project.optional-dependencies]
@@ -21,9 +22,24 @@ dev = [
     "pytest>=7.0.0",
     "black>=23.0.0",
 ]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.20.0",
+    "mkdocs-autorefs>=0.4.0",
+    "pymdown-extensions>=9.0.0",
+]
+
+[project.urls]
+Documentation = "https://bilotto.github.io/diameter_telecom/"
+Repository = "https://github.com/bilotto/diameter_telecom"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false

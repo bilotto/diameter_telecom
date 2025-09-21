@@ -1,16 +1,15 @@
-# Core dependencies for diameter_telecom
-python-diameter
+# Core dependencies
+# Note: python-diameter is not available on PyPI
+# Install it separately from: https://github.com/mensonen/diameter
+# git+https://github.com/mensonen/diameter.git
 
-# # Additional dependencies for PCAP processing and telecom functionality
-# pyshark>=0.6.0
-# scapy>=2.5.0
-# pandas>=1.5.0
-# numpy>=1.24.0
+# Documentation dependencies
+mkdocs>=1.5.0
+mkdocs-material>=9.0.0
+mkdocstrings[python]>=0.20.0
+mkdocs-autorefs>=0.4.0
+pymdown-extensions>=9.0.0
 
-# # Development and testing dependencies
-# pytest>=7.0.0
-# pytest-cov>=4.0.0
-
-# # Optional dependencies for enhanced functionality
-# pyyaml>=6.0
-# requests>=2.28.0
+# Development dependencies
+pytest>=7.0.0
+black>=23.0.0

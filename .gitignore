@@ -1,6 +1,64 @@
+# Python
 *.pyc
-*.log
+*.pyo
+*.pyd
+__pycache__/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 diameter_telecom.code-workspace
+
+# Documentation build artifacts
+site/
+.mkdocs_cache/
+.mkdocs/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# API specs (if not needed)
 dsc_api_spec.yaml
 dsc_create_api_spec.yaml
 dsc_mcp_spec.yaml
+
+# Example files that might be temporary
+examples/diameter_lib_setup_example.py
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+.env.*.local
