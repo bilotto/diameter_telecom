@@ -3,12 +3,12 @@ from typing import List, Dict, Callable, Optional
 from ..diameter.helpers import Node, Peer, create_node, node_peer_uri
 from diameter_telecom.diameter.app import SyApplication
 from ..diameter.constants import *
-from .dsc import DSC
+from ._diameter_entity import DiameterEntity
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.entities_3gpp")
 
 
-class OCS(DSC):
+class OCS(DiameterEntity):
     """Online Charging System (OCS) entity.
     
     The OCS is responsible for:
@@ -27,6 +27,9 @@ class OCS(DSC):
                  vendor_ids: List[int] = None):
         super().__init__(origin_host, realm_name, ip_addresses, tcp_port, sctp_port, vendor_ids)
         # OCS-specific initialization: add its own realm to Sy
-        self.add_sy_realm(self.realm_name)
+        # self.add_sy_realm(self.realm_name)
 
-    # OCS only needs Sy application - inherits setup_sy_app from DSC
+    def setup_apps(self, max_threads: int = 10):
+        for app_id, peers in self.all_peers.items():
+            self.add_realm(app_id, self.realm_name)
+            self.setup_app(app_id, max_threads, handle_request)

@@ -7,6 +7,9 @@ from ..message import DiameterMessage
 import logging
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger("diameter_telecom.diameter.handle_request")
+
+
 def handle_request_rx(app: RxApplication, message: Message):
     logger.info(f"Received message: {message}")
     answer = None

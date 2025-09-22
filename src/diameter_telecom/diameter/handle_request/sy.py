@@ -8,6 +8,9 @@ from ..parse_avp import *
 import logging
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger("diameter_telecom.diameter.handle_request")
+
+
 def handle_request_sy(app: SyApplication, message: Message):
     answer = message.to_answer()
     msisdn, imsi, sip_uri, nai, private = parse_subscription_id(message.subscription_id)

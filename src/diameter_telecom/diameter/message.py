@@ -269,3 +269,19 @@ def name_diameter_message(is_request, cmd_code, cc_request_type):
         return "DPR" if is_request else "DPA"
     else:
         return f"{cmd_code}"
+
+
+def create_message(name: str):
+    if name == CCR_I:
+        message = CreditControlRequest()
+        message.cc_request_type = E_CC_REQUEST_TYPE_INITIAL_REQUEST
+        message.cc_request_number = 0
+    elif name == CCR_U:
+        message = CreditControlRequest()
+        message.cc_request_type = E_CC_REQUEST_TYPE_UPDATE_REQUEST
+    elif name == CCR_T:
+        message = CreditControlRequest()
+        message.cc_request_type = E_CC_REQUEST_TYPE_TERMINATION_REQUEST
+    else:
+        raise ValueError(f"Invalid message name: {name}")
+    return message

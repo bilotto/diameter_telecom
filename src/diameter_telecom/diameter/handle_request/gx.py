@@ -8,8 +8,8 @@ from .. import Subscriber
 from ..parse_avp import *
 import logging
 import functools
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger("diameter_telecom.diameter.handle_request")
 
 def auto_session_management(func):
     """

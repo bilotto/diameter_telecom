@@ -1,228 +1,32 @@
+from ._diameter_entity import DiameterEntity
+from ..diameter.constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
 from ..diameter.app import *
-from typing import List, Callable, Optional
-from ._entity import DiameterEntity
-from ..diameter.helpers import Node, Peer, create_node
 from diameter.message import Message
-from ..diameter.app import *
+from typing import Callable
 import logging
-logger = logging.getLogger(__name__)
-from ..diameter.constants import *
-from diameter.node.peer import PEER_READY_STATES
-from typing import Dict, List
 
-def handle_request_dsc(app: CustomSimpleThreadingApplication, message: Message):
+logger = logging.getLogger("diameter_telecom.entities_3gpp")
+
+def handle_request_dsc(app, message: Message):
+    """DSC-specific request handler for routing messages."""
     origin_host = message.origin_host
     origin_realm = message.origin_realm
     destination_host = message.destination_host
     destination_realm = message.destination_realm
-    #
+    
     logger.info(f"Received message {message} from {origin_realm} to {destination_realm}")
     message.route_record.append(origin_host)
     answer = app.send_request(message)
     return answer
-    # peer_list = []
-    # for peer in app.node.peers.values():
-    #     logger.debug(f"Checking peer {peer.node_name} with realm {peer.realm_name}")
-    #     if peer.realm_name.encode() == destination_realm:
-    #         if peer.connection and peer.connection.state in PEER_READY_STATES:
-    #             peer_list.append(peer)
+
+class DSC(DiameterEntity):
+    """Diameter Signaling Controller (DSC) entity.
     
-    # if not peer_list:
-    #     logger.error(f"No available peers found for realm {destination_realm}")
-    #     return False
-        
-    # logger.debug(f"Found {len(peer_list)} peers for realm {destination_realm}")
-    # peer = min(peer_list, key=lambda c: c.counters.requests)
-    # logger.info(f"Selected peer {peer.node_name} for routing")
+    The DSC is a generic Diameter entity that can handle all 3GPP applications
+    (GX, RX, SY) and provides routing capabilities for Diameter messages.
+    """
     
-    try:
-        # answer = app.node.send_message(peer.connection, message)
-        answer = app.send_request(message)
-        if answer:
-            # logger.info(f"Received answer from {peer.node_name}")
-            # Route the answer back to the original sender
-            app.send_answer(answer)
-            return True
-        else:
-            # logger.error(f"No answer received from {peer.node_name}")
-            return False
-    except Exception as e:
-        logger.error(f"Error routing message: {str(e)}")
-        return False
-
-def node_peer_uri(node: Node):
-    if node.tcp_port:
-        return f"aaa://{node.origin_host}:{node.tcp_port};transport=tcp"
-    elif node.sctp_port:
-        return f"aaa://{node.origin_host}:{node.sctp_port};transport=sctp"
-    else:
-        raise ValueError(f"Node {node.origin_host} has no TCP or SCTP port")
-
-
-
-# class DSC(DiameterEntity):
-class DSC():
-    def __init__(self, 
-                 # Traditional parameters (for backwards compatibility)
-                 origin_host: str = None, 
-                 realm_name: str = None,
-                 ip_addresses: List[str] = None,
-                 tcp_port: int = None, 
-                 sctp_port: int = None,
-                 vendor_ids: List[int] = None,
-                 # New node injection parameter
-                 node: Optional[Node] = None):
-        """
-        Initialize DSC with either traditional parameters or node injection.
-        
-        Args:
-            origin_host: Node hostname (required if node not provided)
-            realm_name: Node realm (required if node not provided)
-            ip_addresses: Node IP addresses (required if node not provided)
-            tcp_port: TCP port (optional)
-            sctp_port: SCTP port (optional)
-            vendor_ids: Vendor IDs (optional)
-            node: Pre-created Node object (alternative to above parameters)
-            
-        Raises:
-            ValueError: If neither node nor required parameters are provided
-        """
-        
-        # Validate input parameters
-        if node is not None:
-            # Node injection pattern
-            if not isinstance(node, Node):
-                raise TypeError("node must be a Node instance")
-            self.node = node
-            self.origin_host = node.origin_host
-            self.realm_name = node.realm_name
-            self.ip_addresses = node.ip_addresses
-            self.tcp_port = node.tcp_port
-            self.sctp_port = node.sctp_port
-            self.vendor_ids = node.vendor_ids
-            logger.info(f"DSC initialized with injected node: {self.origin_host}")
-            
-        elif origin_host and realm_name and ip_addresses:
-            # Traditional pattern (backwards compatible)
-            self.origin_host = origin_host
-            self.realm_name = realm_name
-            self.ip_addresses = ip_addresses
-            self.tcp_port = tcp_port
-            self.sctp_port = sctp_port
-            self.vendor_ids = vendor_ids or [10415]
-            self.node = create_node(origin_host, realm_name, ip_addresses, tcp_port, sctp_port, vendor_ids)
-            logger.info(f"DSC initialized with created node: {self.origin_host}")
-            
-        else:
-            raise ValueError(
-                "Either 'node' parameter or ('origin_host', 'realm_name', 'ip_addresses') "
-                "parameters must be provided"
-            )
-        
-        # Initialize common attributes
-        self.all_peers: Dict[str, List[Peer]] = {}
-        self.all_realms: Dict[str, List[str]] = {}
-        self._setup_app_ran = False
-
-    @property
-    def peer_uri(self):
-        return node_peer_uri(self.node)
-    
-    @property
-    def gx_peers(self):
-        return self.all_peers.get(APP_3GPP_GX, [])
-    
-    @property
-    def gx_realms(self):
-        return self.all_realms.get(APP_3GPP_GX, [])
-    
-    @property
-    def rx_peers(self):
-        return self.all_peers.get(APP_3GPP_RX, [])
-    
-    @property
-    def rx_realms(self):
-        return self.all_realms.get(APP_3GPP_RX, [])
-    
-    @property
-    def sy_peers(self):
-        return self.all_peers.get(APP_3GPP_SY, [])
-    
-    @property
-    def sy_realms(self):
-        return self.all_realms.get(APP_3GPP_SY, [])
-    
-    def add_node_as_peer(self, node_: Node, app_id: str, initiate_connection: bool = False):
-        if app_id not in self.all_peers:
-            self.all_peers[app_id] = []
-        self.all_peers[app_id].append(self.node.add_peer(node_peer_uri(node_), node_.realm_name, node_.ip_addresses, is_persistent=initiate_connection))
-        self.add_realm(app_id, node_.realm_name)
-
-    def add_realm(self, app_id: str, realm_name: str):
-        if app_id not in self.all_realms:
-            self.all_realms[app_id] = []
-        if realm_name not in self.all_realms[app_id]:
-            self.all_realms[app_id].append(realm_name)
-
-    def add_gx_realm(self, realm_name: str):
-        if realm_name not in self.gx_realms:
-            self.add_realm(APP_3GPP_GX, realm_name)
-
-    def add_rx_realm(self, realm_name: str):
-        if realm_name not in self.rx_realms:
-            self.add_realm(APP_3GPP_RX, realm_name)
-
-    def add_sy_realm(self, realm_name: str):
-        if realm_name not in self.sy_realms:
-            self.add_realm(APP_3GPP_SY, realm_name)
-
-    def setup_app(self, app_id: int, max_threads, request_handler: Callable):
-        if app_id == APP_3GPP_GX:
-            self.gx_app = GxApplication(max_threads=max_threads, request_handler=request_handler)
-            self.node.add_application(self.gx_app, self.gx_peers, self.gx_realms)
-        elif app_id == APP_3GPP_RX:
-            self.rx_app = RxApplication(max_threads=max_threads, request_handler=request_handler)
-            self.node.add_application(self.rx_app, self.rx_peers, self.rx_realms)
-        elif app_id == APP_3GPP_SY:
-            self.sy_app = SyApplication(max_threads=max_threads, request_handler=request_handler)
-            self.node.add_application(self.sy_app, self.sy_peers, self.sy_realms)
-        else:
-            raise ValueError(f"Invalid app_id: {app_id}")
-        self._setup_app_ran = True
-
-    def setup_gx_app(self, max_threads: int = 10, request_handler: Callable = handle_request_dsc):
-        self.setup_app(APP_3GPP_GX, max_threads, request_handler)
-
-    def setup_rx_app(self, max_threads: int = 10, request_handler: Callable = handle_request_dsc):
-        self.setup_app(APP_3GPP_RX, max_threads, request_handler)
-
-    def setup_sy_app(self, max_threads: int = 10, request_handler: Callable = handle_request_dsc):
-        self.setup_app(APP_3GPP_SY, max_threads, request_handler)
-
-    def start(self):
-        if not self._setup_app_ran:
-            logger.error("setup_app must be called before start")
-            return
-        logger.info(f"Starting DSC entity {self.origin_host}")
-        self.node.start()
-        logger.debug(f"DSC node started on {self.ip_addresses}:{self.tcp_port}")
-
-    def stop(self):
-        logger.info(f"Stopping DSC entity {self.origin_host}")
-        if self.node._started:
-            self.node.stop()
-            logger.debug(f"DSC node stopped")
-        else:
-            logger.debug(f"DSC node was already stopped")
-
-    def wait_for_ready(self):
-        import time
-        logger.debug(f"Waiting for DSC {self.origin_host} to be ready...")
-        for peer in self.node.peers.values():
-            if peer.connection:
-                if not peer.connection.state in PEER_READY_STATES:
-                    logger.debug(f"Peer {peer.node_name} is in state {peer.connection.state}")
-                    time.sleep(0.5)
-                else:
-                    logger.debug(f"Peer {peer.node_name} is in state {peer.connection.state}")
-        logger.info(f"DSC entity {self.origin_host} is ready")
+    def setup_apps(self, max_threads: int = 10):
+        for app_id, peers in self.all_peers.items():
+            self.add_realm(app_id, self.realm_name)
+            self.setup_app(app_id, max_threads, handle_request_dsc)

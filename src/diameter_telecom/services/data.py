@@ -1,5 +1,5 @@
 # from .ip_queue import APN
-from ..diameter.message import DiameterMessage
+from ..diameter.message import DiameterMessage, create_message
 from ..entities_3gpp import PCEF, OCS
 from ..diameter.constants import *
 from ..diameter.session import GxSession, SySession
@@ -47,6 +47,20 @@ class DataService(Service):
         
         logger.debug(f"DataService request-answer exchange completed for session {session_id}")
         return (request, answer)
+
+
+    def start_gx_session(self, subscriber: Subscriber):
+        ccr_i = create_message(CCR_I)
+        ccr_i.header.application_id = APP_3GPP_GX
+        ccr_i.auth_application_id = APP_3GPP_GX
+        ccr_i.session_id = self.pcef.gx_app.node.session_generator.next_id()
+        ccr_i.subscription_id = subscriber.subscription_id
+        ccr_i.service_context_id = "test"
+        if self.ip_queue:
+            ccr_i.framed_ip_address = ip_to_bytes(self.ip_queue.get_ip())
+            
+        self.send_request(DiameterMessage(ccr_i))
+
 
 
 # @dataclass

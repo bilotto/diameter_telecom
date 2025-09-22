@@ -3,12 +3,12 @@ from ..diameter.helpers import Node, Peer, create_node, node_peer_uri
 from ..diameter.handle_request import handle_request
 from ..diameter.constants import *
 from diameter_telecom.diameter.app import GxApplication, RxApplication, SyApplication
-from .dsc import DSC
+from ._diameter_entity import DiameterEntity
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.entities_3gpp")
 
 
-class PCRF(DSC):
+class PCRF(DiameterEntity):
     """Policy and Charging Rules Function (PCRF) entity.
     
     The PCRF is the central policy decision point in 3GPP networks that:
@@ -52,12 +52,11 @@ class PCRF(DSC):
             node=node
         )
         # PCRF-specific initialization: add its own realm to all applications it supports
-        self.add_gx_realm(self.realm_name)  # For PCEF communication
-        self.add_rx_realm(self.realm_name)  # For AF communication  
-        self.add_sy_realm(self.realm_name)  # For OCS communication
+        # self.add_gx_realm(self.realm_name)  # For PCEF communication
+        # self.add_rx_realm(self.realm_name)  # For AF communication  
+        # self.add_sy_realm(self.realm_name)  # For OCS communication
 
-    # PCRF can use all three applications - inherits setup methods from DSC
-    # - setup_gx_app() for PCEF communication
-    # - setup_rx_app() for AF communication
-    # - setup_sy_app() for OCS communication
-
+    def setup_apps(self, max_threads: int = 10):
+        for app_id, peers in self.all_peers.items():
+            self.add_realm(app_id, self.realm_name)
+            self.setup_app(app_id, max_threads, handle_request)

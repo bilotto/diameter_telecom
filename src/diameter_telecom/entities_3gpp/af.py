@@ -3,13 +3,13 @@ from typing import List, Callable, Dict
 from ..diameter.handle_request import handle_request_rx
 from ..diameter.constants import *
 from ..diameter.helpers import Node, Peer, create_node, node_peer_uri
-from .dsc import DSC
+from ._diameter_entity import DiameterEntity
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.entities_3gpp")
 
 
-class AF(DSC):
+class AF(DiameterEntity):
     """Application Function (AF) entity.
     
     The AF is responsible for:
@@ -29,4 +29,6 @@ class AF(DSC):
         # AF-specific initialization: add its own realm to Rx
         self.add_rx_realm(self.realm_name)
 
-    # AF only needs Rx application - inherits setup_rx_app from DSC
+    def setup_apps(self, max_threads: int = 10):
+        """Setup applications supported by AF (RX only)."""
+        self.setup_app(APP_3GPP_RX, max_threads, handle_request_rx)

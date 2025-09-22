@@ -14,7 +14,7 @@ from ..csv_file import CsvFile, write_to_csv
 from ..diameter.session_manager import SessionManager
 from .diameter_config import DiameterConfig, create_diameter_config_from_entities
 import warnings
-
+from ..apn import IpQueue
 
 @dataclass
 class Service:
@@ -24,6 +24,7 @@ class Service:
     diameter_config: object = None
     carrier: Carrier = None
     csv_file: CsvFile = None
+    ip_queue: IpQueue = None
 
     def __post_init__(self):
         logger.info(f"Initializing Service with PCEF: {self.pcef.origin_host}")
@@ -55,6 +56,9 @@ class Service:
         # Convert DiameterConfig to internal format for compatibility
         self._internal_config = self.diameter_config.get_config()
         logger.debug(f"Service diameter configuration: {list(self._internal_config.keys())}")
+
+    def set_ip_queue(self, ip_range_cidr: str):
+        self.ip_queue = IpQueue(ip_range_cidr)
 
     @property
     def gx_app(self):
