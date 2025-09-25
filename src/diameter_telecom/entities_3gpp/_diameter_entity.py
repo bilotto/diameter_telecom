@@ -81,6 +81,7 @@ class DiameterEntity:
         self.all_realms: Dict[int, List[str]] = {}
         self.all_applications: Dict[int, CustomSimpleThreadingApplication] = {}
         self._setup_app_ran = False
+        logger.info(f"Initialized {type(self).__name__} entity {self.origin_host}")
 
     @property
     def peer_uri(self):
@@ -114,6 +115,7 @@ class DiameterEntity:
         app_id = int(app_id)
         if app_id not in self.all_peers:
             self.all_peers[app_id] = []
+        logger.info(f"{type(self).__name__} adding node {node_.origin_host} as peer for app {app_id}")
         self.all_peers[app_id].append(self.node.add_peer(node_peer_uri(node_), node_.realm_name, node_.ip_addresses, is_persistent=initiate_connection))
         self.add_realm(app_id, node_.realm_name)
 
@@ -137,19 +139,24 @@ class DiameterEntity:
             self.add_realm(APP_3GPP_SY, realm_name)
 
     def setup_app(self, app_id: int, max_threads, request_handler: Callable):
+        # logger.info(f"{type(self).__name__} setting up app {app_id} with max_threads {max_threads} and request_handler {request_handler}")
         app_id = int(app_id)
         if app_id == APP_3GPP_GX:
             self.gx_app = GxApplication(max_threads=max_threads, request_handler=request_handler)
             self.node.add_application(self.gx_app, self.gx_peers, self.gx_realms)
             self.all_applications[APP_3GPP_GX] = self.gx_app
+            logger.info(f"{type(self).__name__} setup Gx application with {len(self.gx_peers)} peers and {self.gx_realms} realms")
         elif app_id == APP_3GPP_RX:
             self.rx_app = RxApplication(max_threads=max_threads, request_handler=request_handler)
             self.node.add_application(self.rx_app, self.rx_peers, self.rx_realms)
             self.all_applications[APP_3GPP_RX] = self.rx_app
+            # logger.info(f"{type(self).__name__} setup Rx application with peers {self.rx_peers} and realms {self.rx_realms}")
+            logger.info(f"{type(self).__name__} setup Rx application with {len(self.rx_peers)} peers and {self.rx_realms} realms")
         elif app_id == APP_3GPP_SY:
             self.sy_app = SyApplication(max_threads=max_threads, request_handler=request_handler)
             self.node.add_application(self.sy_app, self.sy_peers, self.sy_realms)
             self.all_applications[APP_3GPP_SY] = self.sy_app
+            logger.info(f"{type(self).__name__} setup Sy application with {len(self.sy_peers)} peers and {self.sy_realms} realms")
         else:
             raise ValueError(f"Invalid app_id: {app_id}")
         self._setup_app_ran = True

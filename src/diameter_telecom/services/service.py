@@ -25,7 +25,8 @@ class Service:
     carrier: Carrier = None
     csv_file: CsvFile = None
     ip_queue: IpQueue = None
-
+    session_manager: SessionManager = None
+    
     def __post_init__(self):
         logger.info(f"Initializing Service with PCEF: {self.pcef.origin_host}")
         if self.diameter_config is None:
@@ -56,6 +57,7 @@ class Service:
         # Convert DiameterConfig to internal format for compatibility
         self._internal_config = self.diameter_config.get_config()
         logger.debug(f"Service diameter configuration: {list(self._internal_config.keys())}")
+        self.set_session_manager(SessionManager())
 
     def set_ip_queue(self, ip_range_cidr: str):
         self.ip_queue = IpQueue(ip_range_cidr)
@@ -84,6 +86,7 @@ class Service:
         if self.af:
             self.rx_app.set_session_manager(session_manager)
             logger.debug(f"Session manager set on Rx application")
+        self.session_manager = session_manager
         
     def set_host_and_realm(self, diameter_message: DiameterMessage):
         if diameter_message.app_id == APP_3GPP_GX:

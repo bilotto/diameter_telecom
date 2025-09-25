@@ -56,6 +56,8 @@ class DataService(Service):
         ccr_i.session_id = self.pcef.gx_app.node.session_generator.next_id()
         ccr_i.subscription_id = subscriber.subscription_id
         ccr_i.service_context_id = "test"
+        ccr_i.origin_state_id = 0
+        ccr_i.rat_type = E_RAT_TYPE_EUTRAN
         if self.ip_queue:
             ccr_i.framed_ip_address = ip_to_bytes(self.ip_queue.get_ip())
             
