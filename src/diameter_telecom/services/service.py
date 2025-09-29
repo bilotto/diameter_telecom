@@ -1,5 +1,5 @@
 # from .ip_queue import APN
-from ..diameter.message import DiameterMessage
+from ..diameter.message import DiameterMessage, create_message
 from ..entities_3gpp import PCEF, OCS, AF
 from ..diameter.constants import *
 from ..diameter.session import GxSession, SySession
@@ -14,7 +14,7 @@ from ..csv_file import CsvFile, write_to_csv
 from ..diameter.session_manager import SessionManager
 from .diameter_config import DiameterConfig, create_diameter_config_from_entities
 import warnings
-from ..apn import IpQueue
+from ..apn import IpQueue, bytes_to_ip, ip_to_bytes
 
 @dataclass
 class Service:
@@ -153,3 +153,36 @@ class Service:
             self.rx_app.wait_for_ready()
             logger.debug(f"Rx application ready")
         logger.info(f"All Service applications ready")
+
+    def send_request(self, request: DiameterMessage, timeout=5) -> DiameterMessage:
+        if not isinstance(request, DiameterMessage):
+            raise TypeError("request must be an instance of DiameterMessage")
+        request.timestamp = time.time()
+        session_id = request.session_id        
+        request = self.set_host_and_realm(request)
+        if request.app_id == APP_3GPP_GX:
+            answer: DiameterMessage = self.gx_app.send_request_custom(request, timeout)
+        elif request.app_id == APP_3GPP_RX and self.af:
+            answer: DiameterMessage = self.rx_app.send_request_custom(request, timeout)
+        elif request.app_id == APP_3GPP_SY and self.ocs:
+            answer: DiameterMessage = self.sy_app.send_request_custom(request, timeout)
+        else:
+            raise ValueError(f"DataService cannot handle app_id: {request.app_id}")
+        return answer
+
+
+    def start_gx_session(self, gx_session: GxSession):
+        ccr_i = create_message(CCR_I)
+        ccr_i.header.application_id = APP_3GPP_GX
+        ccr_i.auth_application_id = APP_3GPP_GX
+        ccr_i.session_id = gx_session.session_id
+        ccr_i.subscription_id = gx_session.subscriber.subscription_id
+        ccr_i.service_context_id = "test"
+        ccr_i.origin_state_id = 0
+        ccr_i.rat_type = gx_session.rat_type
+        ccr_i.framed_ip_address = ip_to_bytes(gx_session.framed_ip_address)
+        ccr_i.called_station_id = gx_session.called_station_id
+        ccr_i.sgsn_mcc_mnc = gx_session.sgsn_mcc_mnc
+            
+        return self.send_request(DiameterMessage(ccr_i))
+
