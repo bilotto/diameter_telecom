@@ -6,7 +6,7 @@ from diameter_telecom.diameter.app import GxApplication
 from ._diameter_entity import DiameterEntity
 import logging
 logger = logging.getLogger("diameter_telecom.entities_3gpp")
-
+from .ip_queue import IpQueue
 
 class PCEF(DiameterEntity):
     """Policy and Charging Enforcement Function (PCEF) entity.
@@ -49,6 +49,8 @@ class PCEF(DiameterEntity):
             vendor_ids=vendor_ids,
             node=node
         )
+
+        self.ip_queue = IpQueue("10.10.0.0/16")
         # PCEF-specific initialization: add its own realm to Gx  
         # self.add_gx_realm(self.realm_name)
 

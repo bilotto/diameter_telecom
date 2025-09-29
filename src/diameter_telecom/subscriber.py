@@ -3,7 +3,6 @@ from typing import List, Dict, Optional
 import threading
 from diameter.message.avp.grouped import SubscriptionId
 from .diameter.constants import *
-from .apn import APN
 from .diameter.message import DiameterMessage
 
 @dataclass
@@ -37,7 +36,7 @@ class Subscriber:
     nai: str = field(default=None, repr=False)
     private_id: str = field(default=None, repr=False)
     imei: str = field(default=None, repr=False)
-    apn: APN = field(default=None, repr=False)
+    apn: str = field(default=None, repr=False)
     messages: List[DiameterMessage] = field(default_factory=list, repr=False)
     session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=False)
     _session_ids_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)

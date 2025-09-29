@@ -282,6 +282,18 @@ def create_message(name: str):
     elif name == CCR_T:
         message = CreditControlRequest()
         message.cc_request_type = E_CC_REQUEST_TYPE_TERMINATION_REQUEST
+    elif name == RAR:
+        message = ReAuthRequest()
+    elif name == ASR:
+        message = AbortSessionRequest()
+    elif name == SLR:
+        message = SpendingLimitRequest()
+    elif name == SSNR:
+        message = SpendingStatusNotificationRequest()
+    elif name == STR:
+        message = SessionTerminationRequest()
+    elif name == AAR:
+        message = AaRequest()
     else:
         raise ValueError(f"Invalid message name: {name}")
-    return message
+    return message 

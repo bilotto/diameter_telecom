@@ -1,6 +1,7 @@
 # from .ip_queue import APN
 from ..diameter.message import DiameterMessage
 from ..entities_3gpp import PCEF, OCS, AF
+from ..entities_3gpp.ip_queue import IpQueue
 from ..diameter.constants import *
 from ..diameter.session import GxSession, SySession
 from ..subscriber import Subscriber
@@ -9,12 +10,11 @@ logger = logging.getLogger(__name__)
 import time
 from ..apn import *
 from ..carrier import Carrier
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from ..csv_file import CsvFile, write_to_csv
 from ..diameter.session_manager import SessionManager
 from .diameter_config import DiameterConfig, create_diameter_config_from_entities
 import warnings
-from ..apn import IpQueue
 
 @dataclass
 class Service:

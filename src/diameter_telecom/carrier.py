@@ -5,47 +5,20 @@ from .apn import APN
 
 @dataclass
 class Carrier:
-    """
-    Represents a telecommunications carrier with subscriber management capabilities.
-    
-    This class manages carrier information and its associated subscribers. It provides
-    functionality to add and manage subscribers within the carrier's network.
-    
-    Attributes:
-        name (str): The name of the carrier/operator
-        mcc_mnc (str): Mobile Country Code and Mobile Network Code, uniquely identifying
-                      the carrier in the global mobile network
-        country_code (str): The country code where the carrier operates
-        subscribers (Dict[str, Subscriber]): Dictionary of subscribers indexed by their MSISDN
-    """
     name: str
-    mcc_mnc: str
+    mcc_mnc: List[str]
     country_code: str
     subscribers: Dict[str, Subscriber] = field(default_factory=dict)
     apns: Dict[str, APN] = field(default_factory=dict)
 
     def __post_init__(self):
-        """
-        Post-initialization hook to ensure proper type conversion of critical fields.
-        
-        Converts mcc_mnc and country_code to strings to ensure consistent type handling.
-        """
-        self.mcc_mnc = str(self.mcc_mnc)
+        if not isinstance(self.mcc_mnc, list):
+            self.mcc_mnc = list(self.mcc_mnc)
+        else:
+            self.mcc_mnc = self.mcc_mnc
         self.country_code = str(self.country_code)
 
     def add_subscriber(self, subscriber: Subscriber) -> Subscriber:
-        """
-        Add a subscriber to the carrier's subscriber list.
-        
-        Args:
-            subscriber (Subscriber): The subscriber object to add to the carrier
-            
-        Returns:
-            Subscriber: The added subscriber object
-            
-        Raises:
-            ValueError: If the provided subscriber is not an instance of Subscriber class
-        """
         if not isinstance(subscriber, Subscriber):
             raise ValueError("subscriber must be an instance of Subscriber")
         self.subscribers[subscriber.msisdn] = subscriber
@@ -56,15 +29,6 @@ class Carrier:
         return self.apns[apn.apn]
     
     def get_apn(self, apn_name: str) -> Optional[APN]:
-        """
-        Retrieve an APN by its name.
-        
-        Args:
-            apn_name (str): The name of the APN to retrieve
-            
-        Returns:
-            Optional[APN]: The APN object if found, otherwise None
-        """
         return self.apns.get(apn_name)
     
     def create_apn(self, apn_name: str, ip_pool_cidr: str) -> APN:

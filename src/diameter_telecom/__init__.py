@@ -4,3 +4,4 @@ from .carrier import *
 from .entities_3gpp import *
 from .services import *
 from .csv_file import *
+from .apn import IpQueue, APN
