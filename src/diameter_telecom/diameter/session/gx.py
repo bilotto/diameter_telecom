@@ -11,6 +11,7 @@ class GxSession(DiameterSession):
     granted_service_unit: Optional[Dict] = field(default_factory=dict)
     event_trigger: Optional[List[int]] = field(default_factory=list)
     cc_request_number: Optional[int] = field(default=None)
+    rat_type: Optional[int] = field(default=None)
 
     @property
     def apn(self):

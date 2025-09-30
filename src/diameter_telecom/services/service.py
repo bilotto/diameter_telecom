@@ -171,6 +171,12 @@ class Service:
             raise ValueError(f"DataService cannot handle app_id: {request.app_id}")
         return answer
 
+    def create_gx_session(self, subscriber: Subscriber) -> GxSession:
+        session_id = self.gx_app.node.session_generator.next_id()
+        gx_session = GxSession(session_id=session_id, subscriber=subscriber)
+        gx_session.framed_ip_address = self.ip_queue.get_ip()
+        return gx_session
+
 
     def start_gx_session(self, gx_session: GxSession):
         ccr_i = create_message(CCR_I)

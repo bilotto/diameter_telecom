@@ -46,6 +46,9 @@ class MessageProcessingPipeline:
     clear_sessions_after_termination: bool = False
     save_messages_to_session: bool = True
     statistics: dict = field(default_factory=dict)
+
+    def __repr__(self):
+        return f"MessageProcessingPipeline(clear_sessions_after_termination={self.clear_sessions_after_termination}, save_messages_to_session={self.save_messages_to_session})"
     
     @timing_decorator
     def main_pipeline(self, context: MessageProcessingContext):

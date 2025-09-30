@@ -69,21 +69,27 @@ def handle_ccr(app: GxApplication, message: CreditControlRequest):
     answer.cc_request_type = message.cc_request_type
     answer.cc_request_number = message.cc_request_number
 
+    subscriber = None
+
+    if message.subscription_id:
+        msisdn, imsi, _, _, _ = parse_subscription_id(message.subscription_id)
+        if msisdn:
+            subscriber = app.session_manager.subscribers.get_subscriber_by_msisdn(msisdn)
+        elif imsi:
+            subscriber = app.session_manager.subscribers.get_subscriber_by_imsi(imsi)
+
     # Session and subscriber management is now handled by SessionManager
     # Just focus on business logic here
     if message.cc_request_type == E_CC_REQUEST_TYPE_INITIAL_REQUEST:
-        # logger.info(f"🔄 CCR-I received, initiating spending limit check via Sy interface")
-        
-        # # 3GPP Flow: PCRF must check spending limits with OCS before authorizing session
-        # spending_limit_result = _check_spending_limits_via_sy(app, message)
-        
-        # if spending_limit_result == E_RESULT_CODE_DIAMETER_SUCCESS:
-        #     logger.info(f"✅ Spending limits OK, approving session {message.session_id}")
-        #     answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
-        # else:
-        #     logger.warning(f"❌ Spending limits exceeded, rejecting session {message.session_id}")
-        #     answer.result_code = spending_limit_result
+        answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
+        answer.event_trigger.append(E_EVENT_TRIGGER_QOS_CHANGE)
         answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
+        answer.charging_rule_install.append(ChargingRuleInstall("FREE_SERVICES"))
+        if subscriber:
+            answer.charging_rule_install.append(ChargingRuleInstall("INTERNET"))
+        else:
+            answer.charging_rule_install.append(ChargingRuleInstall("BLOCK"))
+        answer.charging_rule_install.append(ChargingRuleInstall("WEB_PORTAL"))
             
     elif message.cc_request_type == E_CC_REQUEST_TYPE_UPDATE_REQUEST:
         # Session lookup handled by SessionManager

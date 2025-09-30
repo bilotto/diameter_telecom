@@ -177,11 +177,6 @@ class SessionManager:
 
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
-        """Send a Diameter request with session management.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
         if not diameter_message.timestamp:
             diameter_message.timestamp = time.time()
 
@@ -196,6 +191,10 @@ class SessionManager:
         if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             logger.error(f"Answer with error: \n {diameter_message_answer}")
         logger.info(f"\n{diameter_message_answer.dump()}")
+
+        if not diameter_message_answer.timestamp:
+        # Set timestamp on answer
+            diameter_message_answer.timestamp = time.time()
         
         return diameter_message_answer
 
