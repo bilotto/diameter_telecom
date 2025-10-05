@@ -110,7 +110,7 @@ class DiameterEntity:
     @property
     def sy_realms(self):
         return self.all_realms.get(APP_3GPP_SY, [])
-    
+
     def add_node_as_peer(self, node_: Node, app_id: int, initiate_connection: bool = False):
         app_id = int(app_id)
         if app_id not in self.all_peers:
@@ -124,6 +124,7 @@ class DiameterEntity:
         if app_id not in self.all_realms:
             self.all_realms[app_id] = []
         if realm_name not in self.all_realms[app_id]:
+            logger.info(f"{type(self).__name__} adding realm {realm_name} to app {app_id}")
             self.all_realms[app_id].append(realm_name)
 
     def add_gx_realm(self, realm_name: str):

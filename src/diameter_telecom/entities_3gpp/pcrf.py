@@ -56,7 +56,7 @@ class PCRF(DiameterEntity):
         # self.add_rx_realm(self.realm_name)  # For AF communication  
         # self.add_sy_realm(self.realm_name)  # For OCS communication
 
-    def setup_apps(self, max_threads: int = 10):
+    def setup_apps(self, max_threads: int = 10, request_handler: Callable = handle_request):
         for app_id, peers in self.all_peers.items():
             self.add_realm(app_id, self.realm_name)
-            self.setup_app(app_id, max_threads, handle_request)
+            self.setup_app(app_id, max_threads, request_handler)

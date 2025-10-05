@@ -26,10 +26,10 @@ class DSC(DiameterEntity):
     (GX, RX, SY) and provides routing capabilities for Diameter messages.
     """
     
-    def setup_apps(self, max_threads: int = 10):
+    def setup_apps(self, max_threads: int = 10, request_handler: callable = handle_request_dsc):
         for app_id, peers in self.all_peers.items():
             self.add_realm(app_id, self.realm_name)
-            self.setup_app(app_id, max_threads, handle_request_dsc)
+            self.setup_app(app_id, max_threads, request_handler)
 
     def wait_for_ready(self):
         import time

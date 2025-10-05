@@ -54,7 +54,7 @@ class PCEF(DiameterEntity):
         # PCEF-specific initialization: add its own realm to Gx  
         # self.add_gx_realm(self.realm_name)
 
-    def setup_apps(self, max_threads: int = 10):
+    def setup_apps(self, max_threads: int = 10, request_handler: Callable = handle_request):
         for app_id, peers in self.all_peers.items():
             self.add_realm(app_id, self.realm_name)
-            self.setup_app(app_id, max_threads, handle_request)
+            self.setup_app(app_id, max_threads, request_handler)
