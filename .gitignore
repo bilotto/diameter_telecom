@@ -62,3 +62,5 @@ htmlcov/
 .env
 .env.local
 .env.*.local
+.cursor/mcp.json
+explanation

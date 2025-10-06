@@ -5,9 +5,12 @@ from ..message import DiameterMessage
 from typing import List, Optional, Dict
 from diameter.message.commands import SessionTerminationRequest
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.diameter.app")
 
 class RxApplication(CustomSimpleThreadingApplication):
+    MESSAGE_CREATE_SESSION = AAR
+    MESSAGE_UPDATE_SESSION = AAR
+    MESSAGE_TERMINATE_SESSION = STR
     def __init__(self, max_threads=1, request_handler=None):
         super().__init__(application_id=APP_3GPP_RX, is_acct_application=False, is_auth_application=True, max_threads=max_threads, request_handler=request_handler)
 

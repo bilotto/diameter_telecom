@@ -1,6 +1,6 @@
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
-from .subscriber import Subscriber
+from .subscriber import Subscriber, Subscribers
 from .apn import APN
 
 @dataclass
@@ -8,7 +8,7 @@ class Carrier:
     name: str
     mcc_mnc: List[str]
     country_code: str
-    subscribers: Dict[str, Subscriber] = field(default_factory=dict)
+    subscribers: Subscribers = field(default_factory=Subscribers)
     apns: Dict[str, APN] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -21,8 +21,8 @@ class Carrier:
     def add_subscriber(self, subscriber: Subscriber) -> Subscriber:
         if not isinstance(subscriber, Subscriber):
             raise ValueError("subscriber must be an instance of Subscriber")
-        self.subscribers[subscriber.msisdn] = subscriber
-        return self.subscribers[subscriber.msisdn]
+        self.subscribers.add_subscriber(subscriber)
+        return self.subscribers.get_subscriber_by_msisdn(subscriber.msisdn)
     
     def add_apn(self, apn: APN) -> APN:
         self.apns[apn.apn] = apn

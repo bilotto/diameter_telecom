@@ -12,6 +12,21 @@ class GxSession(DiameterSession):
     event_trigger: Optional[List[int]] = field(default_factory=list)
     cc_request_number: Optional[int] = field(default=None)
     rat_type: Optional[int] = field(default=None)
+    _avps: Dict[str, str] = field(default_factory=dict, repr=False)
+
+    @property
+    def avps(self) -> Dict[str, str]:
+        for key, value in self.subscriber.avps.items():
+            self._avps[key] = value
+        if self.framed_ip_address:
+            self._avps['framed_ip_address'] = self.framed_ip_address
+        if self.framed_ipv6_prefix:
+            self._avps['framed_ipv6_prefix'] = self.framed_ipv6_prefix
+        if self.called_station_id:
+            self._avps['called_station_id'] = self.called_station_id
+        if self.sgsn_mcc_mnc:
+            self._avps['sgsn_mcc_mnc'] = self.sgsn_mcc_mnc
+        return self._avps
 
     @property
     def apn(self):

@@ -18,6 +18,7 @@ class DiameterSession:
     end_time: Optional[str] = field(default=None)
     subscriber: Optional[Subscriber] = field(default=None)
     bound_sessions: Dict[int, List[str]] = field(default_factory=lambda: {app_id: [] for app_id in [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]})
+    last_result_code: Optional[int] = field(default=None)
 
     def add_bound_session(self, app_id: int, session_id: str):
         self.bound_sessions[app_id].append(session_id)
@@ -59,6 +60,8 @@ class DiameterSession:
         # if not dm.timestamp:
         #     dm.timestamp = time.time()
         dm.session_id = None
+        if dm.result_code:
+            self.last_result_code = dm.result_code
         self.messages.append(dm)
         return dm
 

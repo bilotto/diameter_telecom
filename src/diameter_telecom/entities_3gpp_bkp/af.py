@@ -1,4 +1,4 @@
-from ..diameter.app_new.af import AfRxApplication
+from ..diameter.app.rx import RxApplication
 from typing import List, Callable, Dict, Optional
 from ..diameter.handle_request import handle_request_rx
 from ..diameter.constants import *
@@ -55,21 +55,6 @@ class AF(DiameterEntity):
         # AF-specific initialization: add its own realm to Rx
         # self.add_rx_realm(self.realm_name)
 
-    def setup_app(self, app_id: int, max_threads):
-        # logger.info(f"{type(self).__name__} setting up app {app_id} with max_threads {max_threads} and request_handler {request_handler}")
-        app_id = int(app_id)
-        if app_id == APP_3GPP_RX:
-            self.rx_app = AfRxApplication(max_threads=max_threads)
-            self.all_applications[APP_3GPP_RX] = self.rx_app
-            logger.info(f"{type(self).__name__} setup Rx application with {len(self.rx_peers)} peers and {self.rx_realms} realms")
-        else:
-            raise ValueError(f"Invalid app_id: {app_id}")
-        self._setup_app_ran = True
-
-    def setup_rx_app(self, max_threads: int = 10):
-        self.setup_app(APP_3GPP_RX, max_threads)
-
     def setup_apps(self, max_threads: int = 10):
-        for app_id, peers in self.all_peers.items():
-            self.add_realm(app_id, self.realm_name)
-            self.setup_app(app_id, max_threads)
+        """Setup applications supported by AF (RX only)."""
+        self.setup_app(APP_3GPP_RX, max_threads, handle_request_rx)

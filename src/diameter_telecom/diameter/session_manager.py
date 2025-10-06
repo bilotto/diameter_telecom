@@ -181,7 +181,7 @@ class SessionManager:
             diameter_message.timestamp = time.time()
 
         request_context = self.process_diameter_message(diameter_message)
-        logger.info(f"\n{diameter_message.dump()}")
+        # logger.info(f"\n{diameter_message.dump()}")
         
         answer = send_request_func(diameter_message.message, timeout=timeout)
         diameter_message_answer = DiameterMessage(answer)
@@ -190,7 +190,7 @@ class SessionManager:
         
         if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             logger.error(f"Answer with error: \n {diameter_message_answer}")
-        logger.info(f"\n{diameter_message_answer.dump()}")
+        # logger.info(f"\n{diameter_message_answer.dump()}")
 
         if not diameter_message_answer.timestamp:
         # Set timestamp on answer

@@ -3,6 +3,9 @@ from ..session import SySession
 from ..constants import APP_3GPP_SY
 from ..message import DiameterMessage
 from typing import Optional, Dict
+import logging
+logger = logging.getLogger("diameter_telecom.diameter.app")
+
 
 class SyApplication(CustomSimpleThreadingApplication):
     def __init__(self, max_threads=1, request_handler=None):

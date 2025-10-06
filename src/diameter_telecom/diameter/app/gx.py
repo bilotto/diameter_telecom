@@ -6,7 +6,8 @@ from ..constants import *
 import logging
 from typing import Optional, Dict
 
-logger = logging.getLogger(__name__)
+import logging
+logger = logging.getLogger("diameter_telecom.diameter.app")
 
 class GxApplication(CustomSimpleThreadingApplication):
     def __init__(self, max_threads=1, request_handler=None):

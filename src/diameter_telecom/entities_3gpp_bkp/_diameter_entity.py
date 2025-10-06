@@ -84,18 +84,6 @@ class DiameterEntity:
         logger.info(f"Initialized {type(self).__name__} entity {self.origin_host}")
 
     @property
-    def peers(self):
-        return self.all_peers
-    
-    @property
-    def realms(self):
-        return self.all_realms
-    
-    @property
-    def applications(self):
-        return self.all_applications
-
-    @property
     def peer_uri(self):
         return node_peer_uri(self.node)
     
@@ -194,8 +182,6 @@ class DiameterEntity:
             logger.error("setup_app must be called before start")
             return
         logger.info(f"Starting {type(self).__name__} entity {self.origin_host}")
-        if not self.node.applications:
-            raise ValueError("Node applications are not set")
         self.node.start()
         logger.debug(f"{type(self).__name__} node started on {self.ip_addresses}:{self.tcp_port}")
 

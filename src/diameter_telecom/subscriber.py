@@ -40,6 +40,12 @@ class Subscriber:
     messages: List[DiameterMessage] = field(default_factory=list, repr=False)
     session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=False)
     _session_ids_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    _avps: Dict[str, str] = field(default_factory=dict, repr=False)
+
+    @property
+    def avps(self) -> Dict[str, str]:
+        self._avps['subscription_id'] = self.get_subscription_id()
+        return self._avps
 
     def __post_init__(self):
         """
@@ -198,6 +204,17 @@ class Subscribers:
                 if subscriber.imsi == imsi:
                     return subscriber
             return None
+
+    def create_subscriber(self, msisdn: str, imsi: str):
+        """Create a subscriber.
+        
+        Thread Safety: This method is thread-safe and can be called concurrently
+        from multiple threads.
+        """
+        with self._lock:
+            subscriber = Subscriber(msisdn, imsi)
+            self.add_subscriber(subscriber)
+            return subscriber
     
     # def get_subscribers_with_messages(self) -> List[Subscriber]:
     #     """
