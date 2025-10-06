@@ -32,14 +32,12 @@ class PcefGxApplication(CommonThreadingApplication):
     def create_request(self, message_name: str, session: GxSession) -> CreditControlRequest:
         request = CreditControlRequest()
         request.header.application_id = APP_3GPP_GX
-        request.auth_application_id = APP_3GPP_GX
         request.session_id = session.session_id
-        request.origin_host = self.node.origin_host.encode()
-        request.origin_realm = self.node.realm_name.encode()
-        request.destination_realm = self.node.realm_name.encode()
+        for k, v in self.avps.items():
+            setattr(request, k, v)
         request.service_context_id = "test"
         if message_name == CCR_I:
-            request.cc_request_number = 1
+            request.cc_request_number = 0
             request.cc_request_type = E_CC_REQUEST_TYPE_INITIAL_REQUEST
         elif message_name == CCR_U:
             request.cc_request_number = session.cc_request_number + 1

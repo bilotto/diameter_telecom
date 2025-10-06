@@ -22,6 +22,8 @@ class ApplicationService:
     def __init__(self, applications: List[CommonThreadingApplication], diameter_config: dict, framed_ip_address_cidr: str = "192.168.1.0/24", session_manager: SessionManager = None, subscribers: Subscribers = None):
         app_ids = []
         for i in applications:
+            if not i:
+                continue
             if i.application_id in app_ids:
                 raise ValueError(f"Application ID {i.application_id} is already in the list")
             app_ids.append(i.application_id)
@@ -44,6 +46,7 @@ class ApplicationService:
                     i.related_apps.append(j)
 
         self.logger = logging.getLogger("diameter_telecom")
+
     def get_avps(self, app_id: int):
         return self.diameter_config.get(app_id, {})
 
@@ -57,13 +60,21 @@ class ApplicationService:
         for i in self.applications:
             i.set_subscribers(subscribers)
 
-    def create_session(self, app_id: int, subscriber: Subscriber):
+    def create_session(self, app_id: int, subscriber: Subscriber) -> DiameterSession:
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_session"):
             raise ValueError(f"Application {app_id} does not have a create_session method")
         return app.create_session(subscriber)
+
+    def create_request(self, app_id: int, session: DiameterSession) -> Message:
+        app = self._applications_by_id.get(app_id)
+        if not app:
+            raise ValueError(f"Application ID {app_id} not found")
+        if not hasattr(app, "create_request"):
+            raise ValueError(f"Application {app_id} does not have a create_request method")
+        return app.create_request(session)
 
     def start_session(self, app_id: int, session: DiameterSession):
         app = self._applications_by_id.get(app_id)
@@ -79,7 +90,7 @@ class ApplicationService:
             print(key, value)
             if hasattr(request, key):
                 setattr(request, key, value)
-        app.send_request_custom(request)
+        return app.send_request_custom(request)
 
     def update_session(self, app_id: int, session: DiameterSession):
         app = self._applications_by_id.get(app_id)

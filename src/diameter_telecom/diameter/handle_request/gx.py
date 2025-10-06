@@ -90,6 +90,8 @@ def handle_ccr(app: GxApplication, message: CreditControlRequest):
         else:
             answer.charging_rule_install.append(ChargingRuleInstall("BLOCK"))
         answer.charging_rule_install.append(ChargingRuleInstall("WEB_PORTAL"))
+
+        answer.rat_type = message.rat_type
             
     elif message.cc_request_type == E_CC_REQUEST_TYPE_UPDATE_REQUEST:
         # Session lookup handled by SessionManager

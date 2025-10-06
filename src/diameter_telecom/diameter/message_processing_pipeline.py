@@ -73,7 +73,8 @@ class MessageProcessingPipeline:
         
         session: DiameterSession = context.session
         if session and self.save_messages_to_session:
-            session.messages.append(context.message)
+            # session.messages.append(context.message)
+            session.add_message(context.message)
             
         subscriber = context.subscriber
         if subscriber:

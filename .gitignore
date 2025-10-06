@@ -64,3 +64,5 @@ htmlcov/
 .env.*.local
 .cursor/mcp.json
 explanation
+examples/debug_logging_demo.py
+examples/session_stages_demo.py

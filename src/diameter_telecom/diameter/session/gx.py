@@ -1,6 +1,8 @@
 from ._diameter_session import *
 from ..parse_avp import *
 from typing import *
+from diameter.message.commands import CreditControlRequest, CreditControlAnswer
+from ..message import DiameterMessage
 
 @dataclass
 class GxSession(DiameterSession):
@@ -16,8 +18,6 @@ class GxSession(DiameterSession):
 
     @property
     def avps(self) -> Dict[str, str]:
-        for key, value in self.subscriber.avps.items():
-            self._avps[key] = value
         if self.framed_ip_address:
             self._avps['framed_ip_address'] = self.framed_ip_address
         if self.framed_ipv6_prefix:
@@ -26,14 +26,34 @@ class GxSession(DiameterSession):
             self._avps['called_station_id'] = self.called_station_id
         if self.sgsn_mcc_mnc:
             self._avps['sgsn_mcc_mnc'] = self.sgsn_mcc_mnc
+        if self.rat_type:
+            self._avps['rat_type'] = self.rat_type
+        # if self.cc_request_number:
+        #     self._avps['cc_request_number'] = self.cc_request_number
+        for key, value in self.subscriber.avps.items():
+            self._avps[key] = value
         return self._avps
 
     @property
     def apn(self):
         return self.called_station_id
 
-    def add_message(self, message: DiameterMessage):
+    def add_message(self, diameter_message: DiameterMessage):
+        message = diameter_message.message
         """Add message to session - business logic now handled by SessionManager"""
+        if isinstance(message, CreditControlRequest):
+            self.cc_request_number = message.cc_request_number
+        elif isinstance(message, CreditControlAnswer):
+            self.cc_request_number = message.cc_request_number
+        else:
+            pass
+        if hasattr(message, 'rat_type'):
+            if not self.rat_type:
+                self.rat_type = message.rat_type
+            else:
+                if self.rat_type != message.rat_type:
+                    logger.warning(f"🚨 GxSession: Rat type changed from {self.rat_type} to {message.rat_type}")
+                    self.rat_type = message.rat_type
         return super().add_message(message)
 
     def to_json(self) -> dict:

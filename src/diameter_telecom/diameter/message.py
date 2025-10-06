@@ -52,7 +52,7 @@ class DiameterMessage:
         if hasattr(message, 'session_id'): 
             self.session_id = message.session_id
 
-        self._message = None
+        self._message = message
 
         # self.subscriber: 'Subscriber' = None
         # self.processing_time_microseconds = None # in microseconds (more precise)
@@ -69,7 +69,7 @@ class DiameterMessage:
         return name_diameter_message(self.is_request, self.cmd_code, self.cc_request_type)
 
     @property
-    def message(self):
+    def message(self) -> Message:
         if self._message is None:
             self._message = Message.from_bytes(self.message_bytes)
         return self._message
@@ -143,6 +143,11 @@ class DiameterMessage:
         if not hasattr(self.message, name):
             raise ValueError(f"Attribute {name} not found in message")
         setattr(self.message, name, value)
+
+    def set_message_header_attribute(self, name, value):
+        if not hasattr(self.message.header, name):
+            raise ValueError(f"Attribute {name} not found in message header")
+        setattr(self.message.header, name, value)
 
     # @property
     # def session_id(self):
@@ -271,7 +276,7 @@ def name_diameter_message(is_request, cmd_code, cc_request_type):
         return f"{cmd_code}"
 
 
-def create_message(name: str):
+def create_message(name: str) -> Message:
     if name == CCR_I:
         message = CreditControlRequest()
         message.cc_request_type = E_CC_REQUEST_TYPE_INITIAL_REQUEST

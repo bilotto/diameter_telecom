@@ -37,4 +37,11 @@ class AfRxApplication(CommonThreadingApplication):
             request = AaRequest()
         elif message_name == STR:
             request = SessionTerminationRequest()
+        request.header.application_id = APP_3GPP_RX
+        for k, v in self.avps.items():
+            setattr(request, k, v)
+        request.session_id = session.session_id
+        for key, value in session.avps.items():
+            if hasattr(request, key):
+                setattr(request, key, value)
         return request

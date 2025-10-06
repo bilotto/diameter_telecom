@@ -41,6 +41,7 @@ class Subscriber:
     session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=False)
     _session_ids_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _avps: Dict[str, str] = field(default_factory=dict, repr=False)
+    carrier_name: str = field(default=None, repr=False)
 
     @property
     def avps(self) -> Dict[str, str]:
@@ -174,6 +175,9 @@ class Subscribers:
     """
     subscribers: Dict[str, Subscriber] = field(default_factory=dict)
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+
+    def get_subscribers(self) -> List[Subscriber]:
+        return list(self.subscribers.values())
 
     def add_subscriber(self, subscriber: Subscriber):
         """Add a subscriber to the collection.

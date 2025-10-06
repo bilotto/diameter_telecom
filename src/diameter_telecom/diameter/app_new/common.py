@@ -19,6 +19,17 @@ class CommonThreadingApplication(ThreadingApplication):
         self._avps: Dict[str, str] = {}
 
     @property
+    def avps(self):
+        if self.is_auth_application:
+            self._avps['auth_application_id'] = self.application_id
+        if self.is_acct_application:
+            self._avps['acct_application_id'] = self.application_id
+        self._avps['origin_host'] = self.node.origin_host.encode()
+        self._avps['origin_realm'] = self.node.realm_name.encode()
+        self._avps['destination_realm'] = self.node.realm_name.encode()
+        return self._avps
+
+    @property
     def _request_handler(self):
         return self.handle_request
 
@@ -48,15 +59,3 @@ class CommonThreadingApplication(ThreadingApplication):
         self.logger.debug(f"Received answer {answer.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"{answer.dump()}")
         return answer
-    
-    def create_session(self, app_id: int) -> None:
-        pass
-
-    def start_session(self, app_id: int, session: DiameterSession) -> None:
-        pass
-
-    def update_session(self, app_id: int, session: DiameterSession) -> None:
-        pass
-
-    def terminate_session(self, app_id: int, session: DiameterSession) -> None:
-        pass

@@ -17,8 +17,6 @@ from ..session.sy import SySession
 from ..constants import *
 from ..parse_avp import *
 
-
-
 class PcrfGxApplication(CommonThreadingApplication):
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_GX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
@@ -38,17 +36,10 @@ class PcrfGxApplication(CommonThreadingApplication):
                 return app
         return None
 
-    def create_session(self):
-        raise NotImplementedError("PCRF does not create Gx sessions")
-
-    def create_request(self, message_name: str, session: GxSession) -> CreditControlRequest:
-        if message_name in [CCR_I, CCR_U, CCR_T]:
-            raise NotImplementedError("PCRF does not create Gx requests")
-
     def get_session_by_id(self, session_id: str) -> GxSession:
         return self.session_manager.sessions.get_session_by_id(APP_3GPP_GX, session_id)
 
-    def handle_request(self, message: Message):
+    def handle_request(self, message: CreditControlRequest) -> CreditControlAnswer:
         answer = message.to_answer()
         answer.cc_request_number = message.cc_request_number
         answer.cc_request_type = message.cc_request_type
@@ -59,6 +50,8 @@ class PcrfGxApplication(CommonThreadingApplication):
         answer.session_id = message.session_id
         answer.origin_host = message.destination_host
         answer.origin_realm = message.destination_realm
+        answer.destination_realm = message.destination_realm
+        answer.destination_host = message.destination_host
         answer.auth_application_id = message.auth_application_id
         answer.cc_request_type = message.cc_request_type
         answer.cc_request_number = message.cc_request_number
@@ -80,23 +73,36 @@ class PcrfGxApplication(CommonThreadingApplication):
         # Session and subscriber management is now handled by SessionManager
         # Just focus on business logic here
         if message.cc_request_type == E_CC_REQUEST_TYPE_INITIAL_REQUEST:
-            print(subscriber)
             self.logger.info(f"🆕 Gx CCR: Processing INITIAL request for session {message.session_id}")
-            answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
-            answer.event_trigger.append(E_EVENT_TRIGGER_QOS_CHANGE)
+            # answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
+            # answer.event_trigger.append(E_EVENT_TRIGGER_QOS_CHANGE)
             answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
             answer.charging_rule_install.append(ChargingRuleInstall("FREE_SERVICES"))
             if subscriber:
-                answer.charging_rule_install.append(ChargingRuleInstall("INTERNET"))
+                answer.charging_rule_install.append(ChargingRuleInstall("SUBSCRIBER_INTERNET"))
                 self.logger.debug(f"✅ Gx CCR: Added INTERNET rule for subscriber")
             else:
-                answer.charging_rule_install.append(ChargingRuleInstall("BLOCK"))
+                answer.charging_rule_install.append(ChargingRuleInstall("SUBSCRIBER_BLOCK"))
                 self.logger.debug(f"🚫 Gx CCR: Added BLOCK rule for unknown subscriber")
             answer.charging_rule_install.append(ChargingRuleInstall("WEB_PORTAL"))
             self.logger.info(f"✅ Gx CCR: INITIAL request processed successfully for session {message.session_id}")
 
-        if self.sy_app:
-            self.sy_app.handle_request(message)
+            if message.rat_type and message.rat_type == E_RAT_TYPE_EUTRAN:
+                answer.charging_rule_install.append(ChargingRuleInstall("EUTRAN_SERVICE"))
+                answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
+            elif message.rat_type and message.rat_type == E_RAT_TYPE_GERAN:
+                answer.charging_rule_install.append(ChargingRuleInstall("GERAN_SERVICE"))
+                answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
+            elif message.rat_type and message.rat_type == E_RAT_TYPE_UTRAN:
+                answer.charging_rule_install.append(ChargingRuleInstall("UTRAN_SERVICE"))
+                answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
+
+            if subscriber and self.sy_app:
+                # ocs data flow
+                pass
+            if not subscriber and self.rx_app:
+                # voice flow
+                pass
                 
         elif message.cc_request_type == E_CC_REQUEST_TYPE_UPDATE_REQUEST:
             self.logger.info(f"🔄 Gx CCR: Processing UPDATE request for session {message.session_id}")
