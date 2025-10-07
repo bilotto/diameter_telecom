@@ -108,16 +108,21 @@ class PcrfGxApplication(CommonThreadingApplication):
                     self.logger.debug(f"✅ Gx CCR: Created request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
                     answer = self.sy_app.send_request_custom(request, timeout=2)
                     self.logger.debug(f"✅ Gx CCR: Sent request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                    answer.charging_rule_install.append(ChargingRuleInstall("SY_CALLED"))
                     if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
                         self.logger.error(f"❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with result code {answer.result_code}")
                         pass
                     # ocs data flow
                     pass
                 except Exception as e:
+                    answer.charging_rule_install.append(ChargingRuleInstall("SY_ERROR"))
                     self.logger.error(f"❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with error {e}")
                     pass
+            else:
+                answer.charging_rule_install.append(ChargingRuleInstall("SY_NOT_CALLED"))
             if not subscriber and self.rx_app:
                 # voice flow
+                answer.charging_rule_install.append(ChargingRuleInstall("RX_MISSING_IMPLEMENTATION"))
                 pass
             
                 
