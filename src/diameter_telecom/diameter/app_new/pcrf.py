@@ -1,7 +1,8 @@
+from re import S
 from .common import CommonThreadingApplication
 from diameter.message.constants import *
 from diameter.message import Message
-from diameter.message.commands import CreditControlRequest, CreditControlAnswer
+from diameter.message.commands import CreditControlRequest, CreditControlAnswer, SpendingLimitRequest, SpendingStatusNotificationRequest, SessionTerminationRequest
 from diameter.message.avp import *
 from diameter.message.avp.grouped import *
 # from diameter_telecom import GxSession, Subscriber
@@ -40,6 +41,7 @@ class PcrfGxApplication(CommonThreadingApplication):
         return self.session_manager.sessions.get_session_by_id(APP_3GPP_GX, session_id)
 
     def handle_request(self, message: CreditControlRequest) -> CreditControlAnswer:
+        self.session_manager.process_diameter_message(DiameterMessage(message))
         answer = message.to_answer()
         answer.cc_request_number = message.cc_request_number
         answer.cc_request_type = message.cc_request_type
@@ -98,11 +100,26 @@ class PcrfGxApplication(CommonThreadingApplication):
                 answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
 
             if subscriber and self.sy_app:
-                # ocs data flow
-                pass
+                try:
+                    sy_session: SySession = self.sy_app.create_session(subscriber)
+                    sy_session.gx_session_id = message.session_id
+                    self.logger.debug(f"✅ Gx CCR: Created Sy session for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                    request = self.sy_app.create_request(SLR, sy_session)
+                    self.logger.debug(f"✅ Gx CCR: Created request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                    answer = self.sy_app.send_request_custom(request, timeout=2)
+                    self.logger.debug(f"✅ Gx CCR: Sent request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                    if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+                        self.logger.error(f"❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with result code {answer.result_code}")
+                        pass
+                    # ocs data flow
+                    pass
+                except Exception as e:
+                    self.logger.error(f"❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with error {e}")
+                    pass
             if not subscriber and self.rx_app:
                 # voice flow
                 pass
+            
                 
         elif message.cc_request_type == E_CC_REQUEST_TYPE_UPDATE_REQUEST:
             self.logger.info(f"🔄 Gx CCR: Processing UPDATE request for session {message.session_id}")
@@ -111,6 +128,15 @@ class PcrfGxApplication(CommonThreadingApplication):
             if not gx_session:
                 self.logger.error(f"❌ Gx CCR: Session {message.session_id} not found for UPDATE request")
                 raise ValueError(f"Session {message.session_id} not found")
+            if message.rat_type and message.rat_type == E_RAT_TYPE_EUTRAN:
+                answer.charging_rule_install.append(ChargingRuleInstall("EUTRAN_SERVICE"))
+                answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
+            elif message.rat_type and message.rat_type == E_RAT_TYPE_GERAN:
+                answer.charging_rule_install.append(ChargingRuleInstall("GERAN_SERVICE"))
+                answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
+            elif message.rat_type and message.rat_type == E_RAT_TYPE_UTRAN:
+                answer.charging_rule_install.append(ChargingRuleInstall("UTRAN_SERVICE"))
+                answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
             answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
             self.logger.info(f"✅ Gx CCR: UPDATE request processed successfully for session {message.session_id}")
             
@@ -128,6 +154,9 @@ class PcrfGxApplication(CommonThreadingApplication):
             self.logger.warning(f"⚠️ Gx CCR: Unknown CC request type {message.cc_request_type} for session {message.session_id}")
             
         self.logger.debug(f"💳 Gx CCR: Returning CreditControlAnswer with result code {answer.result_code} for session {message.session_id}")
+
+
+        self.session_manager.process_diameter_message(DiameterMessage(answer))
         return answer
 
 
@@ -144,29 +173,40 @@ class PcrfRxApplication(CommonThreadingApplication):
         answer.cc_request_number = message.cc_request_number
         answer.cc_request_type = message.cc_request_type
         return answer
-    
-    def create_message(self, message_name: str) -> CreditControlRequest:
-        if message_name not in [CCR_I, CCR_U, CCR_T]:
-            raise ValueError(f"Invalid message name: {message_name}")
-        request = CreditControlRequest()
-        request.header.application_id = APP_3GPP_RX
-        request.auth_application_id = APP_3GPP_RX
-        request.session_id = self.node.session_generator.next_id()
-        request.origin_host = self.node.origin_host.encode()
-        request.origin_realm = self.node.realm_name.encode()
-        request.destination_realm = self.node.realm_name.encode()
 
 
+from .. import Subscriber
 
 class PcrfSyApplication(CommonThreadingApplication):
+    MESSAGE_CREATE_SESSION = SLR
+    MESSAGE_UPDATE_SESSION = None
+    MESSAGE_TERMINATE_SESSION = SLR
+
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_SY, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         self.related_apps: List[CommonThreadingApplication] = []
 
-    def create_session(self) -> SySession:
-        # PCRF does create Sy sessions
-        pass
+    def create_session(self, subscriber: Subscriber) -> SySession:
+        sy_session = SySession(self.node.session_generator.next_id(), subscriber=subscriber)
+        self.session_manager.sessions.add_session(APP_3GPP_SY, sy_session)
+        return sy_session
 
+    def create_request(self, message_name: str, session: SySession) -> CreditControlRequest:
+        if message_name == SLR:
+            request = SpendingLimitRequest()
+            request.header.application_id = APP_3GPP_SY
+            request.session_id = session.session_id
+            for k, v in self.avps.items():
+                setattr(request, k, v)
+            for k, v in session.avps.items():
+                setattr(request, k, v)
+            for k, v in session.subscriber.avps.items():
+                setattr(request, k, v)
+            return request
+        elif message_name == SLR:
+            pass
+        return request
+        
     def handle_request(self, message: Message):
         answer = message.to_answer()
         answer.cc_request_number = message.cc_request_number
