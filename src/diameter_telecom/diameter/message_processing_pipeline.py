@@ -14,7 +14,7 @@ from .constants import *
 from .parse_avp import *
 from .message import DiameterMessage
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.session_manager")
 
 
 import time
@@ -52,6 +52,7 @@ class MessageProcessingPipeline:
     
     @timing_decorator
     def main_pipeline(self, context: MessageProcessingContext):
+        logger.debug(f"✅ [MAIN PIPELINE] Message {context.message.name} entering session_manager.")
         self.stage_get_session(context)
         # if not context.session:
         #     if context.message.name not in REQUESTS_CREATE_SESSION:
@@ -62,6 +63,12 @@ class MessageProcessingPipeline:
         if context.message.is_request:
             if not context.session and context.message.name not in REQUESTS_CREATE_SESSION:
                 return False
+            elif context.session and not(context.session.n_messages):
+                # this means the message is flowing through session_manager
+                # it was added to session manager by the client, and the server is during the processing of the message sharing the session manager
+                # is this case, lets try allowing the message to flow
+                logger.info(f"✅ [MAIN PIPELINE] Message {context.message.name} is flowing through shared session_manager.")
+                pass
             self.stage_parse_request(context)
         else:
             if not context.session:
@@ -69,7 +76,7 @@ class MessageProcessingPipeline:
             self.stage_parse_response(context)
         
         # self.process_app_specific_logic(context)
-        logger.debug(f"✅ [MAIN PIPELINE] Message {context} processed")
+
         
         session: DiameterSession = context.session
         if session and self.save_messages_to_session:
@@ -80,6 +87,7 @@ class MessageProcessingPipeline:
         if subscriber:
             context.message.subscriber = subscriber
 
+        logger.debug(f"✅ [MAIN PIPELINE] Message {context.message.name} processed. Leaving session_manager.")
         return True
 
 

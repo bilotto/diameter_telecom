@@ -42,13 +42,9 @@ class PcrfGxApplication(CommonThreadingApplication):
 
     def handle_request(self, message: CreditControlRequest) -> CreditControlAnswer:
         self.session_manager.process_diameter_message(DiameterMessage(message))
-        answer = message.to_answer()
+        answer: CreditControlAnswer = message.to_answer()
         answer.cc_request_number = message.cc_request_number
         answer.cc_request_type = message.cc_request_type
-        if not isinstance(answer, CreditControlAnswer):
-            self.logger.error(f"❌ Gx CCR: Invalid answer type {type(answer)} for session {message.session_id}")
-            raise ValueError("Answer is not CreditControlAnswer")
-            
         answer.session_id = message.session_id
         answer.origin_host = message.destination_host
         answer.origin_realm = message.destination_realm
@@ -59,8 +55,16 @@ class PcrfGxApplication(CommonThreadingApplication):
         answer.cc_request_number = message.cc_request_number
 
         subscriber = None
+        gx_session = None
+        if self.session_manager.sessions.get_session_by_id(APP_3GPP_GX, message.session_id):
+            gx_session = self.session_manager.sessions.get_session_by_id(APP_3GPP_GX, message.session_id)
+        else:
+            self.logger.error(f"{__class__.__name__}❌ Gx CCR: Session {message.session_id} not found for request. Client and Server are not sharing the same session manager.")
+            pass
 
-        if message.subscription_id:
+        if gx_session:
+            subscriber = gx_session.subscriber
+        elif message.subscription_id:
             msisdn, imsi, _, _, _ = parse_subscription_id(message.subscription_id)
             self.logger.debug(f"🔍 Gx CCR: Parsed subscription - MSISDN: {msisdn}, IMSI: {imsi}")
             if msisdn:
@@ -89,6 +93,27 @@ class PcrfGxApplication(CommonThreadingApplication):
             answer.charging_rule_install.append(ChargingRuleInstall("WEB_PORTAL"))
             self.logger.info(f"✅ Gx CCR: INITIAL request processed successfully for session {message.session_id}")
 
+            # Add QoS Information
+            qos_info = QosInformation()
+            qos_info.qos_class_identifier = E_QOS_CLASS_IDENTIFIER_QCI_8  # Default QCI 8 for internet
+            qos_info.max_requested_bandwith_ul = 1000000  # 1 Mbps UL
+            qos_info.max_requested_bandwith_dl = 10000000  # 10 Mbps DL
+            qos_info.guaranteed_bitrate_ul = 500000  # 500 kbps UL
+            qos_info.guaranteed_bitrate_dl = 5000000  # 5 Mbps DL
+            answer.qos_information = qos_info
+            self.logger.debug(f"✅ Gx CCR: Added QoS Information - QCI: {qos_info.qos_class_identifier}")
+
+            # Add Default EPS Bearer QoS
+            default_qos = DefaultEpsBearerQos()
+            default_qos.qos_class_identifier = E_QOS_CLASS_IDENTIFIER_QCI_9  # QCI 9 for default bearer
+            default_qos.allocation_retention_priority = AllocationRetentionPriority()
+            default_qos.allocation_retention_priority.priority_level = 15  # Standard priority
+            default_qos.allocation_retention_priority.pre_emption_vulnerability = 1  # Pre-emption vulnerable
+            default_qos.allocation_retention_priority.pre_emption_capability = 0  # No pre-emption capability
+            answer.default_eps_bearer_qos = default_qos
+            self.logger.debug(f"✅ Gx CCR: Added Default EPS Bearer QoS - QCI: {default_qos.qos_class_identifier}")
+
+
             if message.rat_type and message.rat_type == E_RAT_TYPE_EUTRAN:
                 answer.charging_rule_install.append(ChargingRuleInstall("EUTRAN_SERVICE"))
                 answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
@@ -103,20 +128,21 @@ class PcrfGxApplication(CommonThreadingApplication):
                 try:
                     sy_session: SySession = self.sy_app.create_session(subscriber)
                     sy_session.gx_session_id = message.session_id
-                    self.logger.debug(f"✅ Gx CCR: Created Sy session for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                    self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Created Sy session for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
                     request = self.sy_app.create_request(SLR, sy_session)
-                    self.logger.debug(f"✅ Gx CCR: Created request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
-                    answer = self.sy_app.send_request_custom(request, timeout=2)
-                    self.logger.debug(f"✅ Gx CCR: Sent request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                    self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Created request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                    sy_diameter_answer = self.sy_app.send_request_custom(request, timeout=2)
+                    # sy_answer = sy_diameter_answer.message
+                    self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Sent request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
                     answer.charging_rule_install.append(ChargingRuleInstall("SY_CALLED"))
                     if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-                        self.logger.error(f"❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with result code {answer.result_code}")
+                        self.logger.error(f"{__class__.__name__}❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with result code {answer.result_code}")
                         pass
                     # ocs data flow
                     pass
                 except Exception as e:
                     answer.charging_rule_install.append(ChargingRuleInstall("SY_ERROR"))
-                    self.logger.error(f"❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with error {e}")
+                    self.logger.error(f"{__class__.__name__}❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with error {e}")
                     pass
             else:
                 answer.charging_rule_install.append(ChargingRuleInstall("SY_NOT_CALLED"))
@@ -131,7 +157,7 @@ class PcrfGxApplication(CommonThreadingApplication):
             # Session lookup handled by SessionManager
             gx_session = self.get_session_by_id(message.session_id)
             if not gx_session:
-                self.logger.error(f"❌ Gx CCR: Session {message.session_id} not found for UPDATE request")
+                self.logger.error(f"{__class__.__name__}❌ Gx CCR: Session {message.session_id} not found for UPDATE request")
                 raise ValueError(f"Session {message.session_id} not found")
             if message.rat_type and message.rat_type == E_RAT_TYPE_EUTRAN:
                 answer.charging_rule_install.append(ChargingRuleInstall("EUTRAN_SERVICE"))
@@ -143,18 +169,18 @@ class PcrfGxApplication(CommonThreadingApplication):
                 answer.charging_rule_install.append(ChargingRuleInstall("UTRAN_SERVICE"))
                 answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
             answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
-            self.logger.info(f"✅ Gx CCR: UPDATE request processed successfully for session {message.session_id}")
+            self.logger.info(f"{__class__.__name__}✅ Gx CCR: UPDATE request processed successfully for session {message.session_id}")
             
         elif message.cc_request_type == E_CC_REQUEST_TYPE_TERMINATION_REQUEST:
             self.logger.info(f"🛑 Gx CCR: Processing TERMINATION request for session {message.session_id}")
             # Session lookup and termination handled by SessionManager
             gx_session = self.get_session_by_id(message.session_id)
             if not gx_session:
-                self.logger.error(f"❌ Gx CCR: Session {message.session_id} not found for TERMINATION request")
+                self.logger.error(f"{__class__.__name__}❌ Gx CCR: Session {message.session_id} not found for TERMINATION request")
                 raise ValueError(f"Session {message.session_id} not found")
             answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
             gx_session.end()
-            self.logger.info(f"✅ Gx CCR: TERMINATION request processed successfully for session {message.session_id}")
+            self.logger.info(f"{__class__.__name__}✅ Gx CCR: TERMINATION request processed successfully for session {message.session_id}")
         else:
             self.logger.warning(f"⚠️ Gx CCR: Unknown CC request type {message.cc_request_type} for session {message.session_id}")
             

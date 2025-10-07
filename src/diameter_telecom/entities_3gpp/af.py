@@ -5,6 +5,8 @@ from ..diameter.constants import *
 from ..diameter.helpers import Node, Peer, create_node, node_peer_uri
 from ._diameter_entity import DiameterEntity
 import logging
+from ..subscriber import Subscribers
+
 
 logger = logging.getLogger("diameter_telecom.entities_3gpp")
 
@@ -59,17 +61,24 @@ class AF(DiameterEntity):
         # logger.info(f"{type(self).__name__} setting up app {app_id} with max_threads {max_threads} and request_handler {request_handler}")
         app_id = int(app_id)
         if app_id == APP_3GPP_RX:
-            self.rx_app = AfRxApplication(max_threads=max_threads)
-            self.all_applications[APP_3GPP_RX] = self.rx_app
+            app = AfRxApplication(max_threads=max_threads)
+            if self.subscribers and hasattr(app, 'subscribers'):
+                app.subscribers = self.subscribers
+            self.node.add_application(app, self.rx_peers, self.rx_realms)
+            self.all_applications[APP_3GPP_RX] = app
             logger.info(f"{type(self).__name__} setup Rx application with {len(self.rx_peers)} peers and {self.rx_realms} realms")
         else:
             raise ValueError(f"Invalid app_id: {app_id}")
         self._setup_app_ran = True
-
+        return app
+        
     def setup_rx_app(self, max_threads: int = 10):
         self.setup_app(APP_3GPP_RX, max_threads)
 
     def setup_apps(self, max_threads: int = 10):
         for app_id, peers in self.all_peers.items():
             self.add_realm(app_id, self.realm_name)
-            self.setup_app(app_id, max_threads)
+            app = self.setup_app(app_id, max_threads)
+            if self.subscribers and hasattr(app, 'subscribers'):
+                app.subscribers = self.subscribers
+        logger.info(f"{type(self).__name__} setup apps with {len(self.all_peers)} peers and {self.realm_name} realm")

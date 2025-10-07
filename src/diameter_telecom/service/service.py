@@ -11,6 +11,7 @@ from ..diameter.session import DiameterSession
 from diameter.message import Message
 import logging
 from ..diameter.constants import *
+logger = logging.getLogger("diameter_telecom.service")
 
 class ApplicationService:
     """
@@ -115,7 +116,7 @@ class ApplicationService:
         # destination_realm = self.diameter_config.get("destination_realm", app.node.realm_name)
         # request.destination_realm = destination_realm.encode()
         for key, value in self.get_avps(app_id).items():
-            print(key, value)
+            logger.debug(f"Updating session {session.session_id} with AVPS: {key} = {value}")
             if hasattr(request, key):
                 setattr(request, key, value)
         return app.send_request_custom(request)

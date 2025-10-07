@@ -7,7 +7,7 @@ from ..subscriber import Subscriber
 
 from .parse_avp import *
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.session_manager")
 
 
 @dataclass

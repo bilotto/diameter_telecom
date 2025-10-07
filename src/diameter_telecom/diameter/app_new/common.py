@@ -6,7 +6,7 @@ from ..session_manager import SessionManager, Subscribers
 from ..session import DiameterSession
 from diameter_telecom.diameter.message import DiameterMessage
 from typing import Dict
-
+import time
 
 class CommonThreadingApplication(ThreadingApplication):
     session_manager: SessionManager
@@ -15,7 +15,7 @@ class CommonThreadingApplication(ThreadingApplication):
         super().__init__(application_id=application_id, is_acct_application=is_acct_application, is_auth_application=is_auth_application, max_threads=max_threads)
         self.session_manager = SessionManager()
         self.subscribers = Subscribers()
-        self.logger = logging.getLogger("diameter_telecom")
+        self.logger = logging.getLogger("diameter_telecom.app")
         self._avps: Dict[str, str] = {}
 
     @property
@@ -49,13 +49,17 @@ class CommonThreadingApplication(ThreadingApplication):
         """Send request with full session management handled by SessionManager"""
         if isinstance(diameter_message, Message):
             diameter_message = DiameterMessage(diameter_message)
+        if not diameter_message.timestamp:
+            diameter_message.timestamp = time.time()
         self.logger.debug(f"Sending request {diameter_message.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"{diameter_message.dump()}")
-        answer = self.session_manager.send_request_with_session_management(
-            diameter_message, 
-            self.send_request, 
-            timeout
-        )
-        self.logger.debug(f"Received answer {answer.cmd_code} through node {self.node.origin_host}")
-        self.logger.debug(f"{answer.dump()}")
-        return answer
+        # answer = self.session_manager.send_request_with_session_management(diameter_message, self.send_request, timeout)
+        self.session_manager.process_diameter_message(diameter_message)
+        answer = self.send_request(diameter_message.message, timeout)
+        diameter_message_answer = DiameterMessage(answer)
+        self.session_manager.process_diameter_message(diameter_message_answer)
+        if not diameter_message_answer.timestamp:
+            diameter_message_answer.timestamp = time.time()
+        self.logger.debug(f"Received answer {diameter_message_answer.cmd_code} through node {self.node.origin_host}")
+        self.logger.debug(f"{diameter_message_answer.dump()}")
+        return diameter_message_answer

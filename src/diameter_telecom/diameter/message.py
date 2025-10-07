@@ -121,6 +121,10 @@ class DiameterMessage:
     # @property
     # def end_to_end_id(self):
     #     return self.message.header.end_to_end_identifier
+
+    @property
+    def header(self):
+        return self.message.header
     
     def dump_hex_string(self, file_full_path):
         with open(file_full_path, 'w') as f:

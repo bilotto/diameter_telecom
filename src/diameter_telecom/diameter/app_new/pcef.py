@@ -27,6 +27,7 @@ class PcefGxApplication(CommonThreadingApplication):
         session_id = self.node.session_generator.next_id()
         gx_session = GxSession(session_id=session_id, subscriber=subscriber)
         # gx_session.framed_ip_address = self.ip_queue.get_ip()
+        self.session_manager.sessions.add_session(APP_3GPP_GX, gx_session)
         return gx_session
 
     def create_request(self, message_name: str, session: GxSession) -> CreditControlRequest:

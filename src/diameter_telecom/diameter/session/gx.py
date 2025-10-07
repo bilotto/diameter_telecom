@@ -42,7 +42,11 @@ class GxSession(DiameterSession):
         return self.called_station_id
 
     def add_message(self, diameter_message: DiameterMessage):
-        message = diameter_message.message
+        if isinstance(diameter_message, Message):
+            logger.warning(f"🚨 GxSession: Message is not a DiameterMessage")
+            message = diameter_message
+        else:
+            message = diameter_message.message
 
         # Add active event triggers to session
         if diameter_message.name in [CCA_I, CCA_U, RAR]:
