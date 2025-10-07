@@ -125,10 +125,6 @@ class SessionManager:
         This method orchestrates the message processing by delegating to the
         MessageProcessingPipeline and handling the final message storage.
         
-        Thread Safety: This method supports true parallel processing. Multiple threads
-        can process different messages simultaneously without blocking each other.
-        Fine-grained locks are used only when updating shared data structures.
-        
         Returns:
             Optional[MessageProcessingContext]: The processing context containing all processed data,
             or None if the message was filtered out
@@ -181,16 +177,20 @@ class SessionManager:
             diameter_message.timestamp = time.time()
 
         request_context = self.process_diameter_message(diameter_message)
-        # logger.info(f"\n{diameter_message.dump()}")
         
         answer = send_request_func(diameter_message.message, timeout=timeout)
         diameter_message_answer = DiameterMessage(answer)
         
         answer_context = self.process_diameter_message(diameter_message_answer)
+
+        if answer_context.session and answer_context.session.error:
+            self.sessions.remove_session(answer_context.message.app_id, answer_context.session_id)
         
         if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             logger.error(f"Answer with error: \n {diameter_message_answer}")
         # logger.info(f"\n{diameter_message_answer.dump()}")
+
+        
 
         if not diameter_message_answer.timestamp:
         # Set timestamp on answer
