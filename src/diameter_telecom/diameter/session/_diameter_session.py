@@ -115,17 +115,9 @@ class DiameterSession:
                 f.write(message.hex_string + '\n')
         logger.info(f"Hex strings dumped to {output_file}")
 
-    def to_json(self) -> dict:
-        """
-        Convert DiameterSession to JSON-serializable dictionary.
-        
-        Returns:
-            dict: JSON-serializable representation of the session
-        """
+    def to_dict(self) -> dict:
         try:
-
             session_data = dict()
-
             session_data["session_id"] = self.session_id
             session_data["active"] = self.active
             session_data["error"] = self.error
@@ -194,7 +186,7 @@ class DiameterSession:
             
             # Add sample messages (limit to 5 for performance)
             # session_data["sample_messages"] = [
-            #     msg.to_json() if hasattr(msg, 'to_json') else {
+            #     msg.to_dict() if hasattr(msg, 'to_json') else {
             #         "session_id": getattr(msg, "session_id", None),
             #         "cmd_code": getattr(msg, "cmd_code", None),
             #         "app_id": getattr(msg, "app_id", None),
@@ -206,7 +198,7 @@ class DiameterSession:
             #     }
             #     for msg in self.messages[:5]
             # ]
-            session_data['messages'] = [msg.to_json() for msg in self.messages]
+            session_data['messages'] = [msg.to_dict() for msg in self.messages]
             
             return session_data
             

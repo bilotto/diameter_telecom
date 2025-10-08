@@ -12,8 +12,8 @@ class SySession(DiameterSession):
         """Add message to session - business logic now handled by SessionManager"""
         return super().add_message(message)
 
-    def to_json(self) -> dict:
-        session_data = super().to_json()
+    def to_dict(self) -> dict:
+        session_data = super().to_dict()
         if self.gx_session_id:
             session_data['gx_session_id'] = self.gx_session_id
         return session_data

@@ -94,11 +94,11 @@ class GxSession(DiameterSession):
                     self.rat_type = message.rat_type
         return super().add_message(message)
 
-    def to_json(self) -> dict:
+    def to_dict(self) -> dict:
         """
         Convert GxSession to JSON-serializable dictionary.
         """
-        session_data = super().to_json()
+        session_data = super().to_dict()
         if self.framed_ip_address:
             session_data['framed_ip_address'] = self.framed_ip_address
         if self.framed_ipv6_prefix:

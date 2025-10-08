@@ -140,13 +140,7 @@ class Subscriber:
         with self._session_ids_lock:
             return self.session_ids.get(app_id, []).copy()
 
-    def to_json(self) -> dict:
-        """
-        Convert Subscriber to JSON-serializable dictionary.
-        
-        Returns:
-            dict: JSON-serializable representation of the subscriber
-        """
+    def to_dict(self) -> dict:
         subscriber_data = dict()
         subscriber_data['msisdn'] = self.msisdn
         if self.imsi:
@@ -159,51 +153,34 @@ class Subscriber:
             subscriber_data['private_id'] = self.private_id
         if self.imei:
             subscriber_data['imei'] = self.imei
-        if self.apn:
-            subscriber_data['apn'] = self.apn.to_json()
+        # if self.apn:
+        #     subscriber_data['apn'] = self.apn.to_dict()
         subscriber_data['session_ids'] = self.session_ids
         # subscriber_data['message_count'] = len(self.messages)
-        # subscriber_data['sample_messages'] = [msg.to_json() for msg in self.messages[:3]]
+        # subscriber_data['sample_messages'] = [msg.to_dict() for msg in self.messages[:3]]
         return subscriber_data
+
+import uuid
 
 @dataclass
 class Subscribers:
-    """Thread-safe collection for managing subscribers.
-    
-    Thread Safety:
-    This class is thread-safe and can be safely shared across multiple threads.
-    It uses a single RLock to protect all subscriber operations.
-    """
-    subscribers: Dict[str, Subscriber] = field(default_factory=dict)
+    subscribers: Dict[str, Subscriber] = field(default_factory=dict, repr=False)
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    id: str = field(default_factory=lambda: uuid.uuid4().hex[:8], repr=True)
+    
 
     def get_subscribers(self) -> List[Subscriber]:
         return list(self.subscribers.values())
 
     def add_subscriber(self, subscriber: Subscriber):
-        """Add a subscriber to the collection.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
         with self._lock:
             self.subscribers[subscriber.msisdn] = subscriber
     
     def get_subscriber_by_msisdn(self, msisdn: str) -> Optional[Subscriber]:
-        """Get subscriber by MSISDN.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
         with self._lock:
             return self.subscribers.get(msisdn)
     
     def get_subscriber_by_imsi(self, imsi: str) -> Optional[Subscriber]:
-        """Get subscriber by IMSI.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
         with self._lock:
             for subscriber in self.subscribers.values():
                 if subscriber.imsi == imsi:
@@ -211,39 +188,15 @@ class Subscribers:
             return None
 
     def create_subscriber(self, msisdn: str, imsi: str):
-        """Create a subscriber.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
         with self._lock:
             subscriber = Subscriber(msisdn, imsi)
             self.add_subscriber(subscriber)
             return subscriber
-    
-    # def get_subscribers_with_messages(self) -> List[Subscriber]:
-    #     """
-    #     Get all subscribers that have associated messages.
-        
-    #     Returns:
-    #         List of Subscriber objects that have messages
-    #     """
-    #     return [subscriber for subscriber in self.subscribers.values() if subscriber.messages]
-    
-    # def get_total_messages(self) -> int:
-    #     """
-    #     Get the total number of messages across all subscribers.
-        
-    #     Returns:
-    #         Total count of messages for all subscribers
-    #     """
-    #     return sum(len(subscriber.messages) for subscriber in self.subscribers.values())
 
-    def to_json(self) -> dict:
-        """Convert subscribers to JSON.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
+    def to_dict(self) -> dict:
         with self._lock:
-            return {msisdn: subscriber.to_json() for msisdn, subscriber in self.subscribers.items()}
+            subscribers_dict = dict()
+            subscribers_dict['id'] = self.id
+            subscribers_dict['subscribers'] = [subscriber.to_dict() for subscriber in self.subscribers.values()]
+            return subscribers_dict
+            # return [subscriber.to_dict() for subscriber in self.subscribers.values()]

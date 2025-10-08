@@ -123,31 +123,34 @@ class PcrfGxApplication(CommonThreadingApplication):
                 answer.charging_rule_install.append(ChargingRuleInstall("UTRAN_SERVICE"))
                 answer.event_trigger.append(E_EVENT_TRIGGER_RAT_CHANGE)
 
-            if subscriber and self.sy_app:
-                try:
-                    sy_session: SySession = self.sy_app.create_session(subscriber)
-                    sy_session.gx_session_id = message.session_id
-                    self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Created Sy session for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
-                    request = self.sy_app.create_request(SLR, sy_session)
-                    self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Created request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
-                    sy_diameter_answer = self.sy_app.send_request_custom(request, timeout=2)
-                    # sy_answer = sy_diameter_answer.message
-                    self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Sent request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
-                    answer.charging_rule_install.append(ChargingRuleInstall("SY_CALLED"))
-                    if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-                        self.logger.error(f"{__class__.__name__}❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with result code {answer.result_code}")
+            if self.sy_app:
+                self.logger.debug(f"{__class__.__name__}✅ PCRF with Sy application")
+                if subscriber:
+                    try:
+                        sy_session: SySession = self.sy_app.create_session(subscriber)
+                        sy_session.gx_session_id = message.session_id
+                        self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Created Sy session for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                        request = self.sy_app.create_request(SLR, sy_session)
+                        self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Created request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                        sy_diameter_answer = self.sy_app.send_request_custom(request, timeout=2)
+                        # sy_answer = sy_diameter_answer.message
+                        self.logger.debug(f"{__class__.__name__}✅ Gx CCR: Sent request for subscriber {subscriber.msisdn} with session ID {sy_session.session_id}")
+                        answer.charging_rule_install.append(ChargingRuleInstall("PCRF_SY_CALLED"))
+                        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+                            self.logger.error(f"{__class__.__name__}❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with result code {answer.result_code}")
+                            pass
+                        # ocs data flow
                         pass
-                    # ocs data flow
-                    pass
-                except Exception as e:
-                    answer.charging_rule_install.append(ChargingRuleInstall("SY_ERROR"))
-                    self.logger.error(f"{__class__.__name__}❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with error {e}")
-                    pass
+                    except Exception as e:
+                        answer.charging_rule_install.append(ChargingRuleInstall("PCRF_SY_ERROR"))
+                        self.logger.error(f"{__class__.__name__}❌ Gx CCR: Failed to create session for subscriber {subscriber.msisdn} with error {e}")
+                        pass
             else:
-                answer.charging_rule_install.append(ChargingRuleInstall("SY_NOT_CALLED"))
-            if not subscriber and self.rx_app:
-                # voice flow
-                answer.charging_rule_install.append(ChargingRuleInstall("RX_MISSING_IMPLEMENTATION"))
+                answer.charging_rule_install.append(ChargingRuleInstall("PCRF_WITH_NO_SY_APPLICATION"))
+
+
+            if self.rx_app:
+                self.logger.debug(f"{__class__.__name__}✅ PCRF with Rx application")
                 pass
             
                 

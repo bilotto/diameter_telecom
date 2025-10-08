@@ -520,7 +520,7 @@ class Sessions:
             
             logger.info(f"Cleared {total_sessions} sessions for all applications [hash-indexed]")
 
-    def to_json(self) -> dict:
+    def to_dict(self) -> dict:
         """Convert to JSON using optimized indexing.
         
         Performance: Single loop through optimized index.
@@ -538,6 +538,6 @@ class Sessions:
             result = {}
             for app_id, sessions_list in all_sessions.items():
                 sorted_sessions = sorted(sessions_list, key=lambda x: x.start_time or '0')
-                result[app_id] = [session.to_json() for session in sorted_sessions]
+                result[app_id] = [session.to_dict() for session in sorted_sessions]
             
             return result

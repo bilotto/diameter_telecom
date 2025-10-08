@@ -29,6 +29,16 @@ class CommonThreadingApplication(ThreadingApplication):
         self._avps['destination_realm'] = self.node.realm_name.encode()
         return self._avps
 
+    def to_dict(self):
+        app_dict = dict()
+        app_dict['app_id'] = self.application_id
+        app_dict['class'] = self.__class__.__name__
+        app_dict['is_ready'] = self.is_ready.is_set()
+        app_dict['node'] = self.node.origin_host
+        app_dict['session_manager_id'] = self.session_manager.id
+        app_dict['subscribers_id'] = self.subscribers.id
+        return app_dict
+
     @property
     def _request_handler(self):
         return self.handle_request

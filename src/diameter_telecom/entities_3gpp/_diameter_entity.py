@@ -237,14 +237,32 @@ class DiameterEntity:
 
     def to_dict(self):
         entity_dict = dict()
-        entity_dict['node'] = dict()
-        entity_dict['node']['origin_host'] = self.node.origin_host
-        entity_dict['node']['realm_name'] = self.node.realm_name
-        entity_dict['node']['ip_addresses'] = self.node.ip_addresses
-        entity_dict['node']['tcp_port'] = self.node.tcp_port
-        entity_dict['peer_uri'] = self.peer_uri
-        entity_dict['all_peers'] = self.all_peers
-        entity_dict['all_realms'] = self.all_realms
-        entity_dict['all_applications'] = self.all_applications
-        entity_dict['_setup_app_ran'] = self._setup_app_ran
+        entity_dict['origin_host'] = self.node.origin_host
+        entity_dict['realm_name'] = self.node.realm_name
+        entity_dict['ip_addresses'] = []
+        for ip_address in self.node.ip_addresses:
+            entity_dict['ip_addresses'].append(ip_address)
+        entity_dict['tcp_port'] = self.node.tcp_port
+        entity_dict['vendor_ids'] = []
+        for vendor_id in self.node.vendor_ids:
+            entity_dict['vendor_ids'].append(vendor_id)
+        entity_dict['applications'] = []
+        for app_id, app in self.all_applications.items():
+            app_dict = dict()
+            app_dict['app_id'] = app_id
+            app_dict['peers'] = []
+            app_dict['additional_realms'] = []
+            for realm_name in self.all_realms[app_id]:
+                app_dict['additional_realms'].append(realm_name)
+            for peer in self.all_peers[app_id]:
+                peer_dict = dict()
+                peer_dict['node_name'] = peer.node_name
+                peer_dict['realm_name'] = peer.realm_name
+                peer_dict['ip_addresses'] = []
+                for ip_address in peer.ip_addresses:
+                    peer_dict['ip_addresses'].append(ip_address)
+                peer_dict['port'] = peer.port
+                peer_dict['initiate_connection'] = peer.persistent
+                app_dict['peers'].append(peer_dict)
+            entity_dict['applications'].append(app_dict)
         return entity_dict

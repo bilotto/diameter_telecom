@@ -16,6 +16,7 @@ from .message import DiameterMessage
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
+import uuid
 
 
 @dataclass
@@ -36,12 +37,13 @@ class SessionManager:
     locks protect shared data structures only when necessary, maximizing throughput
     for high-performance telecom applications.
     """
-    sessions: Sessions = field(default_factory=Sessions)
-    subscribers: Subscribers = field(default_factory=Subscribers)
-    messages: List[DiameterMessage] = field(default_factory=list)
-    csv_file: Optional[CsvFile] = field(default=None)
-    statistics: dict = field(default_factory=dict)
-    pipeline: MessageProcessingPipeline = field(init=False)
+    sessions: Sessions = field(default_factory=Sessions, repr=False)
+    subscribers: Subscribers = field(default_factory=Subscribers, repr=False)
+    messages: List[DiameterMessage] = field(default_factory=list, repr=False)
+    csv_file: Optional[CsvFile] = field(default=None, repr=False)
+    statistics: dict = field(default_factory=dict, repr=False)
+    pipeline: MessageProcessingPipeline = field(init=False, repr=False)
+    id: str = field(default_factory=lambda: uuid.uuid4().hex[:8], repr=True)
 
     # Options
     clear_sessions_after_termination: bool = field(default=True, repr=False)
@@ -206,42 +208,10 @@ class SessionManager:
         
         return diameter_message_answer
 
-    def to_json(self) -> dict:
-        """
-        Convert SessionManager to JSON-serializable dictionary.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        
-        Returns:
-            dict: JSON-serializable representation of the session manager
-        """
-        try:
-            session_manager_data = dict()
-            
-            # Extract sessions data with read lock
-            with self._sessions_read_lock():
-                sessions_data = self.sessions.to_json()
-                session_manager_data['sessions'] = sessions_data
-
-            # Extract subscribers data with read lock
-            with self._subscribers_read_lock():
-                subscribers_data = self.subscribers.to_json()
-                session_manager_data['subscribers'] = subscribers_data
-
-            # # Extract messages data
-            # with self._messages_lock_context():
-            #     messages_data = []
-            #     # Sort by timestamp
-            #     messages_data = sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
-            #     messages_data = [message.to_json() for message in messages_data]
-            #     session_manager_data['messages'] = messages_data
-
-            return session_manager_data
-            
-        except Exception as e:
-            logger.exception("SessionManager JSON serialization failed")
-            return {"error": f"Failed to serialize session manager: {str(e)}"}
+    def to_dict(self) -> dict:
+        session_manager_dict = {}
+        session_manager_dict['id'] = self.id
+        return session_manager_dict
 
     def _get_app_name(self, app_id: int) -> str:
         """Convert application ID to readable name."""

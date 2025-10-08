@@ -163,13 +163,7 @@ class DiameterMessage:
     #     if hasattr(self.message, 'session_id'):
     #         return self.message.session_id
 
-    def to_json(self) -> dict:
-        """
-        Convert DiameterMessage to JSON-serializable dictionary.
-        
-        Returns:
-            dict: JSON-serializable representation of the message
-        """
+    def to_dict(self) -> dict:
         try:
             message_data = dict()
             message_data['is_request'] = self.is_request

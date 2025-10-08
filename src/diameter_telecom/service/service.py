@@ -24,8 +24,10 @@ class ApplicationService:
     def __init__(self, applications: List[CommonThreadingApplication], diameter_config: dict, framed_ip_address_cidr: str = "192.168.1.0/24", session_manager: SessionManager = None, subscribers: Subscribers = None):
         app_ids = []
         for i in applications:
-            if not i:
-                continue
+            if not isinstance(i, CommonThreadingApplication):
+                raise ValueError(f"Application {i} is not a CommonThreadingApplication")
+            # if not i:
+            #     continue
             if i.application_id in app_ids:
                 raise ValueError(f"Application ID {i.application_id} is already in the list")
             app_ids.append(i.application_id)
@@ -48,6 +50,17 @@ class ApplicationService:
                     i.related_apps.append(j)
 
         self.logger = logging.getLogger("diameter_telecom")
+
+    def to_dict(self):
+        service_dict = dict()
+        service_dict['applications'] = []
+        for application in self.applications:
+            service_dict['applications'].append(application.to_dict())
+        service_dict['session_manager_id'] = self.session_manager.id
+        service_dict['subscribers_id'] = self.subscribers.id
+        service_dict['diameter_config'] = self.diameter_config
+        service_dict['framed_ip_address_cidr'] = self.framed_ip_address_cidr
+        return service_dict
 
     @property
     def gx_app(self) -> CommonThreadingApplication:
@@ -153,3 +166,6 @@ class ApplicationService:
             if hasattr(request, key):
                 setattr(request, key, value)
         return app.send_request_custom(request)
+
+
+        

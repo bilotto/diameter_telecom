@@ -231,7 +231,7 @@ class APN:
         """
         return self.ip_queue.available_ips
 
-    def to_json(self) -> dict:
+    def to_dict(self) -> dict:
         """
         Convert APN to JSON-serializable dictionary.
         
