@@ -40,8 +40,7 @@ class PcrfGxApplication(CommonThreadingApplication):
     def get_session_by_id(self, session_id: str) -> GxSession:
         return self.session_manager.sessions.get_session_by_id(APP_3GPP_GX, session_id)
 
-    def handle_request(self, message: CreditControlRequest) -> CreditControlAnswer:
-        self.session_manager.process_diameter_message(DiameterMessage(message))
+    def _handle_request(self, message: CreditControlRequest) -> CreditControlAnswer:
         answer: CreditControlAnswer = message.to_answer()
         answer.cc_request_number = message.cc_request_number
         answer.cc_request_type = message.cc_request_type
@@ -186,8 +185,6 @@ class PcrfGxApplication(CommonThreadingApplication):
             
         self.logger.debug(f"💳 Gx CCR: Returning CreditControlAnswer with result code {answer.result_code} for session {message.session_id}")
 
-
-        self.session_manager.process_diameter_message(DiameterMessage(answer))
         return answer
 
 
@@ -199,7 +196,7 @@ class PcrfRxApplication(CommonThreadingApplication):
         pass
         raise NotImplementedError("PCRF does not create Rx sessions. Use AF to create Rx sessions along with PCEF.")
 
-    def handle_request(self, message: Message):
+    def _handle_request(self, message: Message):
         answer = message.to_answer()
         answer.cc_request_number = message.cc_request_number
         answer.cc_request_type = message.cc_request_type
@@ -238,7 +235,7 @@ class PcrfSyApplication(CommonThreadingApplication):
             pass
         return request
         
-    def handle_request(self, message: Message):
+    def _handle_request(self, message: Message):
         answer = message.to_answer()
         answer.cc_request_number = message.cc_request_number
         answer.cc_request_type = message.cc_request_type

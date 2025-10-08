@@ -119,11 +119,15 @@ class SessionManager:
     # def get_messages(self):
     #     return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
 
-    def process_diameter_message(self, dm: DiameterMessage) -> Optional[MessageProcessingContext]:
+    def process_diameter_message(self, dm: DiameterMessage, owner: Optional[str] = None) -> Optional[MessageProcessingContext]:
         """Main entry point for processing Diameter messages.
         
         This method orchestrates the message processing by delegating to the
         MessageProcessingPipeline and handling the final message storage.
+        
+        Args:
+            dm: The Diameter message to process
+            owner: Optional owner identifier in format "ClassName(origin_host)"
         
         Returns:
             Optional[MessageProcessingContext]: The processing context containing all processed data,
@@ -131,8 +135,9 @@ class SessionManager:
         """
 
         context: MessageProcessingContext = MessageProcessingContext.from_diameter_message(dm)
+        context.owner = owner
         # logger.info(f"Processing {dm.name} - {dm.session_id}")
-
+        logger.info(f"[{owner}] Processing {dm.name} - {dm.session_id}")
         result = self.pipeline.main_pipeline(context)
         if not result:
             return None

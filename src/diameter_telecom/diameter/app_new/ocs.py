@@ -25,7 +25,7 @@ class OcsSyApplication(CommonThreadingApplication):
         super().__init__(application_id=APP_3GPP_SY, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         self.related_apps: List[CommonThreadingApplication] = []
 
-    def handle_request(self, message: SpendingLimitRequest | SpendingStatusNotificationRequest | SessionTerminationRequest):
+    def _handle_request(self, message: SpendingLimitRequest | SpendingStatusNotificationRequest | SessionTerminationRequest):
         answer = message.to_answer()
         answer.session_id = message.session_id
         answer.origin_host = message.destination_host
@@ -64,7 +64,6 @@ class OcsSyApplication(CommonThreadingApplication):
             self.logger.warning(f"⚠️ OCS Sy: Unknown request type {type(message)} for session {message.session_id}")
             answer.result_code = E_RESULT_CODE_DIAMETER_UNABLE_TO_COMPLY
 
-        self.session_manager.process_diameter_message(DiameterMessage(answer))
         return answer
 
 

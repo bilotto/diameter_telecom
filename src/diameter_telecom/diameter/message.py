@@ -5,6 +5,7 @@ from .constants import *
 from typing import TYPE_CHECKING, Any
 import datetime
 import logging
+import time
 
 if TYPE_CHECKING:
     from ..subscriber import Subscriber
@@ -41,7 +42,7 @@ class DiameterMessage:
         else:
             raise TypeError(f"Parameter must be a hex string or a Message instance. Provided: {obj},{type(obj)}")
         
-        self.timestamp = None
+        self.timestamp = time.time()
         self.result_code = None
         self.cc_request_type = None
         self.session_id = None
@@ -63,6 +64,10 @@ class DiameterMessage:
     #     if hasattr(self.message, name):
     #         return getattr(self.message, name)
     #     return None
+
+    # def __post_init__(self):
+    #     if not self.timestamp:
+    #         self.timestamp = time.time()
 
     @property
     def name(self):
@@ -135,7 +140,7 @@ class DiameterMessage:
         return dump(self.message)
     
     def __repr__(self):
-        return f"{self.time},{self.name}"
+        return f"{self.time},{self.hop_by_hop_id},{self.end_to_end_id},{self.name}"
     
     def __eq__(self, other):
         return self.hop_by_hop_id == other.hop_by_hop_id and self.end_to_end_id == other.end_to_end_id and self.is_request == other.is_request

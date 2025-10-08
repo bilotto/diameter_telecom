@@ -43,7 +43,26 @@ class CommonThreadingApplication(ThreadingApplication):
         self.subscribers = subscribers
 
     def handle_request(self, message: Message):
-        pass
+        """Template method: processes request with owner tracking, delegates to subclass"""
+        owner_id = f"{self.__class__.__name__}({self.node.origin_host})"
+        
+        # Process incoming request
+        dm_request = DiameterMessage(message)
+        self.session_manager.process_diameter_message(dm_request, owner=owner_id)
+        
+        # Delegate to subclass implementation
+        answer = self._handle_request(message)
+        
+        # Process outgoing answer
+        if answer:
+            dm_answer = DiameterMessage(answer)
+            self.session_manager.process_diameter_message(dm_answer, owner=owner_id)
+        
+        return answer
+
+    def _handle_request(self, message: Message):
+        """Override in subclasses to implement request handling logic"""
+        raise NotImplementedError("Subclasses must implement _handle_request")
 
     def send_request_custom(self, diameter_message: DiameterMessage | Message, timeout=10):
         """Send request with full session management handled by SessionManager"""
@@ -53,11 +72,12 @@ class CommonThreadingApplication(ThreadingApplication):
             diameter_message.timestamp = time.time()
         self.logger.debug(f"Sending request {diameter_message.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"{diameter_message.dump()}")
-        # answer = self.session_manager.send_request_with_session_management(diameter_message, self.send_request, timeout)
-        self.session_manager.process_diameter_message(diameter_message)
+        
+        owner_id = f"{self.__class__.__name__}({self.node.origin_host})"
+        self.session_manager.process_diameter_message(diameter_message, owner=owner_id)
         answer = self.send_request(diameter_message.message, timeout)
         diameter_message_answer = DiameterMessage(answer)
-        self.session_manager.process_diameter_message(diameter_message_answer)
+        self.session_manager.process_diameter_message(diameter_message_answer, owner=owner_id)
         if not diameter_message_answer.timestamp:
             diameter_message_answer.timestamp = time.time()
         self.logger.debug(f"Received answer {diameter_message_answer.cmd_code} through node {self.node.origin_host}")

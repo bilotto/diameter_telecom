@@ -38,13 +38,15 @@ class DiameterSession:
     def __eq__(self, other) -> bool:
         return self.session_id == other.session_id
 
+    def activate(self):
+        self.active = True
+
     def start(self, timestamp: str = None):
         if not self.active:
             if timestamp:
                 self.start_time = timestamp
             else:
                 self.start_time = str(time.time())
-            self.active = True
 
     def end(self, timestamp: str = None):
         if self.active:
@@ -62,9 +64,12 @@ class DiameterSession:
             dm = DiameterMessage(message)
         else:
             raise ValueError("message must be an instance of Message or DiameterMessage")
+        if not dm.hop_by_hop_id and not dm.end_to_end_id:
+            logger.error(f"✅ [{self.session_id}] Message {dm.name} has no hop-by-hop or end-to-end ID. This is not allowed.")
+            return None
         # if not dm.timestamp:
         #     dm.timestamp = time.time()
-        dm.session_id = None
+        # dm.session_id = None
         if dm.result_code:
             self.last_result_code = dm.result_code
         self.messages.append(dm)

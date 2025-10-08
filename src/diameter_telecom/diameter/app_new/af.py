@@ -23,7 +23,7 @@ class AfRxApplication(CommonThreadingApplication):
         super().__init__(application_id=APP_3GPP_RX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         self.related_apps: List[CommonThreadingApplication] = []
 
-    def handle_request(self, message: Message):
+    def _handle_request(self, message: Message):
         pass
 
 

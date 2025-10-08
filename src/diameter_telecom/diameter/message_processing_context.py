@@ -26,6 +26,7 @@ class MessageProcessingContext:
     message: DiameterMessage
     session_id: str
     app_id: int
+    owner: Optional[str] = None  # Format: "ClassName(origin_host)"
     framed_ip_address: Optional[str] = None
     framed_ipv6_prefix: Optional[str] = None
     called_station_id: Optional[str] = None
@@ -36,6 +37,7 @@ class MessageProcessingContext:
     msisdn: Optional[str] = None
     imsi: Optional[str] = None
     result_code: Optional[int] = None
+    session_active: bool = False
     
     # Extensible data storage for pipeline stages
     _additional_data: Dict[str, Any] = field(default_factory=dict)
