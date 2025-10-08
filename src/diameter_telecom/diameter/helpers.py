@@ -143,3 +143,5 @@ def add_peer_to_node(node: Node, host: str, realm: str, port: int, ip_addresses:
     elif node.sctp_port:
         peer = node.add_peer(f"aaa://{host}:{port};transport=sctp", realm, ip_addresses=ip_addresses, is_persistent=initiate_connection)
     return peer
+
+

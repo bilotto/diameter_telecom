@@ -60,6 +60,9 @@ class SessionManager:
             clear_sessions_after_termination=self.clear_sessions_after_termination,
             statistics=self.statistics,
         )
+
+    def set_subscribers(self, subscribers: Subscribers):
+        self.subscribers = subscribers
     
     @contextmanager
     def _sessions_read_lock(self):

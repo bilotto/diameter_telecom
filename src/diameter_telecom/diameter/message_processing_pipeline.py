@@ -45,6 +45,8 @@ class MessageProcessingPipeline:
     subscribers: Subscribers
     clear_sessions_after_termination: bool = False
     save_messages_to_session: bool = True
+    save_messages_to_subscriber: bool = True
+    save_session_ids_to_subscriber: bool = True
     statistics: dict = field(default_factory=dict)
 
     def __repr__(self):
@@ -72,6 +74,7 @@ class MessageProcessingPipeline:
             if not context.session:
                 logger.debug(f"✅ [{context.owner}] Anwer without session. Returning False.")
                 return False
+            
             self.stage_parse_response(context)
         
         # self.process_app_specific_logic(context)
@@ -79,7 +82,6 @@ class MessageProcessingPipeline:
         
         session: DiameterSession = context.session
         if session and self.save_messages_to_session:
-            # session.messages.append(context.message)
             if context.message not in session.messages:
                 session.add_message(context.message)
             else:
@@ -88,6 +90,10 @@ class MessageProcessingPipeline:
             
         subscriber = context.subscriber
         if subscriber:
+            if self.save_messages_to_subscriber:
+                subscriber.add_message(context.message)
+            if self.save_session_ids_to_subscriber:
+                subscriber.add_session_id(context.app_id, context.session_id)
             context.message.subscriber = subscriber
 
         logger.debug(f"✅ [{context.owner}] Message {context.message.name} processed. Leaving session_manager.")
@@ -125,6 +131,10 @@ class MessageProcessingPipeline:
 
     def stage_parse_response(self, context: MessageProcessingContext):
         logger.debug(f"✅ [{context.owner}] Stage parse response.")
+        if context.session and not context.session.active and context.session.start_time:
+            logger.debug(f"✅ [{context.owner}] Session found and not active and has start time. Activating session.")
+            context.session.activate()
+            self.start_session(context)
         if context.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             logger.debug(f"✅ [{context.owner}] Result code not success. Setting session error.")
             context.session.error = True
@@ -147,6 +157,9 @@ class MessageProcessingPipeline:
         if session and session.active:
             context.session_active = True
             logger.debug(f"✅ [{context.owner}] Session found and active. Returning.")
+        elif session and session.start_time and not session.active:
+            context.session_active = False
+            logger.debug(f"✅ [{context.owner}] Session found with start time and started but not active. Returning.")
         else:
             context.session_active = False
             logger.debug(f"✅ [{context.owner}] Session found but not active. Returning.")

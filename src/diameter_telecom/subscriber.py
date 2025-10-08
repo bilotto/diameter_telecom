@@ -128,7 +128,8 @@ class Subscriber:
         with self._session_ids_lock:
             if not app_id in self.session_ids:
                 self.session_ids[app_id] = []
-            self.session_ids[app_id].append(session_id)
+            if session_id not in self.session_ids[app_id]:
+                self.session_ids[app_id].append(session_id)
     
     def get_session_id(self, app_id: int) -> Optional[str]:
         """Get session IDs for an application.
