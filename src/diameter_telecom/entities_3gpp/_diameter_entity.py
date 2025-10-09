@@ -1,16 +1,19 @@
-from ..diameter.app import *
-from typing import List, Callable, Optional
-from ..diameter.helpers import Node, Peer
-from diameter.message import Message
-from ..diameter.app import *
 import logging
-logger = logging.getLogger(__name__)
-from ..diameter.constants import *
-from diameter.node.peer import PEER_READY_STATES
-from typing import Dict, List
-from ..subscriber import Subscribers
+from typing import List, Callable, Optional, Dict
 
-logging.getLogger("diameter_telecom.entities_3gpp").setLevel(logging.DEBUG)
+from diameter.message import Message
+from diameter.node.peer import PEER_READY_STATES
+
+from ..constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
+from ..diameter_layer.helpers import Node, Peer
+from ..subscriber import Subscribers
+from ..app.custom_simple_threading_application import CustomSimpleThreadingApplication
+from ..app.gx import GxApplication
+from ..app.rx import RxApplication
+from ..app.sy import SyApplication
+
+# logging.getLogger("diameter_telecom.entities_3gpp").setLevel(logging.DEBUG)
+logger = logging.getLogger("diameter_telecom.entities_3gpp")
 
 def node_peer_uri(node: Node):
     if node.tcp_port:
@@ -83,7 +86,7 @@ class DiameterEntity:
         self.all_applications: Dict[int, CustomSimpleThreadingApplication] = {}
         self._setup_app_ran = False
         self.subscribers: Subscribers = None
-        logger.info(f"Initialized {type(self).__name__} entity {self.origin_host}")
+        logger.debug(f"Initialized {type(self).__name__} entity {self.origin_host}")
 
     @property
     def gx_app(self):

@@ -1,7 +1,7 @@
 from ._diameter_entity import DiameterEntity, node_peer_uri, PEER_READY_STATES
-from ..diameter.constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
-from ..diameter.app import *
-from diameter.message import Message, dump
+from ..constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
+from ..app import *
+from ..diameter_layer import Message, dump
 from typing import Callable
 import logging
 

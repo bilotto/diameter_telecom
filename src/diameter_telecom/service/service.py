@@ -1,16 +1,14 @@
-from ..diameter.app_new.common import CommonThreadingApplication
-from ..diameter.message import DiameterMessage
-from ..diameter.session_manager import SessionManager
+from ..app_new.common import CommonThreadingApplication
+from ..message import DiameterMessage
+from ..session_manager import SessionManager
 from ..apn import IpQueue, ip_to_bytes
 import time
 from typing import List, Dict, Any
-# from ..diameter.app import GxSession
-# from ..diameter.app import CreditControlRequest
 from ..subscriber import Subscriber, Subscribers
-from ..diameter.session import DiameterSession
+from ..session._diameter_session import DiameterSession
 from diameter.message import Message
 import logging
-from ..diameter.constants import *
+from ..constants import *
 logger = logging.getLogger("diameter_telecom.service")
 
 class ApplicationService:

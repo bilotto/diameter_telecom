@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 import threading
 from diameter.message.avp.grouped import SubscriptionId
-from .diameter.constants import *
-from .diameter.message import DiameterMessage
+from .constants import *
+from .message import DiameterMessage
 
 @dataclass
 class Subscriber:

@@ -1,11 +1,12 @@
-from ..diameter.app_new.af import AfRxApplication
+from ..app_new.af import AfRxApplication
 from typing import List, Callable, Dict, Optional
-from ..diameter.handle_request import handle_request_rx
-from ..diameter.constants import *
-from ..diameter.helpers import Node, Peer, create_node, node_peer_uri
+from ..diameter_layer.handle_request import handle_request_rx
+from ..diameter_layer.helpers import Node, Peer, create_node, node_peer_uri
+from ..constants import *
 from ._diameter_entity import DiameterEntity
 import logging
 from ..subscriber import Subscribers
+from ..app_new.af import AfRxApplication
 
 
 logger = logging.getLogger("diameter_telecom.entities_3gpp")

@@ -44,7 +44,7 @@ class CsvFile:
     def get_csv_columns(self):
         return self.csv_writer.fieldnames
 
-from .diameter.message import DiameterMessage
+from .message import DiameterMessage
 
 def write_to_csv(csv_file: CsvFile,
                  diameter_message: DiameterMessage,

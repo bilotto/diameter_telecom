@@ -6,7 +6,7 @@ def create_diameter_message_from_file(filename) -> DiameterMessage:
     return DiameterMessage(file_content)
 
 
-from .diameter.session._diameter_session import DiameterSession
+from .session._diameter_session import DiameterSession
 from typing import Dict
 def dump_sessions(sessions: Dict[str, DiameterSession], output_file: str) -> str:
     # Dump session_ids to file

@@ -1,12 +1,11 @@
-from ..diameter.handle_request import handle_request
 from typing import List, Optional
-from ..diameter.helpers import Node, Peer, create_node, node_peer_uri
-from diameter_telecom.diameter.app import SyApplication
-from ..diameter.constants import *
+from ..diameter_layer.helpers import Node, Peer, create_node, node_peer_uri
+from ..app.sy import SyApplication
+from ..constants import APP_3GPP_SY
 from ._diameter_entity import DiameterEntity
 import logging
 logger = logging.getLogger("diameter_telecom")
-from ..diameter.app_new.ocs import OcsSyApplication
+from ..app_new.ocs import OcsSyApplication
 from ..subscriber import Subscribers
 
 
