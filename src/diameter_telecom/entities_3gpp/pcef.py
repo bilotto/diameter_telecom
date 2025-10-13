@@ -29,7 +29,7 @@ class PCEF(DiameterEntity):
                  ip_addresses: List[str] = None,
                  tcp_port: int = None, 
                  sctp_port: int = None,
-                 vendor_ids: List[int] = None,
+                 vendor_ids: List[int] = [10415],
                  # New node injection parameter
                  node: Optional[Node] = None):
         """

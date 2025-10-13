@@ -5,7 +5,7 @@ from diameter.message.commands.aa import AaRequest
 from diameter.message.commands import SessionTerminationRequest
 
 from .. import Subscriber
-from ..constants import AAR, STR
+from ..constants import AAR, STR, APP_3GPP_RX
 from ..message import DiameterMessage, create_message
 from ..session.rx import RxSession
 from .common import CommonThreadingApplication

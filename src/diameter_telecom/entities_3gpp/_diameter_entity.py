@@ -259,12 +259,12 @@ class DiameterEntity:
                 app_dict['additional_realms'].append(realm_name)
             for peer in self.all_peers[app_id]:
                 peer_dict = dict()
-                peer_dict['node_name'] = peer.node_name
-                peer_dict['realm_name'] = peer.realm_name
+                peer_dict['peer_host'] = peer.node_name
+                peer_dict['peer_realm'] = peer.realm_name
                 peer_dict['ip_addresses'] = []
                 for ip_address in peer.ip_addresses:
                     peer_dict['ip_addresses'].append(ip_address)
-                peer_dict['port'] = peer.port
+                peer_dict['peer_port'] = peer.port
                 peer_dict['initiate_connection'] = peer.persistent
                 app_dict['peers'].append(peer_dict)
             entity_dict['applications'].append(app_dict)

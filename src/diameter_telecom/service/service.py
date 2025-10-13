@@ -1,3 +1,6 @@
+from diameter_telecom.session_manager.session_manager import SessionManager
+
+
 from ..app_new.common import CommonThreadingApplication
 from ..message import DiameterMessage
 from ..session_manager import SessionManager
@@ -24,8 +27,6 @@ class ApplicationService:
         for i in applications:
             if not isinstance(i, CommonThreadingApplication):
                 raise ValueError(f"Application {i} is not a CommonThreadingApplication")
-            # if not i:
-            #     continue
             if i.application_id in app_ids:
                 raise ValueError(f"Application ID {i.application_id} is already in the list")
             app_ids.append(i.application_id)
@@ -33,11 +34,12 @@ class ApplicationService:
         self._applications_by_id = {i.application_id: i for i in applications}
         self.diameter_config = diameter_config
         self._avps = dict()
+        self.framed_ip_address_cidr = framed_ip_address_cidr
         self.ip_queue = IpQueue(framed_ip_address_cidr)
         if not session_manager:
-            session_manager = SessionManager()
+            session_manager: SessionManager = SessionManager()
         if not subscribers:
-            subscribers = Subscribers()
+            subscribers: Subscribers = Subscribers()
         self.session_manager = session_manager
         self.subscribers = subscribers
         self.set_session_manager(session_manager)

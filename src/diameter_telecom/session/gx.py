@@ -7,6 +7,7 @@ from diameter.message.commands import CreditControlRequest, CreditControlAnswer
 from ..diameter_layer.parse_avp import *
 from ..message import DiameterMessage
 from ._diameter_session import DiameterSession
+from ..constants import *
 
 @dataclass
 class GxSession(DiameterSession):
@@ -86,14 +87,14 @@ class GxSession(DiameterSession):
             self.cc_request_number = message.cc_request_number
         else:
             pass
-        
+
         # Update rat type
         if hasattr(message, 'rat_type'):
             if not self.rat_type:
                 self.rat_type = message.rat_type
             else:
                 if self.rat_type != message.rat_type:
-                    logger.warning(f"🚨 GxSession: Rat type changed from {self.rat_type} to {message.rat_type}")
+                    self.logger.warning(f"🚨 GxSession: Rat type changed from {self.rat_type} to {message.rat_type}")
                     self.rat_type = message.rat_type
         return super().add_message(message)
 
