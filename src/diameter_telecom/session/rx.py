@@ -2,10 +2,12 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ._diameter_session import DiameterSession
+from ..constants import *
 
 
 @dataclass
 class RxSession(DiameterSession):
+    app_id: int = APP_3GPP_RX
     gx_session_id: Optional[str] = field(default=None)
 
     def set_gx_session_id(self, gx_session_id: str):

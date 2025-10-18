@@ -82,7 +82,9 @@ class CommonThreadingApplication(ThreadingApplication):
             diameter_message.timestamp = time.time()
         self.logger.debug(f"Sending request {diameter_message.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"{diameter_message.dump()}")
-        
+        message = diameter_message.message
+        if not message.header.end_to_end_identifier:  # Only if 0 (default)
+            message.header.end_to_end_identifier = self.node.end_to_end_seq.next_sequence()
         owner_id = f"{self.__class__.__name__}({self.node.origin_host})"
         self.session_manager.process_diameter_message(diameter_message, owner=owner_id)
         answer = self.send_request(diameter_message.message, timeout)

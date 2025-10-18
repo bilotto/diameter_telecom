@@ -11,6 +11,7 @@ from ..constants import *
 
 @dataclass
 class GxSession(DiameterSession):
+    app_id: int = APP_3GPP_GX
     framed_ip_address: Optional[str] = field(default=None)
     framed_ipv6_prefix: Optional[str] = field(default=None)
     called_station_id: Optional[str] = field(default=None)

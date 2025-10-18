@@ -217,7 +217,7 @@ class DiameterEntity:
     def start(self):
         if not self._setup_app_ran:
             logger.error("setup_app must be called before start")
-            return
+            raise ValueError("setup_app must be called before start")
         logger.info(f"Starting {type(self).__name__} entity {self.origin_host}")
         if not self.node.applications:
             raise ValueError("Node applications are not set")

@@ -22,7 +22,8 @@ class DiameterSession:
     bound_sessions: Dict[int, List[str]] = field(default_factory=lambda: {app_id: [] for app_id in [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]})
     last_result_code: Optional[int] = field(default=None)
     _avps: Dict[str, Any] = field(default_factory=dict, repr=False)
-    logger: logging.Logger = field(default=logger)
+    logger: logging.Logger = field(default=logger, repr=False)
+    app_id: Optional[int] = field(default=None)
 
     @property
     def avps(self) -> Dict[str, Any]:
@@ -67,8 +68,8 @@ class DiameterSession:
             dm = DiameterMessage(message)
         else:
             raise ValueError("message must be an instance of Message or DiameterMessage")
-        if not dm.hop_by_hop_id and not dm.end_to_end_id:
-            logger.error(f"✅ [{self.session_id}] Message {dm.name} has no hop-by-hop or end-to-end ID. This is not allowed.")
+        if not dm.end_to_end_id:
+            logger.error(f"✅ [{self.session_id}] Message {dm.name} has no end-to-end identifier. This is not allowed.")
             return None
         # if not dm.timestamp:
         #     dm.timestamp = time.time()

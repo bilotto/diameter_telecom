@@ -1,3 +1,4 @@
+from diameter_telecom.app_new.common import CommonThreadingApplication
 from diameter_telecom.session_manager.session_manager import SessionManager
 
 
@@ -133,6 +134,17 @@ class ApplicationService:
             if hasattr(request, key):
                 setattr(request, key, value)
         return app.send_request_custom(request)
+
+    def start_diameter_session(self, session: DiameterSession):
+        """
+        This method is a easier way to start a diameter session. The method will identify the app_id by the DiameterSession object.
+        Args:
+            session: DiameterSession object
+        Returns:
+            DiameterSession object
+        """
+        app_id = session.app_id
+        return self.start_session(app_id, session)
 
     def update_session(self, app_id: int, session: DiameterSession, avps_list: List[Dict[str, Any]] = None):
         app = self._applications_by_id.get(app_id)
