@@ -9,6 +9,8 @@ from ..diameter_layer.handle_request import handle_request
 from ..app_new.pcef import PcefGxApplication
 from ._diameter_entity import DiameterEntity
 from .ip_queue import IpQueue
+from ..subscriber import Subscribers
+from ..session_manager.session_manager import SessionManager
 
 logger = logging.getLogger("diameter_telecom.entities_3gpp")
 
@@ -55,6 +57,8 @@ class PCEF(DiameterEntity):
         )
 
         self.ip_queue = IpQueue("10.10.0.0/16")
+        self.subscribers: Subscribers = None
+        self.session_manager: SessionManager = None
         # PCEF-specific initialization: add its own realm to Gx  
         # self.add_gx_realm(self.realm_name)
 

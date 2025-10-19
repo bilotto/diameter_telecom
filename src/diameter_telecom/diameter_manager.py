@@ -60,6 +60,7 @@ class DiameterManager:
     session_manager: SessionManager = field(default_factory=SessionManager)
     subscribers: Subscribers = field(default_factory=Subscribers)
     _nodes: Dict[str, DiameterEntity] = field(default_factory=dict)
+    
 
     def create_pcef(self, origin_host: str, realm_name: str, ip_addresses: List[str], tcp_port: int, sctp_port: int = None, vendor_ids: List[int] = [10415]) -> PCEF:
         pcef = PCEF(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
@@ -95,6 +96,12 @@ class DiameterManager:
 
     def start(self):
         nodes_to_start: List[Node] = [entity.node for entity in self._nodes.values()]
+        for i in nodes_to_start:
+            for app in i.applications:
+                if hasattr(app, 'set_session_manager'):
+                    app.set_session_manager(self.session_manager)
+                if hasattr(app, 'set_subscribers'):
+                    app.set_subscribers(self.subscribers)
         startup_order = define_node_startup_order(nodes_to_start)
         for node in startup_order:
             self._nodes[node].start()

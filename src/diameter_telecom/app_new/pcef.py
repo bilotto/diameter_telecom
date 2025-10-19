@@ -1,7 +1,7 @@
 from typing import List
 
 from diameter.message import Message
-from diameter.message.commands import CreditControlRequest
+from diameter.message.commands import CreditControlRequest, ReAuthRequest, ReAuthAnswer
 from diameter.message.constants import *
 
 from .. import Subscriber
@@ -20,7 +20,16 @@ class PcefGxApplication(CommonThreadingApplication):
         self.related_apps: List[CommonThreadingApplication] = []
 
     def _handle_request(self, message: Message):
-        pass
+        # Receives the RAR from PCRF
+        answer: ReAuthAnswer = message.to_answer()
+        answer.session_id = message.session_id
+        answer.origin_host = self.node.origin_host.encode()
+        answer.origin_realm = self.node.realm_name.encode()
+        answer.destination_realm = message.origin_realm
+        answer.destination_host = message.origin_host
+        answer.auth_application_id = APP_3GPP_GX
+        answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
+        return answer
 
     def create_session(self, subscriber: Subscriber) -> GxSession:
         session_id = self.node.session_generator.next_id()
@@ -34,6 +43,7 @@ class PcefGxApplication(CommonThreadingApplication):
         request.header.application_id = APP_3GPP_GX
         request.session_id = session.session_id
         for k, v in self.avps.items():
+            self.logger.debug(f"First layer of AVPS (app.avps): {k} = {v}")
             setattr(request, k, v)
         request.service_context_id = "test"
         if message_name == CCR_I:
@@ -46,6 +56,7 @@ class PcefGxApplication(CommonThreadingApplication):
             request.cc_request_number = 1
             request.cc_request_type = E_CC_REQUEST_TYPE_TERMINATION_REQUEST
         for key, value in session.avps.items():
+            self.logger.debug(f"Second layer of AVPS (session.avps): {key} = {value}")
             if hasattr(request, key):
                 setattr(request, key, value)
         return request

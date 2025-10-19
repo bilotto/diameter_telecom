@@ -24,6 +24,8 @@ class DiameterSession:
     _avps: Dict[str, Any] = field(default_factory=dict, repr=False)
     logger: logging.Logger = field(default=logger, repr=False)
     app_id: Optional[int] = field(default=None)
+    origin_host: Optional[str] = field(default=None)
+    origin_realm: Optional[str] = field(default=None)
 
     @property
     def avps(self) -> Dict[str, Any]:
@@ -69,8 +71,11 @@ class DiameterSession:
         else:
             raise ValueError("message must be an instance of Message or DiameterMessage")
         if not dm.end_to_end_id:
-            logger.error(f"✅ [{self.session_id}] Message {dm.name} has no end-to-end identifier. This is not allowed.")
-            return None
+            logger.warning(f"[{self.session_id}] (add_message) Message {dm.name} has no end-to-end identifier. This is not allowed.")
+            pass
+        if self.n_messages == 0:
+            self.origin_host = dm.message.origin_host
+            self.origin_realm = dm.message.origin_realm
         # if not dm.timestamp:
         #     dm.timestamp = time.time()
         # dm.session_id = None
