@@ -248,6 +248,9 @@ class DiameterEntity:
         logger.info(f"{type(self).__name__} entity {self.origin_host} is ready")
 
     def to_dict(self):
+        entity_dict_ = dict()
+        entity_type = type(self).__name__
+        entity_dict_[entity_type] = dict()
         entity_dict = dict()
         entity_dict['origin_host'] = self.node.origin_host
         entity_dict['realm_name'] = self.node.realm_name
@@ -277,4 +280,5 @@ class DiameterEntity:
                 peer_dict['initiate_connection'] = peer.persistent
                 app_dict['peers'].append(peer_dict)
             entity_dict['applications'].append(app_dict)
-        return entity_dict
+        entity_dict_[entity_type] = entity_dict
+        return entity_dict_
