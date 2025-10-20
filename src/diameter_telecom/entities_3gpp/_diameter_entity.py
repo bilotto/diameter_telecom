@@ -6,11 +6,13 @@ from diameter.node.peer import PEER_READY_STATES
 
 from ..constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
 from ..diameter_layer.helpers import Node, Peer
-from ..subscriber import Subscribers
 from ..app.custom_simple_threading_application import CustomSimpleThreadingApplication
 from ..app.gx import GxApplication
 from ..app.rx import RxApplication
 from ..app.sy import SyApplication
+
+from ..subscriber import Subscribers
+from ..session_manager.session_manager import SessionManager
 
 # logging.getLogger("diameter_telecom.entities_3gpp").setLevel(logging.DEBUG)
 logger = logging.getLogger("diameter_telecom.entities_3gpp")
@@ -85,6 +87,7 @@ class DiameterEntity:
         self.all_realms: Dict[int, List[str]] = {}
         self.all_applications: Dict[int, CustomSimpleThreadingApplication] = {}
         self._setup_app_ran = False
+        self.session_manager: SessionManager = None
         self.subscribers: Subscribers = None
         logger.debug(f"Initialized {type(self).__name__} entity {self.origin_host}")
 
@@ -139,6 +142,12 @@ class DiameterEntity:
     @property
     def sy_realms(self):
         return self.all_realms.get(APP_3GPP_SY, [])
+
+    def set_session_manager(self, session_manager: SessionManager):
+        self.session_manager = session_manager
+
+    def set_subscribers(self, subscribers: Subscribers):
+        self.subscribers = subscribers
 
     def add_node_as_peer(self, node_: Node, app_id: int, initiate_connection: bool = False):
         app_id = int(app_id)
@@ -217,7 +226,7 @@ class DiameterEntity:
     def start(self):
         if not self._setup_app_ran:
             logger.error("setup_app must be called before start")
-            return
+            raise ValueError("setup_app must be called before start")
         logger.info(f"Starting {type(self).__name__} entity {self.origin_host}")
         if not self.node.applications:
             raise ValueError("Node applications are not set")
@@ -239,6 +248,9 @@ class DiameterEntity:
         logger.info(f"{type(self).__name__} entity {self.origin_host} is ready")
 
     def to_dict(self):
+        entity_dict_ = dict()
+        entity_type = type(self).__name__
+        entity_dict_[entity_type] = dict()
         entity_dict = dict()
         entity_dict['origin_host'] = self.node.origin_host
         entity_dict['realm_name'] = self.node.realm_name
@@ -268,4 +280,5 @@ class DiameterEntity:
                 peer_dict['initiate_connection'] = peer.persistent
                 app_dict['peers'].append(peer_dict)
             entity_dict['applications'].append(app_dict)
-        return entity_dict
+        entity_dict_[entity_type] = entity_dict
+        return entity_dict_

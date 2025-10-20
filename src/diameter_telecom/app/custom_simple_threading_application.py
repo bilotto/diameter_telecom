@@ -7,6 +7,7 @@ from typing import Dict, Optional
 import logging
 logger = logging.getLogger(__name__)
 from ..session_manager import SessionManager
+from ..app_context import get_session_manager
 
 class CustomSimpleThreadingApplication(SimpleThreadingApplication):
     def __init__(self, application_id,
@@ -17,10 +18,14 @@ class CustomSimpleThreadingApplication(SimpleThreadingApplication):
                  session_manager: SessionManager = None,
                  ):
         super().__init__(application_id, is_acct_application, is_auth_application, max_threads, request_handler)
-        self.session_manager = session_manager if session_manager else SessionManager()
+        self.session_manager = session_manager if session_manager else get_session_manager()
+        if hasattr(self.session_manager, 'register_owner'):
+            self.session_manager.register_owner(self)
 
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
+        if hasattr(self.session_manager, 'register_owner'):
+            self.session_manager.register_owner(self)
 
     # Note: Session and subscriber management methods are available directly through:
     # - self.session_manager.sessions.* for session operations

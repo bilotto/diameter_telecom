@@ -14,7 +14,7 @@ def handle_request_dsc(app, message: Message):
     destination_host = message.destination_host
     destination_realm = message.destination_realm
     logger.info(f"Received message {message} from {origin_realm} to {destination_realm}")
-    logger.debug(dump(message))
+    logger.debug(f"\n{dump(message)}")
     message.route_record.append(origin_host)
     answer = app.send_request(message)
     return answer

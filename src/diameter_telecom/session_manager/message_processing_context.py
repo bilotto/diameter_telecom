@@ -26,7 +26,7 @@ class MessageProcessingContext:
     message: DiameterMessage
     session_id: str
     app_id: int
-    owner: Optional[str] = None  # Format: "ClassName(origin_host)"
+    owner_app: Optional[Any] = None  # Reference to the application object that processed this message
     framed_ip_address: Optional[str] = None
     framed_ipv6_prefix: Optional[str] = None
     called_station_id: Optional[str] = None

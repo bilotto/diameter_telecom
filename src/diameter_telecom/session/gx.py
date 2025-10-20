@@ -11,6 +11,7 @@ from ..constants import *
 
 @dataclass
 class GxSession(DiameterSession):
+    app_id: int = APP_3GPP_GX
     framed_ip_address: Optional[str] = field(default=None)
     framed_ipv6_prefix: Optional[str] = field(default=None)
     called_station_id: Optional[str] = field(default=None)
@@ -51,11 +52,11 @@ class GxSession(DiameterSession):
 
         # Add active event triggers to session
         if diameter_message.name in [CCA_I, CCA_U, RAR]:
-            if message.event_trigger:
+            if hasattr(message, 'event_trigger') and message.event_trigger:
                 for event_trigger in message.event_trigger:
                     if event_trigger not in self.event_trigger:
                         self.event_trigger.append(event_trigger)
-            if message.charging_rule_install:
+            if hasattr(message, 'charging_rule_install') and message.charging_rule_install:
                 if not isinstance(message.charging_rule_install, list):
                     message.charging_rule_install = [message.charging_rule_install]
                 for charging_rule_install in message.charging_rule_install:

@@ -5,8 +5,10 @@ from ..diameter_layer.helpers import Node, Peer, create_node, node_peer_uri
 from ..constants import *
 from ._diameter_entity import DiameterEntity
 import logging
-from ..subscriber import Subscribers
 from ..app_new.af import AfRxApplication
+from ..subscriber import Subscribers
+from ..session_manager.session_manager import SessionManager
+
 
 
 logger = logging.getLogger("diameter_telecom.entities_3gpp")
@@ -57,6 +59,8 @@ class AF(DiameterEntity):
         )
         # AF-specific initialization: add its own realm to Rx
         # self.add_rx_realm(self.realm_name)
+        self.subscribers: Subscribers = None
+        self.session_manager: SessionManager = None
 
     def setup_app(self, app_id: int, max_threads):
         # logger.info(f"{type(self).__name__} setting up app {app_id} with max_threads {max_threads} and request_handler {request_handler}")

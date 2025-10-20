@@ -7,6 +7,7 @@ import logging
 logger = logging.getLogger("diameter_telecom")
 from ..app_new.ocs import OcsSyApplication
 from ..subscriber import Subscribers
+from ..session_manager.session_manager import SessionManager
 
 
 class OCS(DiameterEntity):
@@ -53,6 +54,8 @@ class OCS(DiameterEntity):
             vendor_ids=vendor_ids,
             node=node
         )
+        self.subscribers: Subscribers = None
+        self.session_manager: SessionManager = None
 
 
     def setup_app(self, app_id: int, max_threads):

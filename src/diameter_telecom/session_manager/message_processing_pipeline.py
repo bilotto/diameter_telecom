@@ -318,7 +318,7 @@ class MessageProcessingPipeline:
         # Method 2: Try subscriber session_ids lookup
         subscriber = context.subscriber
         if subscriber:
-            gx_session_id = subscriber.session_ids.get(APP_3GPP_GX)
+            gx_session_id = subscriber.session_ids.get(APP_3GPP_GX)[0]
             if gx_session_id:
                 gx_session = self.sessions.get_session_by_id(APP_3GPP_GX, gx_session_id)
                 if gx_session:

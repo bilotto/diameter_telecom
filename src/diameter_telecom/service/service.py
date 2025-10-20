@@ -1,18 +1,21 @@
-from diameter_telecom.session_manager.session_manager import SessionManager
-
-
+# from diameter_telecom.app_new.common import CommonThreadingApplication
+# from diameter_telecom.session_manager.session_manager import SessionManager
 from ..app_new.common import CommonThreadingApplication
 from ..message import DiameterMessage
 from ..session_manager import SessionManager
+from ..app_context import get_session_manager
 from ..apn import IpQueue, ip_to_bytes
-import time
 from typing import List, Dict, Any
 from ..subscriber import Subscriber, Subscribers
 from ..session._diameter_session import DiameterSession
+from ..session.gx import GxSession
+from ..session.rx import RxSession
+from ..session.sy import SySession
 from diameter.message import Message
 import logging
 from ..constants import *
 logger = logging.getLogger("diameter_telecom.service")
+import time
 
 class ApplicationService:
     """
@@ -37,13 +40,17 @@ class ApplicationService:
         self.framed_ip_address_cidr = framed_ip_address_cidr
         self.ip_queue = IpQueue(framed_ip_address_cidr)
         if not session_manager:
-            session_manager: SessionManager = SessionManager()
+            session_manager = get_session_manager()
         if not subscribers:
-            subscribers: Subscribers = Subscribers()
+            subscribers = session_manager.subscribers
         self.session_manager = session_manager
         self.subscribers = subscribers
         self.set_session_manager(session_manager)
         self.set_subscribers(subscribers)
+        # Register the service's applications as owners (service itself is not an owner)
+        if hasattr(self.session_manager, 'register_owner'):
+            for i in self.applications:
+                self.session_manager.register_owner(i)
         for i in self.applications:
             for j in self.applications:
                 if i.application_id != j.application_id:
@@ -79,22 +86,37 @@ class ApplicationService:
 
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
+        self.subscribers = session_manager.subscribers
         for i in self.applications:
             i.set_session_manager(session_manager)
+            if hasattr(self.session_manager, 'register_owner'):
+                self.session_manager.register_owner(i)
 
     def set_subscribers(self, subscribers: Subscribers):
-        self.subscribers = subscribers
+        # Delegate to session manager to keep single source of truth
+        if hasattr(self.session_manager, 'set_subscribers'):
+            self.session_manager.set_subscribers(subscribers)
+        self.subscribers = self.session_manager.subscribers
         for i in self.applications:
-            i.set_subscribers(subscribers)
+            i.set_subscribers(self.subscribers)
 
     # delegates to the application
     def create_session(self, app_id: int, subscriber: Subscriber) -> DiameterSession:
-        app = self._applications_by_id.get(app_id)
+        app: CommonThreadingApplication = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_session"):
             raise ValueError(f"Application {app_id} does not have a create_session method")
         return app.create_session(subscriber)
+
+    def create_gx_session(self, subscriber: Subscriber) -> GxSession:
+        return self.create_session(APP_3GPP_GX, subscriber)
+
+    def create_rx_session(self, subscriber: Subscriber) -> RxSession:
+        return self.create_session(APP_3GPP_RX, subscriber)
+
+    def create_sy_session(self, subscriber: Subscriber) -> SySession:
+        return self.create_session(APP_3GPP_SY, subscriber)
 
     def _create_request(self, app_id: int, session: DiameterSession, goal: str = "create") -> Message:
         if goal not in ["create", "update", "terminate"]:
@@ -112,6 +134,8 @@ class ApplicationService:
             return app.create_request(app.MESSAGE_UPDATE_SESSION, session)
         elif goal == "terminate":
             return app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
+        elif goal == "refresh":
+            return app.create_request(app.MESSAGE_REFRESH_SESSION, session)
 
     def start_session(self, app_id: int, session: DiameterSession):
         app = self._applications_by_id.get(app_id)
@@ -129,10 +153,21 @@ class ApplicationService:
         # destination_realm = self.diameter_config.get("destination_realm", app.node.realm_name)
         # request.destination_realm = destination_realm.encode()
         for key, value in self.get_avps(app_id).items():
-            logger.debug(f"Updating session {session.session_id} with AVPS: {key} = {value}")
+            logger.debug(f"Third layer of AVPS (service): {key} = {value}")
             if hasattr(request, key):
                 setattr(request, key, value)
         return app.send_request_custom(request)
+
+    def start_diameter_session(self, session: DiameterSession):
+        """
+        This method is a easier way to start a diameter session. The method will identify the app_id by the DiameterSession object.
+        Args:
+            session: DiameterSession object
+        Returns:
+            DiameterSession object
+        """
+        app_id = session.app_id
+        return self.start_session(app_id, session)
 
     def update_session(self, app_id: int, session: DiameterSession, avps_list: List[Dict[str, Any]] = None):
         app = self._applications_by_id.get(app_id)
@@ -166,7 +201,15 @@ class ApplicationService:
             if hasattr(request, key):
                 setattr(request, key, value)
         return app.send_request_custom(request)
-
+                
+    def refresh_session(self, app_id: int, session: DiameterSession):
+        app = self._applications_by_id.get(app_id)
+        if not app:
+            raise ValueError(f"Application ID {app_id} not found")
+        if not hasattr(app, "create_request"):
+            raise ValueError(f"Application {app_id} does not have a refresh_session method")
+        request = self._create_request(app_id, session, goal="refresh")
+        return app.send_request_custom(request)
 
     def start(self):
         for i in self.applications:

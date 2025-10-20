@@ -4,7 +4,7 @@ from .sessions import Sessions
 from .message_processing_pipeline import MessageProcessingPipeline
 from .message_processing_context import MessageProcessingContext
 from ..csv_file import CsvFile
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
 import threading
 import time
@@ -43,6 +43,9 @@ class SessionManager:
     statistics: dict = field(default_factory=dict, repr=False)
     pipeline: MessageProcessingPipeline = field(init=False, repr=False)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8], repr=True)
+    
+    # Registry of applications using this SessionManager
+    owners: Dict[str, Any] = field(default_factory=dict, repr=False)  # key: "ClassName(origin_host)", value: app object
 
     # Options
     clear_sessions_after_termination: bool = field(default=True, repr=False)
@@ -52,6 +55,7 @@ class SessionManager:
     _subscribers_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _messages_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _csv_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    _owners_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
 
     def __post_init__(self):
         """Initialize the message processing pipeline"""
@@ -119,11 +123,20 @@ class SessionManager:
             yield
         finally:
             self._csv_lock.release()
+    
+    @contextmanager
+    def _owners_lock_context(self):
+        """Context manager for owners registry operations."""
+        self._owners_lock.acquire()
+        try:
+            yield
+        finally:
+            self._owners_lock.release()
 
     # def get_messages(self):
     #     return sorted(self.messages, key=lambda x: x.timestamp if x.timestamp else float('inf'))
 
-    def process_diameter_message(self, dm: DiameterMessage, owner: Optional[str] = None) -> Optional[MessageProcessingContext]:
+    def process_diameter_message(self, dm: DiameterMessage, owner_app: Optional[Any] = None) -> Optional[MessageProcessingContext]:
         """Main entry point for processing Diameter messages.
         
         This method orchestrates the message processing by delegating to the
@@ -131,17 +144,24 @@ class SessionManager:
         
         Args:
             dm: The Diameter message to process
-            owner: Optional owner identifier in format "ClassName(origin_host)"
+            owner_app: Optional reference to the application object that processed this message
         
         Returns:
             Optional[MessageProcessingContext]: The processing context containing all processed data,
             or None if the message was filtered out
         """
-
         context: MessageProcessingContext = MessageProcessingContext.from_diameter_message(dm)
-        context.owner = owner
+        context.owner_app = owner_app
+        
+        # Register the owner if provided
+        if owner_app:
+            self._register_owner(owner_app)
+            context.owner = f"{owner_app.__class__.__name__}({owner_app.node.origin_host})"
+        else:
+            context.owner = "Unknown"
+        
         # logger.info(f"Processing {dm.name} - {dm.session_id}")
-        logger.info(f"[{owner}] Processing {dm.name} - {dm.session_id}")
+        logger.info(f"[{context.owner}] Processing {dm.name} - {dm.session_id}")
         result = self.pipeline.main_pipeline(context)
         if not result:
             return None
@@ -177,9 +197,6 @@ class SessionManager:
         except Exception as e:
             logger.error(f"Error auto-writing to CSV for message {context.message.name if context.message else 'unknown'} - {context.session_id}: {e}")
             return False
-    
-
-
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
         if not diameter_message.timestamp:
@@ -312,5 +329,112 @@ class SessionManager:
         except Exception as e:
             logger.exception("Failed to calculate session manager statistics")
             return {"error": f"Statistics calculation failed: {str(e)}"}
+
+    def _register_owner(self, owner_app: Any):
+        """Register an application as an owner of this SessionManager.
+        
+        Args:
+            owner_app: The application object to register
+        """
+        if not owner_app:
+            return
+        # Build a robust owner key even if node/origin_host isn't set yet
+        origin_host = None
+        try:
+            if hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host'):
+                origin_host = owner_app.node.origin_host
+        except Exception:
+            origin_host = None
+        if not origin_host:
+            # Fallback to application_id if present, else a short id
+            fallback = getattr(owner_app, 'application_id', None)
+            origin_host = fallback if fallback is not None else hex(id(owner_app))
+        owner_key = f"{owner_app.__class__.__name__}({origin_host})"
+        
+        with self._owners_lock_context():
+            self.owners[owner_key] = owner_app
+            logger.debug(f"Registered owner: {owner_key}")
+
+    def register_owner(self, owner_app: Any):
+        """Public method to register an owner application."""
+        self._register_owner(owner_app)
+
+    def get_owner(self, owner_key: str) -> Optional[Any]:
+        """Get an owner application by its key.
+        
+        Args:
+            owner_key: The owner key in format "ClassName(origin_host)"
+            
+        Returns:
+            The application object if found, None otherwise
+        """
+        with self._owners_lock_context():
+            return self.owners.get(owner_key)
+
+    def get_owners_by_class(self, class_name: str) -> List[Any]:
+        """Get all owners of a specific class.
+        
+        Args:
+            class_name: The class name to search for (e.g., "PcrfGxApplication")
+            
+        Returns:
+            List of application objects of the specified class
+        """
+        with self._owners_lock_context():
+            matching_owners = []
+            for owner_key, owner_app in self.owners.items():
+                if owner_app.__class__.__name__ == class_name:
+                    matching_owners.append(owner_app)
+            return matching_owners
+
+    def get_owners_by_app_id(self, app_id: int) -> List[Any]:
+        """Get all owners with a specific application ID.
+        
+        Args:
+            app_id: The application ID to search for
+            
+        Returns:
+            List of application objects with the specified app_id
+        """
+        with self._owners_lock_context():
+            matching_owners = []
+            for owner_key, owner_app in self.owners.items():
+                if hasattr(owner_app, 'application_id') and owner_app.application_id == app_id:
+                    matching_owners.append(owner_app)
+            return matching_owners
+
+    def get_all_owners(self) -> Dict[str, Any]:
+        """Get all registered owners.
+        
+        Returns:
+            Dictionary of owner_key -> owner_app mappings
+        """
+        with self._owners_lock_context():
+            return self.owners.copy()
+
+    def remove_owner(self, owner_key: str) -> bool:
+        """Remove an owner from the registry.
+        
+        Args:
+            owner_key: The owner key to remove
+            
+        Returns:
+            True if the owner was removed, False if not found
+        """
+        with self._owners_lock_context():
+            if owner_key in self.owners:
+                del self.owners[owner_key]
+                logger.debug(f"Removed owner: {owner_key}")
+                return True
+            return False
+
+    def get_owner_count(self) -> int:
+        """Get the number of registered owners.
+        
+        Returns:
+            Number of registered owners
+        """
+        with self._owners_lock_context():
+            return len(self.owners)
 
 

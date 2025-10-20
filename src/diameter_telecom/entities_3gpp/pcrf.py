@@ -10,6 +10,7 @@ import logging
 logger = logging.getLogger("diameter_telecom.entities_3gpp")
 from ..app_new.pcrf import PcrfGxApplication, PcrfRxApplication, PcrfSyApplication
 from ..subscriber import Subscribers
+from ..session_manager.session_manager import SessionManager
 
 
 class PCRF(DiameterEntity):
@@ -55,6 +56,8 @@ class PCRF(DiameterEntity):
             vendor_ids=vendor_ids,
             node=node
         )
+        self.subscribers: Subscribers = None
+        self.session_manager: SessionManager = None
         # PCRF-specific initialization: add its own realm to all applications it supports
         # self.add_gx_realm(self.realm_name)  # For PCEF communication
         # self.add_rx_realm(self.realm_name)  # For AF communication  
