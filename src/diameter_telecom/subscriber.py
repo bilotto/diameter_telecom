@@ -38,10 +38,15 @@ class Subscriber:
     imei: str = field(default=None, repr=False)
     apn: str = field(default=None, repr=False)
     messages: List[DiameterMessage] = field(default_factory=list, repr=False)
-    session_ids: Dict[int, List[str]] = field(default_factory=dict, repr=False)
-    _session_ids_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    sessions: Dict[int, List[str]] = field(default_factory=dict, repr=True)
+    _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _avps: Dict[str, str] = field(default_factory=dict, repr=False)
     carrier_name: str = field(default=None, repr=False)
+    # We will replace sessions with sessions
+
+    @property
+    def session_ids(self) -> Dict[int, List[str]]:
+        return self.sessions
 
     @property
     def avps(self) -> Dict[str, str]:
@@ -111,34 +116,18 @@ class Subscriber:
         return subscription_id
 
     def add_message(self, message: DiameterMessage):
-        """
-        Add a Diameter message to the subscriber's message history.
-        
-        Args:
-            message: The DiameterMessage to add to the subscriber's history
-        """
         self.messages.append(message)
 
     def add_session_id(self, app_id: int, session_id: str):
-        """Add a session ID for an application.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
-        with self._session_ids_lock:
-            if not app_id in self.session_ids:
-                self.session_ids[app_id] = []
-            if session_id not in self.session_ids[app_id]:
-                self.session_ids[app_id].append(session_id)
+        with self._sessions_lock:
+            if not app_id in self.sessions:
+                self.sessions[app_id] = []
+            if session_id not in self.sessions[app_id]:
+                self.sessions[app_id].append(session_id)
     
     def get_session_id(self, app_id: int) -> Optional[str]:
-        """Get session IDs for an application.
-        
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
-        with self._session_ids_lock:
-            return self.session_ids.get(app_id, []).copy()
+        with self._sessions_lock:
+            return self.sessions.get(app_id, []).copy()
 
     def to_dict(self) -> dict:
         subscriber_data = dict()
@@ -155,7 +144,7 @@ class Subscriber:
             subscriber_data['imei'] = self.imei
         # if self.apn:
         #     subscriber_data['apn'] = self.apn.to_dict()
-        subscriber_data['session_ids'] = self.session_ids
+        subscriber_data['sessions'] = self.sessions
         # subscriber_data['message_count'] = len(self.messages)
         # subscriber_data['sample_messages'] = [msg.to_dict() for msg in self.messages[:3]]
         return subscriber_data

@@ -129,15 +129,20 @@ class ApplicationService:
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a create_request method")
         if goal == "create":
-            return app.create_request(app.MESSAGE_CREATE_SESSION, session)
+            request = app.create_request(app.MESSAGE_CREATE_SESSION, session)
         elif goal == "update":
-            return app.create_request(app.MESSAGE_UPDATE_SESSION, session)
+            request = app.create_request(app.MESSAGE_UPDATE_SESSION, session)
         elif goal == "terminate":
-            return app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
+            request = app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
         elif goal == "refresh":
-            return app.create_request(app.MESSAGE_REFRESH_SESSION, session)
+            request = app.create_request(app.MESSAGE_REFRESH_SESSION, session)
+        # for key, value in app.avps.items():
+        #     logger.debug(f"First layer of AVPS (app): {key} = {value}")
+        #     if hasattr(request, key):
+        #         setattr(request, key, value)
+        return request
 
-    def start_session(self, app_id: int, session: DiameterSession):
+    def start_session(self, app_id: int, session: DiameterSession, request: Message = None):
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
@@ -148,36 +153,59 @@ class ApplicationService:
         if not isinstance(session, DiameterSession):
             raise ValueError(f"Session is not a DiameterSession")
         # request: Message = app.create_request(app.MESSAGE_CREATE_SESSION, session)
-        request = self._create_request(app_id, session, goal="create")
-        # avps = self._avps.get(app_id, {})
-        # destination_realm = self.diameter_config.get("destination_realm", app.node.realm_name)
-        # request.destination_realm = destination_realm.encode()
+        if not request:
+            request = self._create_request(app_id, session, goal="create")
+        for key, value in app.avps.items():
+            logger.debug(f"First layer of AVPS (application): {key} = {value}")
+            if hasattr(request, key):
+                setattr(request, key, value)
+        for key, value in session.avps.items():
+            logger.debug(f"Second layer of AVPS (session): {key} = {value}")
+            if hasattr(request, key):
+                setattr(request, key, value)
         for key, value in self.get_avps(app_id).items():
             logger.debug(f"Third layer of AVPS (service): {key} = {value}")
             if hasattr(request, key):
                 setattr(request, key, value)
-        return app.send_request_custom(request)
+        for key, value in session.subscriber.avps.items():
+            logger.debug(f"Fourth layer of AVPS (subscriber): {key} = {value}")
+            if hasattr(request, key):
+                setattr(request, key, value)
+        answer = app.send_request_custom(request)
+        time.sleep(1)
+        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+            self.logger.error(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
+            self.terminate_session(app_id, session)
+            raise ValueError(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        return session
 
     def start_diameter_session(self, session: DiameterSession):
-        """
-        This method is a easier way to start a diameter session. The method will identify the app_id by the DiameterSession object.
-        Args:
-            session: DiameterSession object
-        Returns:
-            DiameterSession object
-        """
         app_id = session.app_id
         return self.start_session(app_id, session)
 
-    def update_session(self, app_id: int, session: DiameterSession, avps_list: List[Dict[str, Any]] = None):
+    def update_session(self, app_id: int, session: DiameterSession, avps_list: List[Dict[str, Any]] = None, request: Message = None):
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a update_session method")
         # request: Message = app.create_request(app.MESSAGE_UPDATE_SESSION, session)
-        request = self._create_request(app_id, session, goal="update")
+        if not request:
+            request = self._create_request(app_id, session, goal="update")
+        for key, value in app.avps.items():
+            logger.debug(f"First layer of AVPS (application): {key} = {value}")
+            if hasattr(request, key):
+                setattr(request, key, value)
+        for key, value in session.avps.items():
+            logger.debug(f"Second layer of AVPS (session): {key} = {value}")
+            if hasattr(request, key):
+                setattr(request, key, value)
         for key, value in self.get_avps(app_id).items():
+            logger.debug(f"Third layer of AVPS (service): {key} = {value}")
+            if hasattr(request, key):
+                setattr(request, key, value)
+        for key, value in session.subscriber.avps.items():
+            logger.debug(f"Fourth layer of AVPS (subscriber): {key} = {value}")
             if hasattr(request, key):
                 setattr(request, key, value)
         if avps_list:
@@ -186,7 +214,13 @@ class ApplicationService:
                 avp_value = i.get("value")
                 if hasattr(request, avp_name):
                     setattr(request, avp_name, avp_value)
-        return app.send_request_custom(request)
+        # return app.send_request_custom(request)
+        answer = app.send_request_custom(request)
+        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+            self.logger.error(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
+            self.terminate_session(app_id, session)
+            raise ValueError(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        return session
 
     def terminate_session(self, app_id: int, session: DiameterSession):
         app = self._applications_by_id.get(app_id)
@@ -197,10 +231,12 @@ class ApplicationService:
         # request: Message = app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
         request = self._create_request(app_id, session, goal="terminate")
         for key, value in self.get_avps(app_id).items():
-            print(key, value)
             if hasattr(request, key):
                 setattr(request, key, value)
-        return app.send_request_custom(request)
+        answer = app.send_request_custom(request)
+        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+            self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        return session
                 
     def refresh_session(self, app_id: int, session: DiameterSession):
         app = self._applications_by_id.get(app_id)

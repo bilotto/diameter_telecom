@@ -1,3 +1,5 @@
+from diameter.node.application import Application
+
 from ._diameter_entity import DiameterEntity, node_peer_uri, PEER_READY_STATES
 from ..constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
 from ..app import *
@@ -7,16 +9,28 @@ import logging
 
 logger = logging.getLogger("diameter_telecom.entities_3gpp.dsc")
 
-def handle_request_dsc(app, message: Message):
+def handle_request_dsc(app: Application, message: Message):
     """DSC-specific request handler for routing messages."""
-    origin_host = message.origin_host
-    origin_realm = message.origin_realm
-    destination_host = message.destination_host
-    destination_realm = message.destination_realm
-    logger.info(f"Received message {message} from {origin_realm} to {destination_realm}")
-    logger.debug(f"\n{dump(message)}")
-    message.route_record.append(origin_host)
+    message.route_record.append(message.origin_host)
+    logger.debug("Routing message to application")
+    origin_host = message.origin_host.decode()
+    origin_realm = message.origin_realm.decode()
+    destination_host = message.destination_host.decode()
+    destination_realm = message.destination_realm.decode()
+    if peer := app.node.peers.get(destination_host):
+        logger.debug(f"Peer {destination_host} found. Routing message to it")
+        if destination_realm == peer.realm_name:
+            logger.debug(f"Destination realm {destination_realm} matches peer realm {peer.realm_name}. Routing message to it")
+        else:
+            logger.error(f"Destination realm {destination_realm} does not match peer realm {peer.realm_name}. Routing message to it")
+        # logger.error(f"Peer {destination_host} not found. Trying anyway")
+
+    logger.debug(f"DSC Request: \n{dump(message)}")
+    # This routes the request to the next application
     answer = app.send_request(message)
+
+    logger.debug("Sending answer to destination")
+    logger.debug(f"DSC Answer: \n{dump(answer)}")
     return answer
 
 class DSC(DiameterEntity):

@@ -78,6 +78,7 @@ class AF(DiameterEntity):
         return app
         
     def setup_rx_app(self, max_threads: int = 10):
+        self.add_rx_realm(self.realm_name)
         self.setup_app(APP_3GPP_RX, max_threads)
 
     def setup_apps(self, max_threads: int = 10):

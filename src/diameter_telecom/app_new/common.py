@@ -4,7 +4,7 @@ from diameter.message.constants import *
 import logging
 from ..session_manager import SessionManager, Subscribers
 from ..app_context import get_session_manager
-from ..session import DiameterSession
+from ..session_manager.sessions import Sessions
 from ..message import DiameterMessage
 from typing import Dict, Any
 import time
@@ -22,6 +22,10 @@ class CommonThreadingApplication(ThreadingApplication):
             self.session_manager.register_owner(self)
         self.logger = logging.getLogger("diameter_telecom.app")
         self._avps: Dict[str, str] = {}
+
+    @property
+    def sessions(self) -> Sessions:
+        return self.session_manager.sessions
 
     @property
     def avps(self):
@@ -67,17 +71,18 @@ class CommonThreadingApplication(ThreadingApplication):
         """Template method: processes request with owner tracking, delegates to subclass"""
         # Process incoming request
         dm_request = DiameterMessage(message)
+        self.logger.info(f"Received request {dm_request.cmd_code} through node {self.node.origin_host}")
+        self.logger.debug(f"\n{dm_request.dump()}")
         self.session_manager.process_diameter_message(dm_request, owner_app=self)
 
-        answer: Any = message.to_answer()
-        answer.session_id = message.session_id
-        answer.origin_host = self.node.origin_host.encode()
-        answer.origin_realm = self.node.realm_name.encode()
-        answer.destination_realm = message.origin_realm
-        answer.destination_host = message.origin_host
-        answer.auth_application_id = APP_3GPP_RX
-        answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
-
+        # answer: Any = message.to_answer()
+        # answer.session_id = message.session_id
+        # answer.origin_host = self.node.origin_host.encode()
+        # answer.origin_realm = self.node.realm_name.encode()
+        # answer.destination_realm = message.origin_realm
+        # answer.destination_host = message.origin_host
+        # if hasattr(message, 'auth_application_id') and message.auth_application_id:
+        #     answer.auth_application_id = message.auth_application_id
         
         # Delegate to subclass implementation
         answer = self._handle_request(message)
@@ -99,7 +104,7 @@ class CommonThreadingApplication(ThreadingApplication):
             diameter_message = DiameterMessage(diameter_message)
         if not diameter_message.timestamp:
             diameter_message.timestamp = time.time()
-        self.logger.debug(f"Sending request {diameter_message.cmd_code} through node {self.node.origin_host}")
+        self.logger.info(f"Sending request {diameter_message.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"\n{diameter_message.dump()}")
         message = diameter_message.message
         if not message.header.end_to_end_identifier:  # Only if 0 (default)
@@ -110,6 +115,6 @@ class CommonThreadingApplication(ThreadingApplication):
         self.session_manager.process_diameter_message(diameter_message_answer, owner_app=self)
         if not diameter_message_answer.timestamp:
             diameter_message_answer.timestamp = time.time()
-        self.logger.debug(f"Received answer {diameter_message_answer.cmd_code} through node {self.node.origin_host}")
+        self.logger.info(f"Received answer {diameter_message_answer.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"\n{diameter_message_answer.dump()}")
         return diameter_message_answer

@@ -543,3 +543,29 @@ class Sessions:
                 result[app_id] = [session.to_dict() for session in sorted_sessions]
             
             return result
+
+
+    def add_gx_session(self, session: GxSession):
+        """Add a Gx session to the sessions index."""
+        self.add_session(APP_3GPP_GX, session)
+    
+    def add_rx_session(self, session: RxSession):
+        """Add a Rx session to the sessions index."""
+        self.add_session(APP_3GPP_RX, session)
+    
+    def add_sy_session(self, session: SySession):
+        """Add a Sy session to the sessions index."""
+        self.add_session(APP_3GPP_SY, session)
+
+
+    def get_gx_session(self, session_id: str) -> Optional[GxSession]:
+        """Get a Gx session by session id."""
+        return self.get_session_by_id(APP_3GPP_GX, session_id)
+    
+    def get_rx_session(self, session_id: str) -> Optional[RxSession]:
+        """Get a Rx session by session id."""
+        return self.get_session_by_id(APP_3GPP_RX, session_id)
+    
+    def get_sy_session(self, session_id: str) -> Optional[SySession]:
+        """Get a Sy session by session id."""
+        return self.get_session_by_id(APP_3GPP_SY, session_id)

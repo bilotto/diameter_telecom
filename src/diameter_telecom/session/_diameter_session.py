@@ -23,13 +23,17 @@ class DiameterSession:
     last_result_code: Optional[int] = field(default=None)
     _avps: Dict[str, Any] = field(default_factory=dict, repr=False)
     logger: logging.Logger = field(default=logger, repr=False)
-    app_id: Optional[int] = field(default=None)
+    app_id: Optional[int] = field(default=None, repr=False)
     origin_host: Optional[str] = field(default=None)
     origin_realm: Optional[str] = field(default=None)
+    abort: Optional[bool] = field(default=None, init=False)
 
     @property
     def avps(self) -> Dict[str, Any]:
         return self._avps
+
+    def add_avp(self, key: str, value: Any):
+        self._avps[key] = value
 
     def add_bound_session(self, app_id: int, session_id: str):
         self.bound_sessions[app_id].append(session_id)
@@ -43,6 +47,10 @@ class DiameterSession:
     
     def __eq__(self, other) -> bool:
         return self.session_id == other.session_id
+    
+    def __str__(self) -> str:
+        """String representation for logging and display."""
+        return f"{self.__class__.__name__}(session_id={self.session_id}, active={self.active}, ended={self.ended})"
 
     def activate(self):
         self.active = True

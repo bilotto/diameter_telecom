@@ -79,6 +79,7 @@ class PCEF(DiameterEntity):
         return app
 
     def setup_gx_app(self, max_threads: int = 10):
+        self.add_realm(APP_3GPP_GX, self.realm_name)
         self.setup_app(APP_3GPP_GX, max_threads)
 
     def setup_apps(self, max_threads: int = 10):

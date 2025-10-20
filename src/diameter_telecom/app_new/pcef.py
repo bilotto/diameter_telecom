@@ -20,6 +20,7 @@ class PcefGxApplication(CommonThreadingApplication):
         self.related_apps: List[CommonThreadingApplication] = []
 
     def _handle_request(self, message: Message):
+        self.logger.info(f"{__class__.__name__} Received request {message.header.command_code} through node {self.node.origin_host}")
         # Receives the RAR from PCRF
         answer: ReAuthAnswer = message.to_answer()
         answer.session_id = message.session_id
@@ -35,17 +36,15 @@ class PcefGxApplication(CommonThreadingApplication):
         session_id = self.node.session_generator.next_id()
         gx_session = GxSession(session_id=session_id, subscriber=subscriber)
         # gx_session.framed_ip_address = self.ip_queue.get_ip()
-        self.session_manager.sessions.add_session(APP_3GPP_GX, gx_session)
+        self.session_manager.sessions.add_gx_session(gx_session)
+        subscriber.add_session_id(APP_3GPP_GX, session_id)
         return gx_session
 
     def create_request(self, message_name: str, session: GxSession) -> CreditControlRequest:
         request = CreditControlRequest()
         request.header.application_id = APP_3GPP_GX
         request.session_id = session.session_id
-        for k, v in self.avps.items():
-            self.logger.debug(f"First layer of AVPS (app.avps): {k} = {v}")
-            setattr(request, k, v)
-        request.service_context_id = "test"
+        # request.service_context_id = "test"
         if message_name == CCR_I:
             request.cc_request_number = 0
             request.cc_request_type = E_CC_REQUEST_TYPE_INITIAL_REQUEST
@@ -55,8 +54,4 @@ class PcefGxApplication(CommonThreadingApplication):
         elif message_name == CCR_T:
             request.cc_request_number = 1
             request.cc_request_type = E_CC_REQUEST_TYPE_TERMINATION_REQUEST
-        for key, value in session.avps.items():
-            self.logger.debug(f"Second layer of AVPS (session.avps): {key} = {value}")
-            if hasattr(request, key):
-                setattr(request, key, value)
         return request

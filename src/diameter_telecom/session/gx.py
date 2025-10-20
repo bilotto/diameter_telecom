@@ -9,11 +9,14 @@ from ..message import DiameterMessage
 from ._diameter_session import DiameterSession
 from ..constants import *
 
+from ..apn import ip_to_bytes, bytes_to_ip
+
 @dataclass
 class GxSession(DiameterSession):
     app_id: int = APP_3GPP_GX
     framed_ip_address: Optional[str] = field(default=None)
-    framed_ipv6_prefix: Optional[str] = field(default=None)
+    # framed_ipv6_prefix: Optional[str] = field(default=None)
+    framed_ipv6_prefix: Optional[str] = field(default=None, init=False)
     called_station_id: Optional[str] = field(default=None)
     sgsn_mcc_mnc: Optional[str] = field(default=None)
     granted_service_unit: Optional[Dict] = field(default_factory=dict)
@@ -28,7 +31,7 @@ class GxSession(DiameterSession):
     @property
     def avps(self) -> Dict[str, str]:
         if self.framed_ip_address:
-            self._avps['framed_ip_address'] = self.framed_ip_address
+            self._avps['framed_ip_address'] = ip_to_bytes(self.framed_ip_address)
         if self.framed_ipv6_prefix:
             self._avps['framed_ipv6_prefix'] = self.framed_ipv6_prefix
         if self.called_station_id:
@@ -39,8 +42,9 @@ class GxSession(DiameterSession):
             self._avps['rat_type'] = self.rat_type
         # if self.cc_request_number:
         #     self._avps['cc_request_number'] = self.cc_request_number
-        for key, value in self.subscriber.avps.items():
-            self._avps[key] = value
+        # for key, value in self.subscriber.avps.items():
+        #     self._avps[key] = value
+        self._avps['session_id'] = self.session_id
         return self._avps
 
     @property

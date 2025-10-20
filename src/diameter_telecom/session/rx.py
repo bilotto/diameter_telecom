@@ -4,19 +4,26 @@ from typing import Optional, Dict
 from ._diameter_session import DiameterSession
 from ..constants import *
 
+from ..apn import ip_to_bytes, bytes_to_ip
+
 
 @dataclass
 class RxSession(DiameterSession):
     app_id: int = APP_3GPP_RX
+    # Not an AVP, but used to link the Rx session to the Gx session
     gx_session_id: Optional[str] = field(default=None)
     _avps: Dict[str, str] = field(default_factory=dict, repr=False)
     
     @property
     def avps(self) -> Dict[str, str]:
-        self._avps = {}
-        for key, value in self.subscriber.avps.items():
-            self._avps[key] = value
-        return self._avps
+        avps = dict()
+        for key, value in self._avps.items():
+            if key == 'framed_ip_address':
+                value = ip_to_bytes(value)
+            avps[key] = value
+        avps['session_id'] = self.session_id
+        return avps
+
 
     def set_gx_session_id(self, gx_session_id: str):
         self.gx_session_id = gx_session_id
