@@ -168,4 +168,16 @@ class ApplicationService:
         return app.send_request_custom(request)
 
 
-        
+    def start(self):
+        for i in self.applications:
+            if not i.node._started:
+                i.node.start()
+
+    def wait_for_ready(self):
+        for i in self.applications:
+            i.wait_for_ready(5)
+
+    def stop(self):
+        for i in self.applications:
+            if i.node._started:
+                i.node.stop()

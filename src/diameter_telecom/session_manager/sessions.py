@@ -4,6 +4,8 @@ import logging
 import threading
 from ..session._diameter_session import DiameterSession
 from ..session.gx import GxSession
+from ..session.rx import RxSession
+from ..session.sy import SySession
 from ..constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
 
 logger = logging.getLogger(__name__)

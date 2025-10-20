@@ -167,6 +167,9 @@ class Subscribers:
     subscribers: Dict[str, Subscriber] = field(default_factory=dict, repr=False)
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8], repr=True)
+
+    def values(self) -> List[Subscriber]:
+        return list(self.subscribers.values())
     
 
     def get_subscribers(self) -> List[Subscriber]:
