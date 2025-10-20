@@ -338,12 +338,26 @@ class SessionManager:
         """
         if not owner_app:
             return
-            
-        owner_key = f"{owner_app.__class__.__name__}({owner_app.node.origin_host})"
+        # Build a robust owner key even if node/origin_host isn't set yet
+        origin_host = None
+        try:
+            if hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host'):
+                origin_host = owner_app.node.origin_host
+        except Exception:
+            origin_host = None
+        if not origin_host:
+            # Fallback to application_id if present, else a short id
+            fallback = getattr(owner_app, 'application_id', None)
+            origin_host = fallback if fallback is not None else hex(id(owner_app))
+        owner_key = f"{owner_app.__class__.__name__}({origin_host})"
         
         with self._owners_lock_context():
             self.owners[owner_key] = owner_app
             logger.debug(f"Registered owner: {owner_key}")
+
+    def register_owner(self, owner_app: Any):
+        """Public method to register an owner application."""
+        self._register_owner(owner_app)
 
     def get_owner(self, owner_key: str) -> Optional[Any]:
         """Get an owner application by its key.

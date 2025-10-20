@@ -3,9 +3,10 @@ from diameter.message import Message
 from diameter.message.constants import *
 import logging
 from ..session_manager import SessionManager, Subscribers
+from ..app_context import get_session_manager
 from ..session import DiameterSession
 from ..message import DiameterMessage
-from typing import Dict
+from typing import Dict, Any
 import time
 
 class CommonThreadingApplication(ThreadingApplication):
@@ -13,8 +14,12 @@ class CommonThreadingApplication(ThreadingApplication):
     subscribers: Subscribers
     def __init__(self, application_id: int, is_acct_application: bool, is_auth_application: bool, max_threads: int = 1):
         super().__init__(application_id=application_id, is_acct_application=is_acct_application, is_auth_application=is_auth_application, max_threads=max_threads)
-        self.session_manager = SessionManager()
-        self.subscribers = Subscribers()
+        # Use shared SessionManager from AppContext by default
+        self.session_manager = get_session_manager()
+        self.subscribers = self.session_manager.subscribers
+        # Register as owner of the session manager
+        if hasattr(self.session_manager, 'register_owner'):
+            self.session_manager.register_owner(self)
         self.logger = logging.getLogger("diameter_telecom.app")
         self._avps: Dict[str, str] = {}
 
@@ -48,9 +53,15 @@ class CommonThreadingApplication(ThreadingApplication):
     
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
+        self.subscribers = session_manager.subscribers
+        if hasattr(self.session_manager, 'register_owner'):
+            self.session_manager.register_owner(self)
 
     def set_subscribers(self, subscribers: Subscribers):
-        self.subscribers = subscribers
+        # Delegate to session manager to keep single source of truth
+        if hasattr(self.session_manager, 'set_subscribers'):
+            self.session_manager.set_subscribers(subscribers)
+        self.subscribers = self.session_manager.subscribers
 
     def handle_request(self, message: Message):
         """Template method: processes request with owner tracking, delegates to subclass"""

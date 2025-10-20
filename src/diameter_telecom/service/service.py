@@ -3,6 +3,7 @@
 from ..app_new.common import CommonThreadingApplication
 from ..message import DiameterMessage
 from ..session_manager import SessionManager
+from ..app_context import get_session_manager
 from ..apn import IpQueue, ip_to_bytes
 from typing import List, Dict, Any
 from ..subscriber import Subscriber, Subscribers
@@ -39,13 +40,17 @@ class ApplicationService:
         self.framed_ip_address_cidr = framed_ip_address_cidr
         self.ip_queue = IpQueue(framed_ip_address_cidr)
         if not session_manager:
-            session_manager: SessionManager = SessionManager()
+            session_manager = get_session_manager()
         if not subscribers:
-            subscribers: Subscribers = Subscribers()
+            subscribers = session_manager.subscribers
         self.session_manager = session_manager
         self.subscribers = subscribers
         self.set_session_manager(session_manager)
         self.set_subscribers(subscribers)
+        # Register the service's applications as owners (service itself is not an owner)
+        if hasattr(self.session_manager, 'register_owner'):
+            for i in self.applications:
+                self.session_manager.register_owner(i)
         for i in self.applications:
             for j in self.applications:
                 if i.application_id != j.application_id:
@@ -81,13 +86,19 @@ class ApplicationService:
 
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
+        self.subscribers = session_manager.subscribers
         for i in self.applications:
             i.set_session_manager(session_manager)
+            if hasattr(self.session_manager, 'register_owner'):
+                self.session_manager.register_owner(i)
 
     def set_subscribers(self, subscribers: Subscribers):
-        self.subscribers = subscribers
+        # Delegate to session manager to keep single source of truth
+        if hasattr(self.session_manager, 'set_subscribers'):
+            self.session_manager.set_subscribers(subscribers)
+        self.subscribers = self.session_manager.subscribers
         for i in self.applications:
-            i.set_subscribers(subscribers)
+            i.set_subscribers(self.subscribers)
 
     # delegates to the application
     def create_session(self, app_id: int, subscriber: Subscriber) -> DiameterSession:

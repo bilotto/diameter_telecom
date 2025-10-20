@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 # A class to help create and manage the 3GPP nodes (PCEF, PCRF, AF, OCS, DSC). It links all the entities with same subscribers and session manager.
 from .session_manager import SessionManager
+from .app_context import get_session_manager
 from .subscriber import Subscribers
 from .entities_3gpp import PCEF, PCRF, AF, OCS, DSC
 from .entities_3gpp._diameter_entity import DiameterEntity
@@ -57,8 +58,8 @@ def define_node_startup_order(nodes_to_start: List[Node]) -> List[str]:
 
 @dataclass
 class DiameterManager:
-    session_manager: SessionManager = field(default_factory=SessionManager)
-    subscribers: Subscribers = field(default_factory=Subscribers)
+    session_manager: SessionManager = field(default_factory=get_session_manager)
+    subscribers: Subscribers = field(default=None)
     _nodes: Dict[str, DiameterEntity] = field(default_factory=dict)
     
 
@@ -88,7 +89,9 @@ class DiameterManager:
         return dsc
 
     def create_application_service(self, applications: List[CommonThreadingApplication], diameter_config: dict) -> ApplicationService:
-        application_service = ApplicationService(applications=applications, diameter_config=diameter_config, session_manager=self.session_manager, subscribers=self.subscribers)
+        # Ensure subscribers comes from the session_manager as the source of truth
+        subscribers = self.session_manager.subscribers
+        application_service = ApplicationService(applications=applications, diameter_config=diameter_config, session_manager=self.session_manager, subscribers=subscribers)
         return application_service
 
     def to_dict(self) -> Dict[str, DiameterEntity]:
@@ -96,6 +99,8 @@ class DiameterManager:
 
     def start(self):
         nodes_to_start: List[Node] = [entity.node for entity in self._nodes.values()]
+        # Use subscribers from the session manager as the single source
+        self.subscribers = self.session_manager.subscribers
         for i in nodes_to_start:
             for app in i.applications:
                 if hasattr(app, 'set_session_manager'):
