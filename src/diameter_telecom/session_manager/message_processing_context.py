@@ -27,6 +27,7 @@ class MessageProcessingContext:
     session_id: str
     app_id: int
     owner_app: Optional[Any] = None  # Reference to the application object that processed this message
+    owner_key: Optional[str] = None  # Stable registry key of the owner in SessionManager
     framed_ip_address: Optional[str] = None
     framed_ipv6_prefix: Optional[str] = None
     called_station_id: Optional[str] = None
@@ -92,7 +93,7 @@ class MessageProcessingContext:
     
     def keys(self):
         """Dict-like keys() method for iteration."""
-        core_keys = ['dm', 'message', 'session_id', 'app_id', 'session', 'subscriber']
+        core_keys = ['dm', 'message', 'session_id', 'app_id', 'owner_key', 'session', 'subscriber']
         return core_keys + list(self._additional_data.keys())
     
     def resolve_attribute(self, attr_name: str) -> str:

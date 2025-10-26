@@ -18,8 +18,7 @@ class CommonThreadingApplication(ThreadingApplication):
         self.session_manager = get_session_manager()
         self.subscribers = self.session_manager.subscribers
         # Register as owner of the session manager
-        if hasattr(self.session_manager, 'register_owner'):
-            self.session_manager.register_owner(self)
+        self.session_manager.register_owner(self)
         self.logger = logging.getLogger("diameter_telecom.app")
         self._avps: Dict[str, str] = {}
 
@@ -58,8 +57,7 @@ class CommonThreadingApplication(ThreadingApplication):
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
         self.subscribers = session_manager.subscribers
-        if hasattr(self.session_manager, 'register_owner'):
-            self.session_manager.register_owner(self)
+        self.session_manager.register_owner(self)
 
     # def set_subscribers(self, subscribers: Subscribers):
     #     # Delegate to session manager to keep single source of truth
@@ -70,8 +68,6 @@ class CommonThreadingApplication(ThreadingApplication):
     # Owner-based discovery of peer applications
     def get_app_by_id(self, app_id: int):
         """Lookup a peer application by app_id via SessionManager owners."""
-        if not hasattr(self.session_manager, 'get_owners_by_app_id'):
-            return None
         owners = self.session_manager.get_owners_by_app_id(app_id)
         # Prefer a different instance than self if multiple are registered
         for owner in owners:

@@ -52,6 +52,8 @@ class SessionManager:
     _subscribers_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _messages_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _csv_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    _owners_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    owners: Dict[str, Any] = field(default_factory=dict, repr=False)
     
 
     def __post_init__(self):
@@ -121,6 +123,14 @@ class SessionManager:
         finally:
             self._csv_lock.release()
     
+    @contextmanager
+    def _owners_lock_context(self):
+        """Context manager for owners registry operations."""
+        self._owners_lock.acquire()
+        try:
+            yield
+        finally:
+            self._owners_lock.release()
     
 
     # def get_messages(self):
@@ -142,6 +152,12 @@ class SessionManager:
         """
         context: MessageProcessingContext = MessageProcessingContext.from_diameter_message(dm)
         context.owner_app = owner_app
+        if owner_app is not None:
+            try:
+                owner_key = self.register_owner(owner_app)
+            except Exception:
+                owner_key = None
+            context.owner_key = owner_key
         logger.info(f"Processing {dm.name} - {dm.session_id}")
         result = self.pipeline.main_pipeline(context)
         if not result:
@@ -311,6 +327,35 @@ class SessionManager:
             logger.exception("Failed to calculate session manager statistics")
             return {"error": f"Statistics calculation failed: {str(e)}"}
 
-    
+    def register_owner(self, owner_app: Any):
+        """Register an application instance as owner of this SessionManager.
+        Key format: "ClassName(origin_host|fallback)". Idempotent per object.
+        """
+        if not owner_app:
+            return None
+        # Build origin host fallback safely
+        origin_host = None
+        try:
+            if hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host'):
+                origin_host = owner_app.node.origin_host
+        except Exception:
+            origin_host = None
+        if not origin_host:
+            fallback = getattr(owner_app, 'application_id', None)
+            origin_host = fallback if fallback is not None else hex(id(owner_app))
+        owner_key = f"{owner_app.__class__.__name__}({origin_host})"
+        with self._owners_lock_context():
+            # Remove stale keys pointing to same object
+            stale_keys = [k for k, v in self.owners.items() if v is owner_app and k != owner_key]
+            for k in stale_keys:
+                del self.owners[k]
+            self.owners[owner_key] = owner_app
+        return owner_key
+
+    def get_owners_by_app_id(self, app_id: int) -> List[Any]:
+        """Return all registered owners with matching application_id."""
+        with self._owners_lock_context():
+            return [app for app in self.owners.values() if hasattr(app, 'application_id') and app.application_id == app_id]
+
 
 
