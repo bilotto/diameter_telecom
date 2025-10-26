@@ -56,25 +56,25 @@ class MessageProcessingPipeline:
     
     @timing_decorator
     def main_pipeline(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Message {context.message.name} entering session_manager.")
+        logger.debug(f"✅ Message {context.message.name} entering session_manager.")
         self.stage_get_session(context)
         if context.session:
             logger.debug(context.session)
 
         if context.message.is_request:
             if not context.session and context.message.name not in REQUESTS_CREATE_SESSION:
-                logger.debug(f"✅ [{context.owner}] Message {context.message.name} not in REQUESTS_CREATE_SESSION and no session. Returning False.")
+                logger.debug(f"✅ Message {context.message.name} not in REQUESTS_CREATE_SESSION and no session. Returning False.")
                 return False
             elif context.session and not(context.session.n_messages):
                 # this means the message is flowing through session_manager
                 # it was added to session manager by the client, and the server is during the processing of the message sharing the session manager
                 # is this case, lets try allowing the message to flow
-                logger.debug(f"✅ [{context.owner}] Message {context.message.name} is flowing through shared session_manager.")
+                logger.debug(f"✅ Message {context.message.name} is flowing through shared session_manager.")
                 pass
             self.stage_parse_request(context)
         else:
             if not context.session:
-                logger.debug(f"✅ [{context.owner}] Anwer without session. Returning False.")
+                logger.debug(f"✅ Anwer without session. Returning False.")
                 return False
             
             self.stage_parse_response(context)
@@ -87,7 +87,7 @@ class MessageProcessingPipeline:
             if context.message not in session.messages:
                 session.add_message(context.message)
             else:
-                logger.debug(f"✅ [{context.owner}] Message already in session. Returning.")
+                logger.debug(f"✅ Message already in session. Returning.")
                 pass
             
         subscriber = context.subscriber
@@ -98,25 +98,25 @@ class MessageProcessingPipeline:
                 subscriber.add_session_id(context.app_id, context.session_id)
             context.message.subscriber = subscriber
 
-        logger.debug(f"✅ [{context.owner}] Message {context.message.name} processed. Leaving session_manager.")
+        logger.debug(f"✅ Message {context.message.name} processed. Leaving session_manager.")
         return True
 
 
     def stage_parse_request(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage parse request.")
+        logger.debug(f"✅ Stage parse request.")
         if not context.session:
-            logger.debug(f"✅ [{context.owner}] No session. Identifying subscriber.")
+            logger.debug(f"✅ No session. Identifying subscriber.")
             self.stage_identify_subscriber(context)
-            logger.debug(f"✅ [{context.owner}] Identified subscriber. Creating session.")
+            logger.debug(f"✅ Identified subscriber. Creating session.")
             self.stage_create_session(context)
         elif context.session and not context.session.n_messages:
-            logger.debug(f"✅ [{context.owner}] Session found but no messages. Continuing.")
-            logger.debug(f"✅ [{context.owner}] We should be able to retrieve subscriber from session.")
+            logger.debug(f"✅ Session found but no messages. Continuing.")
+            logger.debug(f"✅ We should be able to retrieve subscriber from session.")
             if not context.session.subscriber:
-                logger.debug(f"✅ [{context.owner}] No subscriber found in session. Identifying subscriber.")
+                logger.debug(f"✅ No subscriber found in session. Identifying subscriber.")
                 self.stage_identify_subscriber(context)
             else:
-                logger.debug(f"✅ [{context.owner}] Subscriber found in session. Continuing. This might be the case where the DiameterMessage was generated from the DiameterSession as opposed to the DiameterSession generated from the DiameterMessage.")
+                logger.debug(f"✅ Subscriber found in session. Continuing. This might be the case where the DiameterMessage was generated from the DiameterSession as opposed to the DiameterSession generated from the DiameterMessage.")
                 context.subscriber = context.session.subscriber
                 self.start_session(context)
                 if context.app_id == APP_3GPP_RX:
@@ -124,33 +124,33 @@ class MessageProcessingPipeline:
                 elif context.app_id == APP_3GPP_SY:
                     self.stage_bind_sy_to_gx(context)
         elif context.session and not context.session.active:
-            logger.debug(f"✅ [{context.owner}] Session found and not active. The answer will activate the session. Continuing.")
+            logger.debug(f"✅ Session found and not active. The answer will activate the session. Continuing.")
         elif context.session and context.session.active:
-            logger.debug(f"✅ [{context.owner}] Session found and active. Updating session.")
+            logger.debug(f"✅ Session found and active. Updating session.")
             self.stage_update_session(context)
         else:
-            logger.debug(f"✅ [{context.owner}] Session {context.session} found but no information. Continuing.")
+            logger.debug(f"✅ Session {context.session} found but no information. Continuing.")
 
     def stage_parse_response(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage parse response.")
+        logger.debug(f"✅ Stage parse response.")
         if context.session and not context.session.active and context.session.start_time:
-            logger.debug(f"✅ [{context.owner}] Session found and not active and has start time. Activating session.")
+            logger.debug(f"✅ Session found and not active and has start time. Activating session.")
             context.session.activate()
             self.start_session(context)
         if context.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-            logger.debug(f"✅ [{context.owner}] Result code not success. Setting session error.")
+            logger.debug(f"✅ Result code not success. Setting session error.")
             context.session.error = True
         if not context.message.name in RESPONSES_END_SESSION:
-            logger.debug(f"✅ [{context.owner}] Message name not in RESPONSES_END_SESSION. Updating session.")
+            logger.debug(f"✅ Message name not in RESPONSES_END_SESSION. Updating session.")
             self.stage_update_session(context)
         else:
-            logger.debug(f"✅ [{context.owner}] Message name in RESPONSES_END_SESSION. Ending session.")
+            logger.debug(f"✅ Message name in RESPONSES_END_SESSION. Ending session.")
             self.stage_end_session(context)
 
 
 
     def stage_get_session(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage get session started")
+        logger.debug(f"✅ Stage get session started")
         app_id = context.app_id
         session_id = context.session_id
         session: DiameterSession | None = self.sessions.get_session_by_id(app_id, session_id)
@@ -158,35 +158,35 @@ class MessageProcessingPipeline:
             context.session = session
         if session and session.active:
             context.session_active = True
-            logger.debug(f"✅ [{context.owner}] Session found and active. Returning.")
+            logger.debug(f"✅ Session found and active. Returning.")
         elif session and session.start_time and not session.active:
             context.session_active = False
-            logger.debug(f"✅ [{context.owner}] Session found with start time and started but not active. Returning.")
+            logger.debug(f"✅ Session found with start time and started but not active. Returning.")
         else:
             context.session_active = False
-            logger.debug(f"✅ [{context.owner}] Session found but not active. Returning.")
-        logger.debug(f"✅ [{context.owner}] Stage get session ended")
+            logger.debug(f"✅ Session found but not active. Returning.")
+        logger.debug(f"✅ Stage get session ended")
 
 
 
     def start_session(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage start session.")
+        logger.debug(f"✅ Stage start session.")
         session: DiameterSession = context.session
         session.start(context.message.timestamp)
-        logger.debug(f"✅ [{context.owner}] Session started. Returning.")
+        logger.debug(f"✅ Session started. Returning.")
         return session
 
     def end_session(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage end session.")
+        logger.debug(f"✅ Stage end session.")
         session: DiameterSession = context.session
         session.end(context.message.timestamp)
-        logger.debug(f"✅ [{context.owner}] Session ended. Returning.")
+        logger.debug(f"✅ Session ended. Returning.")
         return session
 
 
     def stage_create_session(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage create session")
-        logger.debug(f"✅ [{context.owner}] The SessionManager will generate the DiameterSession object from the DiameterMessage.")
+        logger.debug(f"✅ Stage create session")
+        logger.debug(f"✅ The SessionManager will generate the DiameterSession object from the DiameterMessage.")
         dm: DiameterMessage = context.message
         app_id = context.app_id
         session_id = context.session_id
@@ -227,92 +227,92 @@ class MessageProcessingPipeline:
         #     subscriber = context.subscriber
         #     subscriber.add_session_id(app_id, session_id)
 
-        logger.debug(f"✅ [{context.owner}] Adding session to sessions collection.")
+        logger.debug(f"✅ Adding session to sessions collection.")
         self.sessions.add_session(app_id, session)
-        logger.debug(f"✅ [{context.owner}] Session created. Returning.")
+        logger.debug(f"✅ Session created. Returning.")
 
 
 
     def stage_update_session(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage update session.")
+        logger.debug(f"✅ Stage update session.")
         session: DiameterSession = context.session
-        logger.debug(f"✅ [{context.owner}] Session found. Updating session.")
+        logger.debug(f"✅ Session found. Updating session.")
         pass
 
     def stage_end_session(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage end session.")
+        logger.debug(f"✅ Stage end session.")
         session: DiameterSession = context.session
-        logger.debug(f"✅ [{context.owner}] Session found. Ending session.")
+        logger.debug(f"✅ Session found. Ending session.")
         session.end(context.message.timestamp)
         if self.clear_sessions_after_termination:
-            logger.debug(f"✅ [{context.owner}] Clearing sessions after termination.")
+            logger.debug(f"✅ Clearing sessions after termination.")
             self.sessions.remove_session(context.message.app_id, context.message.session_id)
             self._cleanup_session_from_subscriber(session, context.message.app_id)
-        logger.debug(f"✅ [{context.owner}] Session ended. Returning.")
+        logger.debug(f"✅ Session ended. Returning.")
 
     def stage_get_subscriber(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage get subscriber.")
+        logger.debug(f"✅ Stage get subscriber.")
         if context.session:
             context.subscriber = context.session.subscriber
-        logger.debug(f"✅ [{context.owner}] Subscriber found. Returning.")
+        logger.debug(f"✅ Subscriber found. Returning.")
 
     def stage_create_subscriber(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage create subscriber.")
+        logger.debug(f"✅ Stage create subscriber.")
         subscriber = Subscriber(msisdn=context.msisdn, imsi=context.imsi)
-        logger.debug(f"✅ [{context.owner}] Subscriber created. Adding subscriber to subscribers collection.")
+        logger.debug(f"✅ Subscriber created. Adding subscriber to subscribers collection.")
         self.subscribers.add_subscriber(subscriber)
-        logger.debug(f"✅ [{context.owner}] Subscriber added to subscribers collection. Returning.")
+        logger.debug(f"✅ Subscriber added to subscribers collection. Returning.")
         context.subscriber = subscriber
-        logger.debug(f"✅ [{context.owner}] Subscriber added to context. Returning.")
+        logger.debug(f"✅ Subscriber added to context. Returning.")
         return subscriber
 
     def stage_identify_subscriber(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage identify subscriber.")
+        logger.debug(f"✅ Stage identify subscriber.")
         subscriber = None  # Initialize to avoid UnboundLocalError
         if context.msisdn:
-            logger.debug(f"✅ [{context.owner}] Identifying subscriber by msisdn.")
+            logger.debug(f"✅ Identifying subscriber by msisdn.")
             subscriber = self.subscribers.get_subscriber_by_msisdn(context.msisdn)
         elif context.imsi:
-            logger.debug(f"✅ [{context.owner}] Identifying subscriber by imsi.")
+            logger.debug(f"✅ Identifying subscriber by imsi.")
             subscriber = self.subscribers.get_subscriber_by_imsi(context.imsi)
         elif context.framed_ip_address:
-            logger.debug(f"✅ [{context.owner}] Identifying subscriber by framed IP address.")
+            logger.debug(f"✅ Identifying subscriber by framed IP address.")
             gx_session = self.sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
             if gx_session:
-                logger.debug(f"✅ [{context.owner}] Found subscriber by framed IP address.")
+                logger.debug(f"✅ Found subscriber by framed IP address.")
                 subscriber = gx_session.subscriber
         else:
-            logger.debug(f"✅ [{context.owner}] No subscriber identified. Returning.")
+            logger.debug(f"✅ No subscriber identified. Returning.")
             pass
         
         if not subscriber:
-            logger.debug(f"✅ [{context.owner}] No subscriber found. Creating subscriber.")
+            logger.debug(f"✅ No subscriber found. Creating subscriber.")
             self.stage_create_subscriber(context)
         else:
-            logger.debug(f"✅ [{context.owner}] Subscriber found. Adding to context.")
+            logger.debug(f"✅ Subscriber found. Adding to context.")
             context.subscriber = subscriber
-        logger.debug(f"✅ [{context.owner}] Stage identify subscriber. Returning.")
+        logger.debug(f"✅ Stage identify subscriber. Returning.")
         return subscriber
 
     def stage_bind_rx_to_gx(self, context: MessageProcessingContext):
-        logger.debug(f"✅ [{context.owner}] Stage bind rx to gx.")
+        logger.debug(f"✅ Stage bind rx to gx.")
         dm: DiameterMessage = context.message
         rx_session = context.session
-        logger.debug(f"✅ [{context.owner}] Rx session found. Binding rx to gx.")
+        logger.debug(f"✅ Rx session found. Binding rx to gx.")
 
         # Method 1: Try framed IP address lookup
         if context.framed_ip_address:
             gx_session = self.sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
             if gx_session:
-                logger.debug(f"✅ [{context.owner}] Found gx session by framed IP address.")
+                logger.debug(f"✅ Found gx session by framed IP address.")
                 rx_session.gx_session_id = gx_session.session_id
                 rx_session.subscriber = gx_session.subscriber
                 gx_session.add_bound_session(APP_3GPP_RX, rx_session.session_id)
                 rx_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
-                logger.debug(f"✅ [{context.owner}] Rx session bound to gx session by framed IP address.")
+                logger.debug(f"✅ Rx session bound to gx session by framed IP address.")
                 return
             else:
-                logger.debug(f"✅ [{context.owner}] No gx session found by framed IP address.")
+                logger.debug(f"✅ No gx session found by framed IP address.")
                 pass
         
         # Method 2: Try subscriber session_ids lookup
@@ -322,12 +322,12 @@ class MessageProcessingPipeline:
             if gx_session_id:
                 gx_session = self.sessions.get_session_by_id(APP_3GPP_GX, gx_session_id)
                 if gx_session:
-                    logger.debug(f"✅ [{context.owner}] Found gx session by subscriber session id.")
+                    logger.debug(f"✅ Found gx session by subscriber session id.")
                     rx_session.gx_session_id = gx_session.session_id
                     rx_session.subscriber = gx_session.subscriber
                     gx_session.add_bound_session(APP_3GPP_RX, rx_session.session_id)
                     rx_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
-                    logger.debug(f"✅ [{context.owner}] Rx session bound to gx session by subscriber session id.")
+                    logger.debug(f"✅ Rx session bound to gx session by subscriber session id.")
                     return
                 else:
                     # Clean up invalid session ID
@@ -338,10 +338,10 @@ class MessageProcessingPipeline:
         # The Sy session is bound using the subscription_id which is already in the context
         sy_session = context.session
         if hasattr(sy_session, 'gx_session_id') and sy_session.gx_session_id:
-            logger.debug(f"✅ [{context.owner}] Sy session already bound to gx session. Returning.")
+            logger.debug(f"✅ Sy session already bound to gx session. Returning.")
             return
         else:
-            logger.debug(f"✅ [{context.owner}] Sy session not bound to gx session. Binding.")
+            logger.debug(f"✅ Sy session not bound to gx session. Binding.")
 
         msisdn, imsi = context.msisdn, context.imsi
         if msisdn:
