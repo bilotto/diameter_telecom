@@ -68,6 +68,34 @@ class SessionManager:
     def set_subscribers(self, subscribers: Subscribers):
         self.subscribers = subscribers
     
+    def log_message(self, context: Optional[MessageProcessingContext], level: str, message: str):
+        """SessionManager-level logging with owner prefix from context."""
+        owner: Optional[str] = None
+        try:
+            if context and getattr(context, 'owner_key', None):
+                owner = context.owner_key
+            elif context and getattr(context, 'owner_app', None):
+                owner_app = context.owner_app
+                origin_host = None
+                try:
+                    if hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host'):
+                        origin_host = owner_app.node.origin_host
+                except Exception:
+                    origin_host = None
+                owner = f"{owner_app.__class__.__name__}({origin_host})" if origin_host else owner_app.__class__.__name__
+        except Exception:
+            owner = None
+        prefix = f"[{owner}] " if owner else ""
+        full_message = f"{prefix}{message}"
+        if level == "debug":
+            logger.debug(full_message)
+        elif level == "info":
+            logger.info(full_message)
+        elif level == "warning":
+            logger.warning(full_message)
+        elif level == "error":
+            logger.error(full_message)
+    
     @contextmanager
     def _sessions_read_lock(self):
         """Context manager for read access to sessions."""
@@ -158,7 +186,16 @@ class SessionManager:
             except Exception:
                 owner_key = None
             context.owner_key = owner_key
-        logger.info(f"Processing {dm.name} - {dm.session_id}")
+        self.log_message(context, "info", f"Processing {dm.name} - {dm.session_id}")
+        # Skip processing messages originating from the same owner host
+        try:
+            owner_origin_host = owner_app.node.origin_host if (owner_app and hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host')) else None
+            message_origin_host = context.origin_host
+            if owner_origin_host and message_origin_host and message_origin_host == owner_origin_host:
+                self.log_message(context, "info", "The message comes from the host itself. SessionManager wont process it")
+                return None
+        except Exception:
+            pass
         result = self.pipeline.main_pipeline(context)
         if not result:
             return None
@@ -180,7 +217,7 @@ class SessionManager:
         Returns:
             bool: True if successful, False otherwise
         """
-        logger.info(f"Writing context to CSV: {context}")
+        self.log_message(context, "info", f"Writing context to CSV: {context}")
         try:
             row = {}
             for column in self.csv_file.get_csv_columns():
@@ -192,7 +229,7 @@ class SessionManager:
             return True
             
         except Exception as e:
-            logger.error(f"Error auto-writing to CSV for message {context.message.name if context.message else 'unknown'} - {context.session_id}: {e}")
+            self.log_message(context, "error", f"Error auto-writing to CSV for message {context.message.name if context.message else 'unknown'} - {context.session_id}: {e}")
             return False
 
     def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
@@ -210,7 +247,7 @@ class SessionManager:
             self.sessions.remove_session(answer_context.message.app_id, answer_context.session_id)
         
         if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-            logger.error(f"Answer with error: \n {diameter_message_answer}")
+            self.log_message(answer_context, "error", f"Answer with error: \n {diameter_message_answer}")
         # logger.info(f"\n{diameter_message_answer.dump()}")
 
         

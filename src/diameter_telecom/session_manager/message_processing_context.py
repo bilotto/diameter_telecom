@@ -39,6 +39,10 @@ class MessageProcessingContext:
     imsi: Optional[str] = None
     result_code: Optional[int] = None
     session_active: bool = False
+    origin_host: Optional[str] = None
+    origin_realm: Optional[str] = None
+    destination_host: Optional[str] = None
+    destination_realm: Optional[str] = None
     
     # Extensible data storage for pipeline stages
     _additional_data: Dict[str, Any] = field(default_factory=dict)
@@ -192,6 +196,14 @@ class MessageProcessingContext:
                 context.imsi = imsi
         if hasattr(dm.message, 'result_code') and dm.message.result_code:
             context.result_code = dm.message.result_code
+        if hasattr(dm.message, 'origin_host') and dm.message.origin_host:
+            context.origin_host = dm.message.origin_host.decode()
+        # if hasattr(dm.message, 'origin_realm') and dm.message.origin_realm:
+        #     context.origin_realm = dm.message.origin_realm
+        # if hasattr(dm.message, 'destination_host') and dm.message.destination_host:
+        #     context.destination_host = dm.message.destination_host
+        # if hasattr(dm.message, 'destination_realm') and dm.message.destination_realm:
+        #     context.destination_realm = dm.message.destination_realm
 
         return context
     
