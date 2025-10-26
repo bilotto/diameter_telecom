@@ -18,7 +18,7 @@ class AfRxApplication(CommonThreadingApplication):
 
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_RX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
-        self.related_apps: List[CommonThreadingApplication] = []
+        # related_apps removed; use owner-based discovery via get_app_by_id
 
     def _handle_request(self, message: Message):
         self.logger.info(f"{__class__.__name__} Received request {message.header.command_code} through node {self.node.origin_host}")

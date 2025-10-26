@@ -16,6 +16,7 @@ def handle_request_dsc(app: Application, message: Message):
     origin_host = message.origin_host.decode()
     origin_realm = message.origin_realm.decode()
     # Not all the messages have a destination_host, but they all should have a destination_real
+    destination_realm = message.destination_realm.decode()
     if hasattr(message, 'destination_host') and message.destination_host:
         destination_host = message.destination_host.decode()
         if peer := app.node.peers.get(destination_host):
@@ -26,7 +27,6 @@ def handle_request_dsc(app: Application, message: Message):
                 logger.error(f"Destination realm {destination_realm} does not match peer realm {peer.realm_name}. Routing message to it")
     else:
         destination_host = None
-    destination_realm = message.destination_realm.decode()
     logger.debug(f"DSC Request: \n{dump(message)}")
     # This routes the request to the next application
     answer = app.send_request(message)

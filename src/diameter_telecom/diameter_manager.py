@@ -59,37 +59,49 @@ def define_node_startup_order(nodes_to_start: List[Node]) -> List[str]:
 @dataclass
 class DiameterManager:
     session_manager: SessionManager = field(default_factory=get_session_manager)
-    subscribers: Subscribers = field(default=None)
     _nodes: Dict[str, DiameterEntity] = field(default_factory=dict)
+    _applications: List[CommonThreadingApplication] = field(default_factory=list)
+    # _services: Dict[int, ApplicationService] = field(default_factory=dict)
+    service: ApplicationService = field(default=None)
+
+    def add_node(self, node: DiameterEntity):
+        self._nodes[node.origin_host] = node
+        # for app in node.applications:
+        #     self._applications.append(app)
     
 
     def create_pcef(self, origin_host: str, realm_name: str, ip_addresses: List[str], tcp_port: int, sctp_port: int = None, vendor_ids: List[int] = [10415]) -> PCEF:
         pcef = PCEF(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
-        self._nodes[pcef.origin_host] = pcef
+        self.add_node(pcef)
         return pcef
 
     def create_pcrf(self, origin_host: str, realm_name: str, ip_addresses: List[str], tcp_port: int, sctp_port: int = None, vendor_ids: List[int] = [10415]) -> PCRF:
         pcrf = PCRF(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
-        self._nodes[pcrf.origin_host] = pcrf
+        self.add_node(pcrf)
         return pcrf
     
     def create_af(self, origin_host: str, realm_name: str, ip_addresses: List[str], tcp_port: int, sctp_port: int = None, vendor_ids: List[int] = [10415]) -> AF:
         af = AF(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
-        self._nodes[af.origin_host] = af
+        self.add_node(af)
         return af
 
     def create_ocs(self, origin_host: str, realm_name: str, ip_addresses: List[str], tcp_port: int, sctp_port: int = None, vendor_ids: List[int] = [10415]) -> OCS:
         ocs = OCS(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
-        self._nodes[ocs.origin_host] = ocs
+        self.add_node(ocs)
         return ocs
     
-    def create_dsc(self, origin_host: str, realm_name: str, ip_addresses: List[str], tcp_port: int, sctp_port: int = None, vendor_ids: List[int] = [10415]) -> DSC:
-        dsc = DSC(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
-        self._nodes[dsc.origin_host] = dsc
-        return dsc
+    # def create_dsc(self, origin_host: str, realm_name: str, ip_addresses: List[str], tcp_port: int, sctp_port: int = None, vendor_ids: List[int] = [10415]) -> DSC:
+    #     dsc = DSC(origin_host=origin_host, realm_name=realm_name, ip_addresses=ip_addresses, tcp_port=tcp_port, sctp_port=sctp_port, vendor_ids=vendor_ids)
+    #     self.add_node(dsc)
+    #     return dsc
 
-    def create_application_service(self, applications: List[CommonThreadingApplication], diameter_config: dict) -> ApplicationService:
-        application_service = ApplicationService(applications=applications, diameter_config=diameter_config, session_manager=self.session_manager)
+    def create_application_service(self, diameter_config: dict) -> ApplicationService:
+        apps = []
+        for entity in self._nodes.values():
+            for app in entity.node.applications:
+                apps.append(app)
+        application_service = ApplicationService(applications=apps, diameter_config=diameter_config, session_manager=self.session_manager)                          
+        self.service = application_service
         return application_service
 
     def to_dict(self) -> Dict[str, DiameterEntity]:

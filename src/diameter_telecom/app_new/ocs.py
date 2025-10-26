@@ -18,7 +18,7 @@ class OcsSyApplication(CommonThreadingApplication):
     MESSAGE_TERMINATE_SESSION = None
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_SY, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
-        self.related_apps: List[CommonThreadingApplication] = []
+        # related_apps removed; use owner-based discovery via get_app_by_id
 
     def _handle_request(self, message: SpendingLimitRequest | SpendingStatusNotificationRequest | SessionTerminationRequest):
         answer = message.to_answer()

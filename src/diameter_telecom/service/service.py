@@ -44,16 +44,14 @@ class ApplicationService:
             session_manager = get_session_manager()
         self.session_manager = session_manager
         self.set_session_manager(session_manager)
-        for i in self.applications:
-            for j in self.applications:
-                if i.application_id != j.application_id:
-                    i.related_apps.append(j)
-
         self.logger = logging.getLogger("diameter_telecom")
 
     @property
     def subscribers(self) -> Subscribers:
         return self.session_manager.subscribers
+
+    def __repr__(self):
+        return str(self.to_dict())
 
     def to_dict(self):
         service_dict = dict()

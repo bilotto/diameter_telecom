@@ -61,11 +61,23 @@ class CommonThreadingApplication(ThreadingApplication):
         if hasattr(self.session_manager, 'register_owner'):
             self.session_manager.register_owner(self)
 
-    def set_subscribers(self, subscribers: Subscribers):
-        # Delegate to session manager to keep single source of truth
-        if hasattr(self.session_manager, 'set_subscribers'):
-            self.session_manager.set_subscribers(subscribers)
-        self.subscribers = self.session_manager.subscribers
+    # def set_subscribers(self, subscribers: Subscribers):
+    #     # Delegate to session manager to keep single source of truth
+    #     if hasattr(self.session_manager, 'set_subscribers'):
+    #         self.session_manager.set_subscribers(subscribers)
+    #     self.subscribers = self.session_manager.subscribers
+
+    # Owner-based discovery of peer applications
+    def get_app_by_id(self, app_id: int):
+        """Lookup a peer application by app_id via SessionManager owners."""
+        if not hasattr(self.session_manager, 'get_owners_by_app_id'):
+            return None
+        owners = self.session_manager.get_owners_by_app_id(app_id)
+        # Prefer a different instance than self if multiple are registered
+        for owner in owners:
+            if owner is not self:
+                return owner
+        return owners[0] if owners else None
 
     def handle_request(self, message: Message):
         """Template method: processes request with owner tracking, delegates to subclass"""
@@ -74,16 +86,6 @@ class CommonThreadingApplication(ThreadingApplication):
         self.logger.info(f"Received request {dm_request.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"\n{dm_request.dump()}")
         self.session_manager.process_diameter_message(dm_request, owner_app=self)
-
-        # answer: Any = message.to_answer()
-        # answer.session_id = message.session_id
-        # answer.origin_host = self.node.origin_host.encode()
-        # answer.origin_realm = self.node.realm_name.encode()
-        # answer.destination_realm = message.origin_realm
-        # answer.destination_host = message.origin_host
-        # if hasattr(message, 'auth_application_id') and message.auth_application_id:
-        #     answer.auth_application_id = message.auth_application_id
-        
         # Delegate to subclass implementation
         answer = self._handle_request(message)
         

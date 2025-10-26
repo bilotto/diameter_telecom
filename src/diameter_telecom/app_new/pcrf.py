@@ -30,21 +30,17 @@ class PcrfGxApplication(CommonThreadingApplication):
     MESSAGE_REFRESH_SESSION = RAR
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_GX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
-        self.related_apps: List[CommonThreadingApplication] = []
+        # related_apps removed; use owner-based discovery via get_app_by_id
 
     @property
     def rx_app(self) -> CommonThreadingApplication:
-        return self.get_related_app(APP_3GPP_RX)
+        return self.get_app_by_id(APP_3GPP_RX)
 
     @property
     def sy_app(self) -> CommonThreadingApplication:
-        return self.get_related_app(APP_3GPP_SY)
+        return self.get_app_by_id(APP_3GPP_SY)
 
-    def get_related_app(self, app_id: int) -> CommonThreadingApplication:
-        for app in self.related_apps:
-            if app.application_id == app_id:
-                return app
-        return None
+    # get_related_app removed; replaced by owner-based lookup in base class
 
     def create_request(self, session: GxSession) -> ReAuthRequest:
         request = ReAuthRequest()
@@ -225,17 +221,19 @@ def identify_voice_call(request: AaRequest) -> bool:
 class PcrfRxApplication(CommonThreadingApplication):
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_RX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
-        self.related_apps: List[CommonThreadingApplication] = []
+        # self.related_apps: List[CommonThreadingApplication] = []
 
     @property
     def gx_app(self) -> PcrfGxApplication:
-        return self.get_related_app(APP_3GPP_GX)
+        return self.get_app_by_id(APP_3GPP_GX)
 
-    def get_related_app(self, app_id: int) -> CommonThreadingApplication:
-        for app in self.related_apps:
-            if app.application_id == app_id:
-                return app
-        return None
+    # def get_related_app(self, app_id: int) -> CommonThreadingApplication:
+    #     for app in self.related_apps:
+    #         if not isinstance(app, PcrfGxApplication):
+    #             continue
+    #         if app.application_id == app_id:
+    #             return app
+    #     return None
 
     def create_session(self) -> RxSession:
         pass
