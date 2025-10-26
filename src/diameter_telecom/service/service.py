@@ -1,5 +1,3 @@
-# from diameter_telecom.app_new.common import CommonThreadingApplication
-# from diameter_telecom.session_manager.session_manager import SessionManager
 from ..app_new.common import CommonThreadingApplication
 from ..message import DiameterMessage
 from ..session_manager import SessionManager
@@ -25,7 +23,10 @@ class ApplicationService:
     applications: List[CommonThreadingApplication]
     subscribers: Subscribers
 
-    def __init__(self, applications: List[CommonThreadingApplication], diameter_config: dict, framed_ip_address_cidr: str = "192.168.1.0/24", session_manager: SessionManager = None, subscribers: Subscribers = None):
+    def __init__(self, applications: List[CommonThreadingApplication],
+                    diameter_config: dict,
+                    framed_ip_address_cidr: str = "192.168.1.0/24",
+                    session_manager: SessionManager = None):
         app_ids = []
         for i in applications:
             if not isinstance(i, CommonThreadingApplication):
@@ -41,22 +42,18 @@ class ApplicationService:
         self.ip_queue = IpQueue(framed_ip_address_cidr)
         if not session_manager:
             session_manager = get_session_manager()
-        if not subscribers:
-            subscribers = session_manager.subscribers
         self.session_manager = session_manager
-        self.subscribers = subscribers
         self.set_session_manager(session_manager)
-        self.set_subscribers(subscribers)
-        # Register the service's applications as owners (service itself is not an owner)
-        if hasattr(self.session_manager, 'register_owner'):
-            for i in self.applications:
-                self.session_manager.register_owner(i)
         for i in self.applications:
             for j in self.applications:
                 if i.application_id != j.application_id:
                     i.related_apps.append(j)
 
         self.logger = logging.getLogger("diameter_telecom")
+
+    @property
+    def subscribers(self) -> Subscribers:
+        return self.session_manager.subscribers
 
     def to_dict(self):
         service_dict = dict()
@@ -86,19 +83,17 @@ class ApplicationService:
 
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
-        self.subscribers = session_manager.subscribers
+        # self.subscribers = session_manager.subscribers
         for i in self.applications:
             i.set_session_manager(session_manager)
-            if hasattr(self.session_manager, 'register_owner'):
-                self.session_manager.register_owner(i)
 
-    def set_subscribers(self, subscribers: Subscribers):
-        # Delegate to session manager to keep single source of truth
-        if hasattr(self.session_manager, 'set_subscribers'):
-            self.session_manager.set_subscribers(subscribers)
-        self.subscribers = self.session_manager.subscribers
-        for i in self.applications:
-            i.set_subscribers(self.subscribers)
+    # def set_subscribers(self, subscribers: Subscribers):
+    #     # Delegate to session manager to keep single source of truth
+    #     if hasattr(self.session_manager, 'set_subscribers'):
+    #         self.session_manager.set_subscribers(subscribers)
+    #     self.subscribers = self.session_manager.subscribers
+    #     for i in self.applications:
+    #         i.set_subscribers(self.subscribers)
 
     # delegates to the application
     def create_session(self, app_id: int, subscriber: Subscriber) -> DiameterSession:
@@ -136,10 +131,6 @@ class ApplicationService:
             request = app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
         elif goal == "refresh":
             request = app.create_request(app.MESSAGE_REFRESH_SESSION, session)
-        # for key, value in app.avps.items():
-        #     logger.debug(f"First layer of AVPS (app): {key} = {value}")
-        #     if hasattr(request, key):
-        #         setattr(request, key, value)
         return request
 
     def start_session(self, app_id: int, session: DiameterSession, request: Message = None):
@@ -152,7 +143,6 @@ class ApplicationService:
             raise ValueError(f"Session not found")
         if not isinstance(session, DiameterSession):
             raise ValueError(f"Session is not a DiameterSession")
-        # request: Message = app.create_request(app.MESSAGE_CREATE_SESSION, session)
         if not request:
             request = self._create_request(app_id, session, goal="create")
         for key, value in app.avps.items():
@@ -189,7 +179,6 @@ class ApplicationService:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a update_session method")
-        # request: Message = app.create_request(app.MESSAGE_UPDATE_SESSION, session)
         if not request:
             request = self._create_request(app_id, session, goal="update")
         for key, value in app.avps.items():
@@ -214,7 +203,6 @@ class ApplicationService:
                 avp_value = i.get("value")
                 if hasattr(request, avp_name):
                     setattr(request, avp_name, avp_value)
-        # return app.send_request_custom(request)
         answer = app.send_request_custom(request)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             self.logger.error(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
@@ -260,3 +248,4 @@ class ApplicationService:
         for i in self.applications:
             if i.node._started:
                 i.node.stop()
+ 

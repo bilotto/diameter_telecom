@@ -1,7 +1,7 @@
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 from .subscriber import Subscriber, Subscribers
-from .apn import APN
+# from .apn import APN
 from .subscriber_generator import SubscriberGenerator
 
 @dataclass
@@ -9,7 +9,7 @@ class Carrier:
     name: str
     mcc_mnc: List[str]
     country_code: str
-    apns: Dict[str, APN] = field(default_factory=dict)
+    # apns: Dict[str, APN] = field(default_factory=dict)
     subscribers: Subscribers = field(default_factory=Subscribers)
     apn_list: List[str] = field(default_factory=list)
     msisdn_length: int = 13
@@ -26,11 +26,10 @@ class Carrier:
         # Use the first MCC/MNC from the list as the primary one
         primary_mcc_mnc = self.mcc_mnc[0] if self.mcc_mnc else "00000"
         self.subscriber_generator = SubscriberGenerator(
-            carrier_name=self.name,
             mcc_mnc=primary_mcc_mnc,
             country_code=self.country_code,
             msisdn_length=self.msisdn_length,
-            imsi_length=self.imsi_length
+            imsi_length=self.imsi_length 
         )
 
     # def add_subscriber(self, subscriber: Subscriber) -> Subscriber:
@@ -92,11 +91,3 @@ class Carrier:
             subscriber = self.create_subscriber(**kwargs)
             subscribers.append(subscriber)
         return subscribers
-    
-    def get_subscriber_generator_stats(self) -> dict:
-        """Get statistics about the subscriber generator.
-        
-        Returns:
-            Dictionary with generator statistics
-        """
-        return self.subscriber_generator.get_stats()

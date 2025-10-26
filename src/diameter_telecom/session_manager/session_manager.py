@@ -333,6 +333,9 @@ class SessionManager:
     def _register_owner(self, owner_app: Any):
         """Register an application as an owner of this SessionManager.
         
+        Idempotent: replaces any previous entry for the same object, even if the
+        previously computed key (e.g., before node.origin_host was set) differs.
+        
         Args:
             owner_app: The application object to register
         """
@@ -352,6 +355,13 @@ class SessionManager:
         owner_key = f"{owner_app.__class__.__name__}({origin_host})"
         
         with self._owners_lock_context():
+            # Remove any existing entry pointing to the same object (by identity)
+            stale_keys = [k for k, v in self.owners.items() if v is owner_app]
+            for k in stale_keys:
+                if k != owner_key:
+                    del self.owners[k]
+                    logger.debug(f"Removed stale owner key: {k}")
+            # Upsert current key
             self.owners[owner_key] = owner_app
             logger.debug(f"Registered owner: {owner_key}")
 

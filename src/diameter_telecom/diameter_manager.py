@@ -89,9 +89,7 @@ class DiameterManager:
         return dsc
 
     def create_application_service(self, applications: List[CommonThreadingApplication], diameter_config: dict) -> ApplicationService:
-        # Ensure subscribers comes from the session_manager as the source of truth
-        subscribers = self.session_manager.subscribers
-        application_service = ApplicationService(applications=applications, diameter_config=diameter_config, session_manager=self.session_manager, subscribers=subscribers)
+        application_service = ApplicationService(applications=applications, diameter_config=diameter_config, session_manager=self.session_manager)
         return application_service
 
     def to_dict(self) -> Dict[str, DiameterEntity]:

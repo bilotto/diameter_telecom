@@ -18,18 +18,16 @@ class SubscriberGenerator:
     duplicate subscriber generation in concurrent scenarios.
     """
     
-    def __init__(self, carrier_name: str, mcc_mnc: str, country_code: str, 
+    def __init__(self, mcc_mnc: str, country_code: str, 
                  msisdn_length: int = 13, imsi_length: int = 15):
         """Create a new subscriber generator.
         
         Args:
-            carrier_name: Name of the carrier (for logging/debugging)
             mcc_mnc: Mobile Country Code + Mobile Network Code (e.g., "72488")
             country_code: Country calling code (e.g., "55" for Brazil)
             msisdn_length: Total length of MSISDN (default: 13)
             imsi_length: Total length of IMSI (default: 15)
         """
-        self.carrier_name = carrier_name
         self.mcc_mnc = str(mcc_mnc)
         self.country_code = str(country_code)
         self.msisdn_length = msisdn_length
@@ -109,7 +107,6 @@ class SubscriberGenerator:
             Dictionary with generator statistics
         """
         return {
-            "carrier_name": self.carrier_name,
             "mcc": self.mcc,
             "mnc": self.mnc,
             "country_code": self.country_code,

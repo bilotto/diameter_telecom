@@ -73,8 +73,7 @@ class PcrfGxApplication(CommonThreadingApplication):
         answer.auth_application_id = APP_3GPP_GX
         answer.cc_request_type = message.cc_request_type
         answer.cc_request_number = message.cc_request_number
-        
-
+        #
         subscriber = None
         gx_session = None
         if self.session_manager.sessions.get_session_by_id(APP_3GPP_GX, message.session_id):
@@ -250,7 +249,6 @@ class PcrfRxApplication(CommonThreadingApplication):
         answer.destination_realm = message.origin_realm
         answer.destination_host = message.origin_host
         answer.auth_application_id = APP_3GPP_RX
-        answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
 
         if isinstance(message, AaRequest):
             rx_session: RxSession = self.session_manager.sessions.get_session_by_id(APP_3GPP_RX, message.session_id)
@@ -263,20 +261,36 @@ class PcrfRxApplication(CommonThreadingApplication):
                 raise ValueError(f"Gx session {rx_session.gx_session_id} not found")
             voice_call = identify_voice_call(message)
             # If voice call, we need to trigger RAR to PCEF
-            if voice_call and self.gx_app:
+            if voice_call:
+                if not self.gx_app:
+                    self.logger.error(f"{__class__.__name__}❌ Rx AAR: Gx application not found for voice call")
+                    answer.result_code = E_RESULT_CODE_DIAMETER_UNABLE_TO_COMPLY
+                    return answer
+
                 # Grab Gx session from SessionManager
                 try:
                     request = self.gx_app.create_request(gx_session)
                     request.destination_host = gx_session.origin_host
                     request.destination_realm = gx_session.origin_realm
                     request.charging_rule_install.append(ChargingRuleInstall("VOICE_CALL"))
-                    self.gx_app.send_request_custom(request, timeout=2)
+                    gx_answer = self.gx_app.send_request_custom(request, timeout=2)
+                    if gx_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+                        self.logger.error(f"{__class__.__name__}❌ Rx AAR: Failed to send RAR to PCEF for voice call {gx_answer.result_code}")
+                        answer.result_code = E_RESULT_CODE_DIAMETER_AUTHORIZATION_REJECTED
+                        return answer
                     
                 except Exception as e:
                     self.logger.error(f"{__class__.__name__}❌ Rx AAR: Failed to send RAR to PCEF for voice call {e}")
                     pass
+
+
+
         elif isinstance(message, SessionTerminationRequest):
             pass
+
+        answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
+
+
         return answer
 
 

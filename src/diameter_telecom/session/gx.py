@@ -15,8 +15,7 @@ from ..apn import ip_to_bytes, bytes_to_ip
 class GxSession(DiameterSession):
     app_id: int = APP_3GPP_GX
     framed_ip_address: Optional[str] = field(default=None)
-    # framed_ipv6_prefix: Optional[str] = field(default=None)
-    framed_ipv6_prefix: Optional[str] = field(default=None, init=False)
+    framed_ipv6_prefix: Optional[str] = field(default=None)
     called_station_id: Optional[str] = field(default=None)
     sgsn_mcc_mnc: Optional[str] = field(default=None)
     granted_service_unit: Optional[Dict] = field(default_factory=dict)

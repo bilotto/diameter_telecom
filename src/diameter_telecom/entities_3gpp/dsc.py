@@ -15,16 +15,18 @@ def handle_request_dsc(app: Application, message: Message):
     logger.debug("Routing message to application")
     origin_host = message.origin_host.decode()
     origin_realm = message.origin_realm.decode()
-    destination_host = message.destination_host.decode()
+    # Not all the messages have a destination_host, but they all should have a destination_real
+    if hasattr(message, 'destination_host') and message.destination_host:
+        destination_host = message.destination_host.decode()
+        if peer := app.node.peers.get(destination_host):
+            logger.debug(f"Peer {destination_host} found. Routing message to it")
+            if destination_realm == peer.realm_name:
+                logger.debug(f"Destination realm {destination_realm} matches peer realm {peer.realm_name}. Routing message to it")
+            else:
+                logger.error(f"Destination realm {destination_realm} does not match peer realm {peer.realm_name}. Routing message to it")
+    else:
+        destination_host = None
     destination_realm = message.destination_realm.decode()
-    if peer := app.node.peers.get(destination_host):
-        logger.debug(f"Peer {destination_host} found. Routing message to it")
-        if destination_realm == peer.realm_name:
-            logger.debug(f"Destination realm {destination_realm} matches peer realm {peer.realm_name}. Routing message to it")
-        else:
-            logger.error(f"Destination realm {destination_realm} does not match peer realm {peer.realm_name}. Routing message to it")
-        # logger.error(f"Peer {destination_host} not found. Trying anyway")
-
     logger.debug(f"DSC Request: \n{dump(message)}")
     # This routes the request to the next application
     answer = app.send_request(message)
