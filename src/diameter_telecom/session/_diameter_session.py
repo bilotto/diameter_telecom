@@ -32,6 +32,13 @@ class DiameterSession:
     def avps(self) -> Dict[str, Any]:
         return self._avps
 
+    def add_avps(self, message: Message):
+        for key, value in self.avps.items():
+            if hasattr(message, key):
+                self.logger.debug(f"Adding AVPS (session): {key} = {value}")
+                setattr(message, key, value)
+        return message
+
     def add_avp(self, key: str, value: Any):
         self._avps[key] = value
 
@@ -82,8 +89,8 @@ class DiameterSession:
             logger.warning(f"[{self.session_id}] (add_message) Message {dm.name} has no end-to-end identifier. This is not allowed.")
             pass
         if self.n_messages == 0:
-            self.origin_host = dm.message.origin_host
-            self.origin_realm = dm.message.origin_realm
+            self.origin_host = dm.message.origin_host.decode()
+            self.origin_realm = dm.message.origin_realm.decode()
         # if not dm.timestamp:
         #     dm.timestamp = time.time()
         # dm.session_id = None

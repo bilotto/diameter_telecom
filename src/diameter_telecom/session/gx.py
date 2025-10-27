@@ -29,8 +29,10 @@ class GxSession(DiameterSession):
 
     @property
     def avps(self) -> Dict[str, str]:
-        if self.framed_ip_address:
+        if self.framed_ip_address and isinstance(self.framed_ip_address, str):
             self._avps['framed_ip_address'] = ip_to_bytes(self.framed_ip_address)
+        elif self.framed_ip_address:
+            self._avps['framed_ip_address'] = self.framed_ip_address  # Assume already in bytes
         if self.framed_ipv6_prefix:
             self._avps['framed_ipv6_prefix'] = self.framed_ipv6_prefix
         if self.called_station_id:

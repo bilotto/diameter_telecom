@@ -1,7 +1,8 @@
 from ..subscriber import Subscriber, Subscribers
 from ..session import GxSession, RxSession, SySession, DiameterSession
 from .sessions import Sessions
-from .message_processing_pipeline import MessageProcessingPipeline
+from .message_processing_pipeline_refactor import MessageProcessingPipeline
+# from .message_processing_pipeline import MessageProcessingPipeline
 from .message_processing_context import MessageProcessingContext
 from ..csv_file import CsvFile
 from typing import List, Dict, Optional, Any
@@ -186,6 +187,7 @@ class SessionManager:
             except Exception:
                 owner_key = None
             context.owner_key = owner_key
+        # self.log_message(context, "info", f"Message: {dm.dump()}")
         self.log_message(context, "info", f"Processing {dm.name} - {dm.session_id}")
         # Skip processing messages originating from the same owner host
         try:

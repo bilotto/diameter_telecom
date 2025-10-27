@@ -26,6 +26,13 @@ class CommonThreadingApplication(ThreadingApplication):
     def sessions(self) -> Sessions:
         return self.session_manager.sessions
 
+    def add_avps(self, message: Message):
+        for key, value in self.avps.items():
+            if hasattr(message, key):
+                self.logger.debug(f"Adding AVPS (application): {key} = {value}")
+                setattr(message, key, value)
+        return message
+
     @property
     def avps(self):
         if self.is_auth_application:

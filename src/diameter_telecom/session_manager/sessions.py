@@ -41,7 +41,7 @@ class Sessions:
     framed_ip_index: Dict[Tuple[int, str], str] = field(default_factory=dict)
     framed_ipv6_index: Dict[Tuple[int, str], str] = field(default_factory=dict) 
     msisdn_index: Dict[Tuple[int, str], str] = field(default_factory=dict)
-    _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     
     @property
     def sessions(self) -> Dict[int, Dict[str, DiameterSession]]:

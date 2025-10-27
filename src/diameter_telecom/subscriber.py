@@ -4,6 +4,9 @@ import threading
 from diameter.message.avp.grouped import SubscriptionId
 from .constants import *
 from .message import DiameterMessage
+from diameter.message import Message
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Subscriber:
@@ -76,6 +79,14 @@ class Subscriber:
     #     # Add message count
     #     fields.append(f"messages={len(self.messages)}")
     #     return f"Subscriber({', '.join(fields)})"
+
+    def add_avps(self, message: Message) -> Message:
+        logger.debug(f"Subscriber AVPS: {self.avps}")
+        for key, value in self.avps.items():
+            if hasattr(message, key):
+                setattr(message, key, value)
+                logger.debug(f"Adding AVPS (subscriber): {key} = {value}")
+        return message
 
     @property
     def subscription_id(self) -> List[SubscriptionId]:
@@ -153,7 +164,7 @@ import uuid
 
 @dataclass
 class Subscribers:
-    subscribers: Dict[str, Subscriber] = field(default_factory=dict, repr=False)
+    subscribers: Dict[str, Subscriber] = field(default_factory=dict, repr=True)
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8], repr=True)
 

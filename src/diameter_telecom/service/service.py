@@ -79,6 +79,13 @@ class ApplicationService:
     def get_avps(self, app_id: int):
         return self.diameter_config.get(app_id, {})
 
+    def add_avps(self, message: Message):
+        app_id = message.header.application_id
+        for key, value in self.get_avps(app_id).items():
+            if hasattr(message, key):
+                setattr(message, key, value)
+        return message
+
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
         # self.subscribers = session_manager.subscribers
@@ -100,7 +107,10 @@ class ApplicationService:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_session"):
             raise ValueError(f"Application {app_id} does not have a create_session method")
-        return app.create_session(subscriber)
+        diameter_session = app.create_session(subscriber)
+        if hasattr(diameter_session, "framed_ip_address") and not diameter_session.framed_ip_address:
+            diameter_session.framed_ip_address = self.ip_queue.get_ip()
+        return diameter_session
 
     def create_gx_session(self, subscriber: Subscriber) -> GxSession:
         return self.create_session(APP_3GPP_GX, subscriber)
@@ -131,7 +141,7 @@ class ApplicationService:
             request = app.create_request(app.MESSAGE_REFRESH_SESSION, session)
         return request
 
-    def start_session(self, app_id: int, session: DiameterSession, request: Message = None):
+    def start_session(self, app_id: int, session: DiameterSession, request: Message = None) -> DiameterSession:
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
@@ -142,23 +152,21 @@ class ApplicationService:
         if not isinstance(session, DiameterSession):
             raise ValueError(f"Session is not a DiameterSession")
         if not request:
-            request = self._create_request(app_id, session, goal="create")
-        for key, value in app.avps.items():
-            logger.debug(f"First layer of AVPS (application): {key} = {value}")
-            if hasattr(request, key):
-                setattr(request, key, value)
-        for key, value in session.avps.items():
-            logger.debug(f"Second layer of AVPS (session): {key} = {value}")
-            if hasattr(request, key):
-                setattr(request, key, value)
-        for key, value in self.get_avps(app_id).items():
-            logger.debug(f"Third layer of AVPS (service): {key} = {value}")
-            if hasattr(request, key):
-                setattr(request, key, value)
-        for key, value in session.subscriber.avps.items():
-            logger.debug(f"Fourth layer of AVPS (subscriber): {key} = {value}")
-            if hasattr(request, key):
-                setattr(request, key, value)
+            request: Message = self._create_request(app_id, session, goal="create")
+        logger.debug(f"First layer of AVPS (application)")
+        request = app.add_avps(request)
+        # for key, value in app.avps.items():
+        #     if hasattr(request, key):
+        #         setattr(request, key, value)
+        logger.debug(f"Second layer of AVPS (session)")
+        request = session.add_avps(request)
+        # for key, value in session.avps.items():
+        #     if hasattr(request, key):
+        #         setattr(request, key, value)
+        logger.debug(f"Third layer of AVPS (service)")
+        request = self.add_avps(request)
+        logger.debug(f"Fourth layer of AVPS (subscriber)")
+        request = session.subscriber.add_avps(request)
         answer = app.send_request_custom(request)
         time.sleep(1)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
