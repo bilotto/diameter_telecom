@@ -54,6 +54,9 @@ class DiameterMessage:
     def name(self):
         return name_diameter_message(self.is_request, self.cmd_code, self.cc_request_type)
 
+    def __repr__(self):
+        return f"{self.time},{self.name}"
+
     @property
     def message(self) -> Message:
         if self._message is None:
@@ -100,7 +103,7 @@ class DiameterMessage:
         return dump(self.message)
     
     def __repr__(self):
-        return f"{self.time},{self.hop_by_hop_id},{self.end_to_end_id},{self.name}"
+        return f"{self.time},{self.name}"
     
     def __eq__(self, other):
         return self.hop_by_hop_id == other.hop_by_hop_id and self.end_to_end_id == other.end_to_end_id and self.is_request == other.is_request
@@ -137,60 +140,6 @@ class DiameterMessage:
             }
 
 
-# def name_diameter_message(diameter_message: DiameterMessage) -> str | None:
-#     """
-#     Get the name of a diameter message based on its type and request/response status.
-    
-#     This function determines the appropriate name for a Diameter message based on
-#     its type (e.g., Credit Control, Re-Auth, etc.) and whether it's a request or
-#     answer message.
-    
-#     Args:
-#         diameter_message: The DiameterMessage instance to name
-        
-#     Returns:
-#         str: The message name (e.g., CCR-I, CCA-I, RAR, RAA, etc.) or None if not recognized
-#     """
-#     message = diameter_message.message
-#     is_request = message.header.is_request
-
-#     if isinstance(message, CreditControl):
-#         cc_type_mapping = {
-#             E_CC_REQUEST_TYPE_INITIAL_REQUEST: (CCR_I, CCA_I),
-#             E_CC_REQUEST_TYPE_UPDATE_REQUEST: (CCR_U, CCA_U),
-#             E_CC_REQUEST_TYPE_TERMINATION_REQUEST: (CCR_T, CCA_T)
-#         }
-        
-#         cc_request_type = getattr(message, 'cc_request_type', None) if hasattr(message, 'cc_request_type') else None
-        
-#         if cc_request_type is not None and cc_request_type in cc_type_mapping:
-#             return cc_type_mapping[cc_request_type][0 if isinstance(message, CreditControlRequest) else 1]
-        
-#         if isinstance(message, CreditControlRequest):
-#             return "CCR"
-#         else:
-#             if hasattr(message, 'result_code') and message.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-#                 return "CCA-ERROR"
-#             return "CCA"
-
-#     message_type_mapping = {
-#         ReAuth: (RAR, RAA),
-#         AbortSession: (ASR, ASA),
-#         SpendingLimit: (SLR, SLA),
-#         SpendingStatusNotification: (SSNR, SSNA),
-#         DeviceWatchdog: (DWR, DWA),
-#         CapabilitiesExchange: (CER, CEA),
-#         SessionTermination: (STR, STA),
-#         Aa: (AAR, AAA),
-#         DisconnectPeer: (DPR, DPA)
-#     }
-
-#     for msg_type, (req_name, ans_name) in message_type_mapping.items():
-#         if isinstance(message, msg_type):
-#             return req_name if is_request else ans_name
-
-#     return f"{diameter_message.message.header.application_id},{diameter_message.message.header.command_code}"
-
 def name_diameter_message(is_request, cmd_code, cc_request_type):
     if cmd_code == CMD_CREDIT_CONTROL:
         if cc_request_type == E_CC_REQUEST_TYPE_INITIAL_REQUEST:
@@ -222,30 +171,57 @@ def name_diameter_message(is_request, cmd_code, cc_request_type):
     else:
         return f"{cmd_code}"
 
+from typing import List, Optional
+from typing_extensions import Tuple
+from dataclasses import dataclass, field
 
-def create_message(name: str) -> Message:
-    if name == CCR_I:
-        message = CreditControlRequest()
-        message.cc_request_type = E_CC_REQUEST_TYPE_INITIAL_REQUEST
-        message.cc_request_number = 0
-    elif name == CCR_U:
-        message = CreditControlRequest()
-        message.cc_request_type = E_CC_REQUEST_TYPE_UPDATE_REQUEST
-    elif name == CCR_T:
-        message = CreditControlRequest()
-        message.cc_request_type = E_CC_REQUEST_TYPE_TERMINATION_REQUEST
-    elif name == RAR:
-        message = ReAuthRequest()
-    elif name == ASR:
-        message = AbortSessionRequest()
-    elif name == SLR:
-        message = SpendingLimitRequest()
-    elif name == SSNR:
-        message = SpendingStatusNotificationRequest()
-    elif name == STR:
-        message = SessionTerminationRequest()
-    elif name == AAR:
-        message = AaRequest()
-    else:
-        raise ValueError(f"Invalid message name: {name}")
-    return message 
+@dataclass
+class DiameterMessages:
+    messages: List[DiameterMessage] = field(default_factory=list)
+    messages_pairs: List[Tuple[DiameterMessage, DiameterMessage]] = field(default_factory=list)
+    last_end_to_end_id: Optional[str] = field(default=None) # end_to_end_id
+    last_is_request: Optional[bool] = field(default=None) # is_request
+
+
+    def __iter__(self):
+        return iter(self.messages)
+
+    def __contains__(self, message: DiameterMessage):
+        return message in self.messages
+
+    def __len__(self):
+        return len(self.messages)
+
+    def __getitem__(self, index):
+        return self.messages[index]
+
+    def __setitem__(self, index, value):
+        self.messages[index] = value
+
+    def __delitem__(self, index):
+        del self.messages[index]
+
+    def __iter__(self):
+        return iter(self.messages)
+
+    def __next__(self):
+        return next(self.messages)  
+
+    def append(self, message: DiameterMessage):
+        if isinstance(message, Message):
+            message = DiameterMessage(message)
+        logger.debug(message)
+        if len(self.messages) == 0:
+            logger.debug(f"First message: {message}")
+            if not message.is_request:
+                logger.error(f"Tried to start DiameterMessages with a message that is not a request: {message.name}")
+                return
+        else:
+            if self.last_end_to_end_id and message.end_to_end_id != self.last_end_to_end_id:
+                logger.error(f"Tried to add message with different end_to_end_id: {message.name}")
+                return
+        self.messages.append(message)
+        if message.is_request:
+            self.last_end_to_end_id = message.end_to_end_id
+        else:
+            self.last_end_to_end_id = None

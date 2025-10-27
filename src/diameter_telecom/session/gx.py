@@ -55,6 +55,12 @@ class GxSession(DiameterSession):
     def add_message(self, diameter_message: DiameterMessage):
         message = diameter_message.message
 
+        if diameter_message.name == CCA_I:
+            if diameter_message.result_code == E_RESULT_CODE_DIAMETER_SUCCESS:
+                self.activate()
+            else:
+                self.error = True
+
         # Add active event triggers to session
         if diameter_message.name in [CCA_I, CCA_U, RAR]:
             if hasattr(message, 'event_trigger') and message.event_trigger:
@@ -77,8 +83,10 @@ class GxSession(DiameterSession):
                         if isinstance(charging_rule_install.charging_rule_name, list):
                             for i in charging_rule_install.charging_rule_name:
                                 self.charging_rule_name.append(i)
-                        else:
+                        elif isinstance(charging_rule_install.charging_rule_name, str):
                             self.charging_rule_name.append(charging_rule_install.charging_rule_name)
+                        elif isinstance(charging_rule_install.charging_rule_name, bytes):
+                            self.charging_rule_name.append(charging_rule_install.charging_rule_name.decode())
                     if charging_rule_install.charging_rule_definition:
                         if isinstance(charging_rule_install.charging_rule_definition, list):
                             for i in charging_rule_install.charging_rule_definition:

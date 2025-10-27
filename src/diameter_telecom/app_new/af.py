@@ -7,7 +7,7 @@ from diameter.message.commands import SessionTerminationRequest, ReAuthRequest, 
 
 from .. import Subscriber
 from ..constants import *
-from ..message import DiameterMessage, create_message
+from ..message import DiameterMessage
 from ..session.rx import RxSession
 from .common import CommonThreadingApplication
 

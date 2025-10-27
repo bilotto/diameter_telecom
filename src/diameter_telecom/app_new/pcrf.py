@@ -18,7 +18,7 @@ from diameter.message.constants import *
 
 from ..constants import *
 from ..diameter_layer.parse_avp import *
-from ..message import DiameterMessage, create_message
+from ..message import DiameterMessage
 from ..session.gx import GxSession
 from ..session.rx import RxSession
 from ..session.sy import SySession
@@ -268,8 +268,8 @@ class PcrfRxApplication(CommonThreadingApplication):
                 # Grab Gx session from SessionManager
                 try:
                     request = self.gx_app.create_request(gx_session)
-                    request.destination_host = gx_session.origin_host
-                    request.destination_realm = gx_session.origin_realm
+                    request.destination_host = gx_session.origin_host.encode()
+                    request.destination_realm = gx_session.origin_realm.encode()
                     request.charging_rule_install.append(ChargingRuleInstall("VOICE_CALL"))
                     gx_answer = self.gx_app.send_request_custom(request, timeout=2)
                     if gx_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:

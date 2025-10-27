@@ -569,3 +569,18 @@ class Sessions:
     def get_sy_session(self, session_id: str) -> Optional[SySession]:
         """Get a Sy session by session id."""
         return self.get_session_by_id(APP_3GPP_SY, session_id)
+
+
+    @property
+    def gx_sessions(self) -> List[GxSession]:
+        """Get all Gx sessions."""
+        return [session for session in self.sessions_index.values() if isinstance(session, GxSession)]
+    
+    @property
+    def rx_sessions(self) -> List[RxSession]:
+        """Get all Rx sessions."""
+        return [session for session in self.sessions_index.values() if isinstance(session, RxSession)]
+    
+    @property
+    def sy_sessions(self) -> List[SySession]:
+        """Get all Sy sessions."""

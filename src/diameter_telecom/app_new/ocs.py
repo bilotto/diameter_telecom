@@ -7,7 +7,7 @@ from diameter.message.constants import *
 from .. import Subscriber
 from ..constants import *
 from ..diameter_layer.parse_avp import *
-from ..message import DiameterMessage, create_message
+from ..message import DiameterMessage
 from ..session.sy import SySession
 from .common import CommonThreadingApplication
 

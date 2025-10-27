@@ -31,7 +31,7 @@ class ProcessingStage:
     def log_stage(self, context: MessageProcessingContext, level: str, message: str):
         """Helper method for consistent stage logging."""
         owner = getattr(context, 'owner_key', None) or "Unknown"
-        prefix = f"[{owner}] [{self.name}]"
+        prefix = f"[{owner}] [{self.name}] [{context.message.name}]"
         full_message = f"{prefix} {message}"
         
         if level == "debug":
@@ -81,17 +81,17 @@ class ValidationStage(ProcessingStage):
         
         # Check if message should be processed (skip messages from same host)
         # This logic was in the original SessionManager.process_diameter_message
-        try:
-            owner_app = getattr(context, 'owner_app', None)
-            if owner_app and hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host'):
-                owner_origin_host = owner_app.node.origin_host
-                message_origin_host = context.origin_host
-                if owner_origin_host and message_origin_host and message_origin_host == owner_origin_host:
-                    self.log_stage(context, "info", f"🔄 Message comes from the host itself. Skipping processing.")
-                    context.should_stop = True
-                    return
-        except Exception as e:
-            self.log_stage(context, "debug", f"⚠️ Could not check origin host: {e}")
+        # try:
+        #     owner_app = getattr(context, 'owner_app', None)
+        #     if owner_app and hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host'):
+        #         owner_origin_host = owner_app.node.origin_host
+        #         message_origin_host = context.origin_host
+        #         if owner_origin_host and message_origin_host and message_origin_host == owner_origin_host:
+        #             self.log_stage(context, "info", f"🔄 Message comes from the host itself. Skipping processing.")
+        #             context.should_stop = True
+        #             return
+        # except Exception as e:
+        #     self.log_stage(context, "debug", f"⚠️ Could not check origin host: {e}")
         
         # Validate message has required fields for session creation
         if context.message.is_request and context.message.name not in REQUESTS_CREATE_SESSION:
@@ -405,9 +405,166 @@ class SessionBindingStage(ProcessingStage):
         super().__init__("SESSION_BINDING")
     
     def execute(self, context: MessageProcessingContext) -> None:
+        """Bind Rx/Sy sessions to Gx sessions."""
         self.log_stage(context, "debug", f"✅ Binding sessions")
-        # TODO: Add session binding logic
-        pass
+        
+        # Get collections from context
+        sessions = getattr(context, 'sessions', None)
+        
+        if not sessions:
+            self.log_stage(context, "error", "❌ Sessions collection not available in context")
+            context.session_bound = False
+            context.binding_method = None
+            return
+        
+        # Check if we have a session to bind
+        if not context.session:
+            self.log_stage(context, "debug", f"📋 No session to bind")
+            context.session_bound = False
+            context.binding_method = None
+            return
+        
+        # Only bind Rx and Sy sessions to Gx sessions
+        if context.app_id == APP_3GPP_GX:
+            self.log_stage(context, "debug", f"📋 Gx session - no binding needed")
+            context.session_bound = False
+            context.binding_method = "NONE"
+            return
+        
+        try:
+            if context.app_id == APP_3GPP_RX:
+                success = self._bind_rx_to_gx(context, sessions)
+            elif context.app_id == APP_3GPP_SY:
+                success = self._bind_sy_to_gx(context, sessions)
+            else:
+                self.log_stage(context, "debug", f"📋 Unknown app_id {context.app_id} - no binding needed")
+                success = False
+            
+            context.session_bound = success
+            
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Error during session binding: {e}")
+            context.session_bound = False
+            context.binding_method = None
+    
+    def _bind_rx_to_gx(self, context: MessageProcessingContext, sessions) -> bool:
+        """Bind Rx session to Gx session."""
+        rx_session = context.session
+        binding_method = None
+        
+        self.log_stage(context, "debug", f"🔗 Binding Rx session {rx_session.session_id} to Gx")
+        
+        # Check if already bound
+        if hasattr(rx_session, 'gx_session_id') and rx_session.gx_session_id:
+            self.log_stage(context, "debug", f"📋 Rx session already bound to Gx session: {rx_session.gx_session_id}")
+            context.binding_method = "ALREADY_BOUND"
+            return True
+        
+        # Method 1: Try framed IP address lookup
+        if context.framed_ip_address:
+            self.log_stage(context, "debug", f"🔍 Trying framed IP binding: {context.framed_ip_address}")
+            gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
+            if gx_session:
+                binding_method = "FRAMED_IP"
+                self.log_stage(context, "debug", f"✅ Found Gx session by framed IP address: {gx_session.session_id}")
+            else:
+                self.log_stage(context, "debug", f"📋 No Gx session found by framed IP address")
+        
+        # Method 2: Try subscriber session_ids lookup
+        if not binding_method and context.subscriber:
+            self.log_stage(context, "debug", f"🔍 Trying subscriber session IDs binding")
+            gx_session_ids = context.subscriber.session_ids.get(APP_3GPP_GX, [])
+            if gx_session_ids:
+                gx_session_id = gx_session_ids[0]  # Take first Gx session
+                gx_session = sessions.get_session_by_id(APP_3GPP_GX, gx_session_id)
+                if gx_session:
+                    binding_method = "SUBSCRIBER_SESSION_ID"
+                    self.log_stage(context, "debug", f"✅ Found Gx session by subscriber session ID: {gx_session.session_id}")
+                else:
+                    self.log_stage(context, "debug", f"📋 Gx session ID {gx_session_id} not found in sessions")
+                    # Clean up invalid session ID
+                    context.subscriber.session_ids.pop(APP_3GPP_GX, None)
+                    self.log_stage(context, "debug", f"🧹 Cleaned up invalid Gx session ID from subscriber")
+        
+        # Perform binding if we found a Gx session
+        if binding_method:
+            gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address) if binding_method == "FRAMED_IP" else sessions.get_session_by_id(APP_3GPP_GX, context.subscriber.session_ids.get(APP_3GPP_GX, [])[0])
+            
+            if gx_session:
+                # Bind Rx to Gx
+                rx_session.gx_session_id = gx_session.session_id
+                rx_session.subscriber = gx_session.subscriber
+                
+                # Bind Gx to Rx
+                gx_session.add_bound_session(APP_3GPP_RX, rx_session.session_id)
+                rx_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
+                
+                context.binding_method = binding_method
+                self.log_stage(context, "info", f"✅ [BINDING] RxSession {rx_session.session_id} bound to GxSession {gx_session.session_id} via {binding_method}")
+                return True
+        
+        # Binding failed
+        self.log_stage(context, "warning", f"⚠️ [BINDING] RxSession {rx_session.session_id} not bound to GxSession")
+        context.binding_method = "FAILED"
+        return False
+    
+    def _bind_sy_to_gx(self, context: MessageProcessingContext, sessions) -> bool:
+        """Bind Sy session to Gx session."""
+        sy_session = context.session
+        binding_method = None
+        
+        self.log_stage(context, "debug", f"🔗 Binding Sy session {sy_session.session_id} to Gx")
+        
+        # Check if already bound
+        if hasattr(sy_session, 'gx_session_id') and sy_session.gx_session_id:
+            self.log_stage(context, "debug", f"📋 Sy session already bound to Gx session: {sy_session.gx_session_id}")
+            context.binding_method = "ALREADY_BOUND"
+            return True
+        
+        # Method 1: Try MSISDN lookup
+        if context.msisdn:
+            self.log_stage(context, "debug", f"🔍 Trying MSISDN binding: {context.msisdn}")
+            gx_session = sessions.get_session_by_msisdn(APP_3GPP_GX, context.msisdn)
+            if gx_session:
+                binding_method = "MSISDN"
+                self.log_stage(context, "debug", f"✅ Found Gx session by MSISDN: {gx_session.session_id}")
+            else:
+                self.log_stage(context, "debug", f"📋 No Gx session found by MSISDN")
+        
+        # Method 2: Try IMSI lookup
+        if not binding_method and context.imsi:
+            self.log_stage(context, "debug", f"🔍 Trying IMSI binding: {context.imsi}")
+            gx_session = sessions.get_session_by_imsi(APP_3GPP_GX, context.imsi)
+            if gx_session:
+                binding_method = "IMSI"
+                self.log_stage(context, "debug", f"✅ Found Gx session by IMSI: {gx_session.session_id}")
+            else:
+                self.log_stage(context, "debug", f"📋 No Gx session found by IMSI")
+        
+        # Perform binding if we found a Gx session
+        if binding_method:
+            if binding_method == "MSISDN":
+                gx_session = sessions.get_session_by_msisdn(APP_3GPP_GX, context.msisdn)
+            else:  # IMSI
+                gx_session = sessions.get_session_by_imsi(APP_3GPP_GX, context.imsi)
+            
+            if gx_session:
+                # Bind Sy to Gx
+                sy_session.gx_session_id = gx_session.session_id
+                sy_session.subscriber = gx_session.subscriber
+                
+                # Bind Gx to Sy
+                gx_session.add_bound_session(APP_3GPP_SY, sy_session.session_id)
+                sy_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
+                
+                context.binding_method = binding_method
+                self.log_stage(context, "info", f"✅ [BINDING] SySession {sy_session.session_id} bound to GxSession {gx_session.session_id} via {binding_method}")
+                return True
+        
+        # Binding failed
+        self.log_stage(context, "warning", f"⚠️ [BINDING] SySession {sy_session.session_id} not bound to GxSession")
+        context.binding_method = "FAILED"
+        return False
 
 class SessionUpdateStage(ProcessingStage):
     """Updates session state based on message."""
@@ -416,9 +573,113 @@ class SessionUpdateStage(ProcessingStage):
         super().__init__("SESSION_UPDATE")
     
     def execute(self, context: MessageProcessingContext) -> None:
+        """Update session state based on message."""
         self.log_stage(context, "debug", f"✅ Updating session state")
-        # TODO: Add session update logic
-        pass
+        
+        # Check if we have a session to update
+        if not context.session:
+            self.log_stage(context, "debug", f"📋 No session to update")
+            context.session_updated = False
+            return
+        
+        session = context.session
+        message = context.message
+        session_updated = False
+        
+        try:
+            if message.is_request:
+                # Handle request messages - update session attributes
+                session_updated = self._handle_request_message(context, session, message)
+            else:
+                # Handle response messages - activate session, handle errors
+                session_updated = self._handle_response_message(context, session, message)
+            
+            context.session_updated = session_updated
+            
+            if session_updated:
+                self.log_stage(context, "debug", f"✅ Session state updated: active={session.active}, ended={session.ended}, error={session.error}")
+            else:
+                self.log_stage(context, "debug", f"📋 No session state changes needed")
+                
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Error during session update: {e}")
+            context.session_updated = False
+    
+    def _handle_request_message(self, context: MessageProcessingContext, session: DiameterSession, message: DiameterMessage) -> bool:
+        """Handle request messages - update session attributes."""
+        updated = False
+        
+        try:
+            # Update session attributes from request message
+            if hasattr(message.message, 'cc_request_number') and message.message.cc_request_number is not None:
+                if hasattr(session, 'cc_request_number'):
+                    session.cc_request_number = message.message.cc_request_number
+                    updated = True
+                    self.log_stage(context, "debug", f"📝 Updated cc_request_number: {message.message.cc_request_number}")
+            
+            # Update SGSN MCC/MNC if present
+            if hasattr(message.message, 'sgsn_mcc_mnc') and message.message.sgsn_mcc_mnc:
+                if hasattr(session, 'sgsn_mcc_mnc'):
+                    session.sgsn_mcc_mnc = message.message.sgsn_mcc_mnc
+                    updated = True
+                    self.log_stage(context, "debug", f"📝 Updated sgsn_mcc_mnc: {message.message.sgsn_mcc_mnc}")
+            
+            # Update framed IP address if present and not already set
+            if hasattr(message.message, 'framed_ip_address') and message.message.framed_ip_address:
+                if hasattr(session, 'framed_ip_address') and not session.framed_ip_address:
+                    session.framed_ip_address = message.message.framed_ip_address
+                    updated = True
+                    self.log_stage(context, "debug", f"📝 Updated framed_ip_address: {message.message.framed_ip_address}")
+            
+            # Update framed IPv6 prefix if present and not already set
+            if hasattr(message.message, 'framed_ipv6_prefix') and message.message.framed_ipv6_prefix:
+                if hasattr(session, 'framed_ipv6_prefix') and not session.framed_ipv6_prefix:
+                    session.framed_ipv6_prefix = message.message.framed_ipv6_prefix
+                    updated = True
+                    self.log_stage(context, "debug", f"📝 Updated framed_ipv6_prefix: {message.message.framed_ipv6_prefix}")
+            
+            # Update called station ID if present and not already set
+            if hasattr(message.message, 'called_station_id') and message.message.called_station_id:
+                if hasattr(session, 'called_station_id') and not session.called_station_id:
+                    session.called_station_id = message.message.called_station_id
+                    updated = True
+                    self.log_stage(context, "debug", f"📝 Updated called_station_id: {message.message.called_station_id}")
+            
+            return updated
+            
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Error handling request message: {e}")
+            return False
+    
+    def _handle_response_message(self, context: MessageProcessingContext, session: DiameterSession, message: DiameterMessage) -> bool:
+        """Handle response messages - activate session, handle errors, etc."""
+        updated = False
+        
+        try:
+            # Activate session if it has start_time but is not active (CCA-I success case)
+            if session.start_time and not session.active and context.result_code == E_RESULT_CODE_DIAMETER_SUCCESS:
+                session.activate()
+                updated = True
+                self.log_stage(context, "debug", f"✅ Session activated after successful response: {session.session_id}")
+            
+            # Handle error responses
+            if context.result_code and context.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+                session.error = True
+                updated = True
+                self.log_stage(context, "debug", f"❌ Session marked as error due to result code: {context.result_code}")
+            
+            # Update session timestamps
+            if message.timestamp:
+                if hasattr(session, 'last_activity_time'):
+                    session.last_activity_time = message.timestamp
+                    updated = True
+                    self.log_stage(context, "debug", f"📝 Updated last_activity_time: {message.timestamp}")
+            
+            return updated
+            
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Error handling response message: {e}")
+            return False
 
 class MessageStorageStage(ProcessingStage):
     """Stores message in session and subscriber."""

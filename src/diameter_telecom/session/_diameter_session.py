@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 
 from .. import Subscriber
 from ..constants import *
-from ..message import DiameterMessage, Message, convert_timestamp
+from ..message import DiameterMessage, Message, convert_timestamp, DiameterMessages
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class DiameterSession:
     active: bool = field(default=False)
     error: bool = field(default=False)
     ended: bool = field(default=False)
-    messages: List[DiameterMessage] = field(default_factory=list)
+    messages: DiameterMessages = field(default_factory=DiameterMessages, repr=True)
     start_time: Optional[str] = field(default=None)
     end_time: Optional[str] = field(default=None)
     subscriber: Optional[Subscriber] = field(default=None)
@@ -89,6 +89,9 @@ class DiameterSession:
             logger.warning(f"[{self.session_id}] (add_message) Message {dm.name} has no end-to-end identifier. This is not allowed.")
             pass
         if self.n_messages == 0:
+            if not dm.is_request:
+                logger.error(f"[{self.session_id}] (add_message) Message {dm.name} is not a request. This is not allowed.")
+                return None
             self.origin_host = dm.message.origin_host.decode()
             self.origin_realm = dm.message.origin_realm.decode()
         # if not dm.timestamp:

@@ -44,7 +44,7 @@ class ApplicationService:
             session_manager = get_session_manager()
         self.session_manager = session_manager
         self.set_session_manager(session_manager)
-        self.logger = logging.getLogger("diameter_telecom")
+        self.logger = logging.getLogger("diameter_telecom.service")
 
     @property
     def subscribers(self) -> Subscribers:
@@ -102,6 +102,7 @@ class ApplicationService:
 
     # delegates to the application
     def create_session(self, app_id: int, subscriber: Subscriber) -> DiameterSession:
+        self.logger.debug(f"Creating session for application {app_id} and subscriber {subscriber.msisdn}")
         app: CommonThreadingApplication = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
@@ -110,18 +111,23 @@ class ApplicationService:
         diameter_session = app.create_session(subscriber)
         if hasattr(diameter_session, "framed_ip_address") and not diameter_session.framed_ip_address:
             diameter_session.framed_ip_address = self.ip_queue.get_ip()
+        self.logger.debug(f"Session created: {diameter_session}")
         return diameter_session
 
     def create_gx_session(self, subscriber: Subscriber) -> GxSession:
+        self.logger.debug(f"Creating GX session for subscriber {subscriber.msisdn}")
         return self.create_session(APP_3GPP_GX, subscriber)
 
     def create_rx_session(self, subscriber: Subscriber) -> RxSession:
+        self.logger.debug(f"Creating RX session for subscriber {subscriber.msisdn}")
         return self.create_session(APP_3GPP_RX, subscriber)
 
     def create_sy_session(self, subscriber: Subscriber) -> SySession:
+        self.logger.debug(f"Creating SY session for subscriber {subscriber.msisdn}")
         return self.create_session(APP_3GPP_SY, subscriber)
 
     def _create_request(self, app_id: int, session: DiameterSession, goal: str = "create") -> Message:
+        self.logger.debug(f"Creating request for session {session.session_id} for application {app_id} with goal {goal}")
         if goal not in ["create", "update", "terminate"]:
             raise ValueError(f"Goal {goal} not found")
         if not isinstance(session, DiameterSession):
@@ -132,16 +138,20 @@ class ApplicationService:
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a create_request method")
         if goal == "create":
-            request = app.create_request(app.MESSAGE_CREATE_SESSION, session)
+            request: Message = app.create_request(app.MESSAGE_CREATE_SESSION, session)
         elif goal == "update":
-            request = app.create_request(app.MESSAGE_UPDATE_SESSION, session)
+            request: Message = app.create_request(app.MESSAGE_UPDATE_SESSION, session)
         elif goal == "terminate":
-            request = app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
+            request: Message = app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
         elif goal == "refresh":
-            request = app.create_request(app.MESSAGE_REFRESH_SESSION, session)
+            request: Message = app.create_request(app.MESSAGE_REFRESH_SESSION, session)
+        self.logger.debug(f"Request created: {request}")
+        if not request.header.end_to_end_identifier:
+            request.header.end_to_end_identifier = app.node.end_to_end_seq.next_sequence()
         return request
 
     def start_session(self, app_id: int, session: DiameterSession, request: Message = None) -> DiameterSession:
+        self.logger.debug(f"Starting session {session.session_id} for application {app_id}")
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
@@ -153,26 +163,28 @@ class ApplicationService:
             raise ValueError(f"Session is not a DiameterSession")
         if not request:
             request: Message = self._create_request(app_id, session, goal="create")
-        logger.debug(f"First layer of AVPS (application)")
+        logger.debug(f"{app_id}, {session.session_id}: First layer of AVPS (application)")
         request = app.add_avps(request)
         # for key, value in app.avps.items():
         #     if hasattr(request, key):
         #         setattr(request, key, value)
-        logger.debug(f"Second layer of AVPS (session)")
+        logger.debug(f"{app_id}, {session.session_id}: Second layer of AVPS (session)")
         request = session.add_avps(request)
         # for key, value in session.avps.items():
         #     if hasattr(request, key):
         #         setattr(request, key, value)
-        logger.debug(f"Third layer of AVPS (service)")
+        logger.debug(f"{app_id}, {session.session_id}: Third layer of AVPS (service)")
         request = self.add_avps(request)
-        logger.debug(f"Fourth layer of AVPS (subscriber)")
+        logger.debug(f"{app_id}, {session.session_id}: Fourth layer of AVPS (subscriber)")
         request = session.subscriber.add_avps(request)
+        # session.messages.append(request)
         answer = app.send_request_custom(request)
         time.sleep(1)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             self.logger.error(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
             self.terminate_session(app_id, session)
             raise ValueError(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        self.logger.debug(f"{app_id}, {session.session_id}: Session started")
         return session
 
     def start_diameter_session(self, session: DiameterSession):

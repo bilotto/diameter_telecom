@@ -187,17 +187,17 @@ class SessionManager:
             except Exception:
                 owner_key = None
             context.owner_key = owner_key
-        # self.log_message(context, "info", f"Message: {dm.dump()}")
+        self.log_message(context, "debug", f"Message:\n{dm.dump()}")
         self.log_message(context, "info", f"Processing {dm.name} - {dm.session_id}")
         # Skip processing messages originating from the same owner host
-        try:
-            owner_origin_host = owner_app.node.origin_host if (owner_app and hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host')) else None
-            message_origin_host = context.origin_host
-            if owner_origin_host and message_origin_host and message_origin_host == owner_origin_host:
-                self.log_message(context, "info", "The message comes from the host itself. SessionManager wont process it")
-                return None
-        except Exception:
-            pass
+        # try:
+        #     owner_origin_host = owner_app.node.origin_host if (owner_app and hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host')) else None
+        #     message_origin_host = context.origin_host
+        #     if owner_origin_host and message_origin_host and message_origin_host == owner_origin_host:
+        #         self.log_message(context, "info", "The message comes from the host itself. SessionManager wont process it")
+        #         return None
+        # except Exception:
+        #     pass
         result = self.pipeline.main_pipeline(context)
         if not result:
             return None

@@ -6,7 +6,7 @@ from diameter.message.constants import *
 
 from .. import Subscriber
 from ..constants import CCR_I, CCR_U, CCR_T
-from ..message import DiameterMessage, create_message
+from ..message import DiameterMessage
 from ..session.gx import GxSession
 from .common import CommonThreadingApplication
 
