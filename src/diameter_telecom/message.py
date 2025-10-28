@@ -70,26 +70,20 @@ class DiameterMessage:
     @property
     def hex_string(self):
         return self.message_bytes.hex()
-    
-    # @property
-    
+        
     @property
     def processing_time(self):
         """Processing time in milliseconds (calculated from microseconds)"""
         if self.processing_time_microseconds is not None:
             return self.processing_time_microseconds / 1000.0
         return None
-    
-    # @property
-    
+        
     @property
     def time(self):
         if self.timestamp:
             return datetime.datetime.fromtimestamp(float(self.timestamp), tz=datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         return None
     
-    
-
     @property
     def header(self):
         return self.message.header
@@ -205,7 +199,7 @@ class DiameterMessages:
         return iter(self.messages)
 
     def __next__(self):
-        return next(self.messages)  
+        return next(self.messages)
 
     def append(self, message: DiameterMessage):
         if isinstance(message, Message):

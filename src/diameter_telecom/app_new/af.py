@@ -49,7 +49,6 @@ class AfRxApplication(CommonThreadingApplication):
             session.abort = True
             return answer
 
-
     def create_session(self, subscriber: Subscriber) -> RxSession:
         session_id = self.node.session_generator.next_id()
         rx_session = RxSession(session_id=session_id, subscriber=subscriber)
@@ -65,12 +64,4 @@ class AfRxApplication(CommonThreadingApplication):
             request.termination_cause = E_TERMINATION_CAUSE_DIAMETER_LOGOUT
         request.header.application_id = APP_3GPP_RX
         request.session_id = session.session_id
-        # for k, v in self.avps.items():
-        #     self.logger.debug(f"First layer of AVPS (app.avps): {k} = {v}")
-        #     setattr(request, k, v)
-        # request.session_id = session.session_id
-        # for key, value in session.avps.items():
-        #     self.logger.debug(f"Second layer of AVPS (session.avps): {key} = {value}")
-        #     if hasattr(request, key):
-        #         setattr(request, key, value)
         return request

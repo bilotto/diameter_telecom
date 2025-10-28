@@ -7,7 +7,7 @@ from .. import Subscriber
 from ..constants import *
 from ..message import DiameterMessage, Message, convert_timestamp, DiameterMessages
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.session")
 
 @dataclass
 class DiameterSession:
