@@ -3,6 +3,7 @@ from typing import Optional, List, Any
 import logging
 import time
 import functools
+from datetime import datetime
 
 from ..subscriber import Subscriber, Subscribers
 from ..session._diameter_session import DiameterSession
@@ -93,10 +94,14 @@ class ValidationStage(ProcessingStage):
         # except Exception as e:
         #     self.log_stage(context, "debug", f"⚠️ Could not check origin host: {e}")
         
-        # Validate message has required fields for session creation
-        if context.message.is_request and context.message.name not in REQUESTS_CREATE_SESSION:
-            # This is not an error, but we need to ensure we have a session
-            self.log_stage(context, "debug", f"📋 Message {context.message.name} not in REQUESTS_CREATE_SESSION - will need existing session")
+        # Classify message flow type based on message name
+        context.message_flow_type = self._classify_message_flow(context.message.name)
+        self.log_stage(context, "debug", f"📋 Message flow classified as: {context.message_flow_type}")
+        
+        # # Validate message has required fields for session creation
+        # if context.message.is_request and context.message.name not in REQUESTS_CREATE_SESSION:
+        #     # This is not an error, but we need to ensure we have a session
+        #     self.log_stage(context, "debug", f"📋 Message {context.message.name} not in REQUESTS_CREATE_SESSION - will need existing session")
         
         # Set validation results
         context.validated = True
@@ -107,6 +112,29 @@ class ValidationStage(ProcessingStage):
             context.should_stop = True
         else:
             self.log_stage(context, "debug", f"✅ Message validation passed for {context.message.name}")
+    
+    def _classify_message_flow(self, message_name: str) -> str:
+        """Classify the message flow type based on message name."""
+        # Check request messages
+        if message_name in REQUESTS_CREATE_SESSION:
+            return "START"
+        elif message_name in REQUESTS_UPDATE_SESSION:
+            return "UPDATE"
+        elif message_name in REQUESTS_REFRESH_SESSION:
+            return "REFRESH"
+        elif message_name in REQUESTS_TERMINATE_SESSION:
+            return "TERMINATE"
+        # Check response messages
+        elif message_name in RESPONSES_CREATE_SESSION:
+            return "START"
+        elif message_name in RESPONSES_UPDATE_SESSION:
+            return "UPDATE"
+        elif message_name in RESPONSES_REFRESH_SESSION:
+            return "REFRESH"
+        elif message_name in RESPONSES_TERMINATE_SESSION:
+            return "TERMINATE"
+        else:
+            return "UNKNOWN"
 
 class SessionResolutionStage(ProcessingStage):
     """Finds existing session by app_id and session_id."""
@@ -139,6 +167,12 @@ class SessionResolutionStage(ProcessingStage):
             if session:
                 context.session = session
                 context.session_found = True
+                # We can pre set the context.subscriber here too from the session so we can skip the subscriber resolution stage if we have a subscriber from the session
+                if session.subscriber:
+                    context.subscriber = session.subscriber
+                    context.subscriber_found = True
+                    context.subscriber_resolution_method = "SESSION"
+                    self.log_stage(context, "debug", f"✅ Subscriber found from session: {session.subscriber.msisdn}")
                 
                 # Determine session state
                 if session.active:
@@ -176,6 +210,11 @@ class SubscriberResolutionStage(ProcessingStage):
     def execute(self, context: MessageProcessingContext) -> None:
         """Find or create subscriber based on message data."""
         self.log_stage(context, "debug", f"✅ Resolving subscriber")
+        
+        # Skip if subscriber already found
+        if context.subscriber_found:
+            self.log_stage(context, "debug", "📋 Subscriber already resolved - skipping")
+            return
         
         # Get collections from context
         subscribers = getattr(context, 'subscribers', None)
@@ -231,6 +270,11 @@ class SubscriberResolutionStage(ProcessingStage):
                     resolution_method = "CREATED"
                     self.log_stage(context, "debug", f"✅ New subscriber created: {subscriber.msisdn}")
             
+            # Ensure subscriber is in the collection if found
+            if subscriber and resolution_method != "CREATED":
+                # Subscriber was found, ensure it's in the collection
+                self._ensure_subscriber_in_collection(subscriber, subscribers, resolution_method, context)
+            
             # Set context results
             context.subscriber = subscriber
             context.subscriber_found = subscriber is not None
@@ -247,6 +291,32 @@ class SubscriberResolutionStage(ProcessingStage):
             context.subscriber = None
             context.subscriber_found = False
             context.subscriber_created = False
+    
+    def _ensure_subscriber_in_collection(self, subscriber: Subscriber, subscribers, resolution_method: str, context: MessageProcessingContext):
+        """Ensure subscriber is in the subscribers collection."""
+        try:
+            # Check if subscriber is already in collection by MSISDN or IMSI
+            existing_subscriber = None
+            if subscriber.msisdn:
+                existing_subscriber = subscribers.get_subscriber_by_msisdn(subscriber.msisdn)
+            elif subscriber.imsi:
+                existing_subscriber = subscribers.get_subscriber_by_imsi(subscriber.imsi)
+            
+            if existing_subscriber:
+                # Subscriber already in collection - use the one from collection
+                if existing_subscriber is not subscriber:
+                    self.log_stage(context, "debug", f"📋 Subscriber already in collection, using existing instance: {subscriber.msisdn}")
+                    # Update context to use the subscriber from collection
+                    context.subscriber = existing_subscriber
+                else:
+                    self.log_stage(context, "debug", f"📋 Subscriber already in collection: {subscriber.msisdn}")
+            else:
+                # Subscriber not in collection - add it
+                subscribers.add_subscriber(subscriber)
+                self.log_stage(context, "debug", f"✅ Added found subscriber to collection: MSISDN={subscriber.msisdn}, method={resolution_method}")
+                
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Error ensuring subscriber in collection: {e}")
     
     def _create_subscriber(self, context: MessageProcessingContext, subscribers) -> Optional[Subscriber]:
         """Create a new subscriber based on context data."""
@@ -274,14 +344,20 @@ class SubscriberResolutionStage(ProcessingStage):
             return None
 
 class SessionCreationStage(ProcessingStage):
-    """Creates new session if needed."""
+    """Creates new session for START flow messages only."""
     
     def __init__(self):
         super().__init__("SESSION_CREATION")
     
     def execute(self, context: MessageProcessingContext) -> None:
-        """Create new session if needed."""
+        """Create new session for START flow messages."""
         self.log_stage(context, "debug", f"✅ Creating session if needed")
+        
+        # Skip if not a start flow
+        if context.message_flow_type != "START":
+            self.log_stage(context, "debug", f"📋 Not a start flow - skipping")
+            context.session_created = False
+            return
         
         # Get collections from context
         sessions = getattr(context, 'sessions', None)
@@ -289,28 +365,24 @@ class SessionCreationStage(ProcessingStage):
         if not sessions:
             self.log_stage(context, "error", "❌ Sessions collection not available in context")
             context.session_created = False
-            context.session_started = False
             return
         
         # Check if session creation is needed
         if context.session_found:
             self.log_stage(context, "debug", f"📋 Session already exists: {context.session_id}")
             context.session_created = False
-            context.session_started = False
             return
         
         # Check if this message should create a session
         if context.message.is_request and context.message.name not in REQUESTS_CREATE_SESSION:
             self.log_stage(context, "debug", f"📋 Message {context.message.name} not in REQUESTS_CREATE_SESSION - no session creation needed")
             context.session_created = False
-            context.session_started = False
             return
         
         # Check if we have a subscriber
         if not context.subscriber:
             self.log_stage(context, "warning", f"⚠️ Cannot create session: no subscriber available")
             context.session_created = False
-            context.session_started = False
             return
         
         try:
@@ -321,21 +393,16 @@ class SessionCreationStage(ProcessingStage):
                 context.session = session
                 context.session_created = True
                 
-                # Start the session
-                self._start_session(context, session)
-                
                 # Add session to sessions collection
                 sessions.add_session(context.app_id, session)
                 
                 self.log_stage(context, "debug", f"✅ Session created and added to collection: {session.session_id}")
             else:
                 context.session_created = False
-                context.session_started = False
                 
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error during session creation: {e}")
             context.session_created = False
-            context.session_started = False
     
     def _create_session_by_type(self, context: MessageProcessingContext) -> Optional[DiameterSession]:
         """Create appropriate session type based on app_id."""
@@ -381,19 +448,50 @@ class SessionCreationStage(ProcessingStage):
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error creating session: {e}")
             return None
+
+class SessionStartStage(ProcessingStage):
+    """Starts sessions for START flow messages only."""
     
-    def _start_session(self, context: MessageProcessingContext, session: DiameterSession):
-        """Start the session with message timestamp."""
+    def __init__(self):
+        super().__init__("SESSION_START")
+    
+    def execute(self, context: MessageProcessingContext) -> None:
+        """Start session for START flow messages."""
+        self.log_stage(context, "debug", f"✅ Starting session if needed")
+        
+        # Skip if not a start flow
+        if context.message_flow_type != "START":
+            self.log_stage(context, "debug", f"📋 Not a start flow - skipping")
+            context.session_started = False
+            return
+        
+        # Check if we have a session to start
+        if not context.session:
+            self.log_stage(context, "debug", f"📋 No session to start")
+            context.session_started = False
+            return
+        
+        # Check if session was just created or already exists
+        if not context.session_created and not context.session_found:
+            self.log_stage(context, "debug", f"📋 No session created or found - skipping start")
+            context.session_started = False
+            return
+        
         try:
+            # Start the session with message timestamp
             if context.message.timestamp:
-                session.start(context.message.timestamp)
+                context.session.start(context.message.timestamp)
                 context.session_started = True
                 self.log_stage(context, "debug", f"✅ Session started with timestamp: {context.message.timestamp}")
             else:
-                session.start()
+                context.session.start()
                 context.session_started = True
                 self.log_stage(context, "debug", f"✅ Session started without timestamp")
-                
+
+            if not context.is_request and context.message.result_code == E_RESULT_CODE_DIAMETER_SUCCESS:
+                context.session.activate()
+                context.session_active = True
+                self.log_stage(context, "debug", f"✅ Session activated by answer with result code 2001")
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error starting session: {e}")
             context.session_started = False
@@ -566,19 +664,121 @@ class SessionBindingStage(ProcessingStage):
         context.binding_method = "FAILED"
         return False
 
+class SessionRefreshStage(ProcessingStage):
+    """Handles session refresh/re-auth operations."""
+    
+    def __init__(self):
+        super().__init__("SESSION_REFRESH")
+    
+    def execute(self, context: MessageProcessingContext) -> None:
+        """Handle session refresh operations (RAR, ASR)."""
+        self.log_stage(context, "debug", f"✅ Refreshing session state")
+        
+        # Skip if no session found
+        if not context.session:
+            self.log_stage(context, "debug", f"📋 No session to refresh")
+            context.session_refreshed = False
+            return
+        
+        # Skip if not a refresh flow
+        if context.message_flow_type != "REFRESH":
+            self.log_stage(context, "debug", f"📋 Not a refresh flow - skipping")
+            context.session_refreshed = False
+            return
+        
+        try:
+            # Update session activity time
+            context.session.last_activity_time = datetime.now()
+            
+            # Handle specific refresh operations based on message type
+            if context.message.name == "RAR":
+                self._handle_rar_refresh(context)
+            elif context.message.name == "ASR":
+                self._handle_asr_refresh(context)
+            
+            context.session_refreshed = True
+            self.log_stage(context, "debug", f"✅ Session refresh completed: {context.session_id}")
+            
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Session refresh failed: {e}")
+            context.session_refreshed = False
+    
+    def _handle_rar_refresh(self, context: MessageProcessingContext):
+        """Handle Re-Auth-Request refresh."""
+        self.log_stage(context, "debug", f"🔄 Processing RAR refresh for session {context.session_id}")
+        # RAR-specific refresh logic can be added here
+        
+    def _handle_asr_refresh(self, context: MessageProcessingContext):
+        """Handle Abort-Session-Request refresh."""
+        self.log_stage(context, "debug", f"🔄 Processing ASR refresh for session {context.session_id}")
+        # ASR-specific refresh logic can be added here
+
+class SessionTerminateStage(ProcessingStage):
+    """Handles session termination operations."""
+    
+    def __init__(self):
+        super().__init__("SESSION_TERMINATE")
+    
+    def execute(self, context: MessageProcessingContext) -> None:
+        """Handle session termination operations (CCR-T, STR)."""
+        self.log_stage(context, "debug", f"✅ Terminating session")
+        
+        # Skip if no session found
+        if not context.session:
+            self.log_stage(context, "debug", f"📋 No session to terminate")
+            context.session_terminated = False
+            return
+        
+        # Skip if not a terminate flow
+        if context.message_flow_type != "TERMINATE":
+            self.log_stage(context, "debug", f"📋 Not a terminate flow - skipping")
+            context.session_terminated = False
+            return
+        
+        try:
+            # Handle specific termination operations based on message type
+            if context.message.name == "CCR-T":
+                self._handle_ccr_t_termination(context)
+            elif context.message.name == "STR":
+                self._handle_str_termination(context)
+            
+            context.session_terminated = True
+            context.session.end(context.message.timestamp)
+            self.log_stage(context, "debug", f"✅ Session termination completed: {context.session_id}")
+            
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Session termination failed: {e}")
+            context.session_terminated = False
+    
+    def _handle_ccr_t_termination(self, context: MessageProcessingContext):
+        """Handle CCR-T termination."""
+        self.log_stage(context, "debug", f"🔄 Processing CCR-T termination for session {context.session_id}")
+        # CCR-T specific termination logic can be added here
+        
+    def _handle_str_termination(self, context: MessageProcessingContext):
+        """Handle STR termination."""
+        self.log_stage(context, "debug", f"🔄 Processing STR termination for session {context.session_id}")
+        # STR specific termination logic can be added here
+
 class SessionUpdateStage(ProcessingStage):
-    """Updates session state based on message."""
+    """Updates session state for UPDATE flow messages only."""
     
     def __init__(self):
         super().__init__("SESSION_UPDATE")
     
     def execute(self, context: MessageProcessingContext) -> None:
-        """Update session state based on message."""
+        """Update session state for UPDATE flow messages."""
         self.log_stage(context, "debug", f"✅ Updating session state")
         
-        # Check if we have a session to update
+        # Skip if no session found
         if not context.session:
             self.log_stage(context, "debug", f"📋 No session to update")
+            context.session_updated = False
+            return
+        
+        # Skip if not an update flow
+        if context.message_flow_type != "UPDATE":
+            self.log_stage(context, "debug", f"📋 Not an update flow - skipping")
             context.session_updated = False
             return
         
@@ -761,16 +961,27 @@ class MessageStorageStage(ProcessingStage):
             return False
     
     def _add_session_id_to_subscriber(self, context: MessageProcessingContext) -> bool:
-        """Add session ID to subscriber tracking."""
+        """Add session ID to subscriber tracking if not already present."""
         try:
             subscriber = context.subscriber
             session = context.session
             app_id = context.app_id
             session_id = context.session_id
             
-            subscriber.add_session_id(app_id, session_id)
-            self.log_stage(context, "debug", f"✅ Session ID {session_id} added to subscriber {subscriber.msisdn} for app_id {app_id}")
-            return True
+            # Check if session ID is already tracked for this app_id
+            existing_session_ids = subscriber.session_ids.get(app_id, [])
+            if session_id in existing_session_ids:
+                self.log_stage(context, "debug", f"📋 Session ID {session_id} already tracked for subscriber {subscriber.msisdn} for app_id {app_id} - skipping")
+                return False
+            
+            # Only add if it's a new session or if we're creating/starting a session
+            if context.session_created or context.session_started:
+                subscriber.add_session_id(app_id, session_id)
+                self.log_stage(context, "debug", f"✅ Session ID {session_id} added to subscriber {subscriber.msisdn} for app_id {app_id}")
+                return True
+            else:
+                self.log_stage(context, "debug", f"📋 Session not created/started - skipping session ID addition for {session_id}")
+                return False
             
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error adding session ID to subscriber: {e}")
@@ -819,16 +1030,19 @@ class MessageProcessingPipeline:
     
     def __post_init__(self):
         """Initialize the processing stages."""
-        self.stages = [
-            ValidationStage(),           # Validate message and context
-            SessionResolutionStage(),    # Find existing session
-            SubscriberResolutionStage(), # Find/create subscriber  
-            SessionCreationStage(),      # Create new session if needed
-            SessionBindingStage(),       # Bind Rx/Sy to Gx sessions
-            SessionUpdateStage(),       # Update session state
-            MessageStorageStage(),      # Store message in session/subscriber
-            CleanupStage()              # Cleanup and finalize
-        ]
+        self.stages = {
+            'VALIDATION': ValidationStage(),           # Validate message and context
+            'SESSION_RESOLUTION': SessionResolutionStage(),    # Find existing session
+            'SUBSCRIBER_RESOLUTION': SubscriberResolutionStage(), # Find/create subscriber  
+            'SESSION_CREATION': SessionCreationStage(),      # Create new session for START flow
+            'SESSION_START': SessionStartStage(),         # Start session for START flow
+            'SESSION_BINDING': SessionBindingStage(),       # Bind Rx/Sy to Gx sessions
+            'SESSION_REFRESH': SessionRefreshStage(),       # Handle REFRESH flow (RAR, ASR)
+            'SESSION_TERMINATE': SessionTerminateStage(),     # Handle TERMINATE flow (CCR-T, STR)
+            'SESSION_UPDATE': SessionUpdateStage(),       # Update session for UPDATE flow
+            'MESSAGE_STORAGE': MessageStorageStage(),      # Store message in session/subscriber
+            'CLEANUP': CleanupStage()              # Cleanup and finalize
+        }
     
     def __repr__(self):
         return f"MessageProcessingPipeline(clear_sessions_after_termination={self.clear_sessions_after_termination}, save_messages_to_session={self.save_messages_to_session})"
@@ -847,13 +1061,20 @@ class MessageProcessingPipeline:
         context.save_session_ids_to_subscriber = self.save_session_ids_to_subscriber
         
         try:
-            for stage in self.stages:
-                stage.execute(context)
-                
-                # Check if processing should stop
-                if getattr(context, 'should_stop', False):
-                    logger.debug(f"🛑 Pipeline stopped at stage {stage.name}")
-                    break
+            # Always run validation first
+            self.stages['VALIDATION'].execute(context)
+            if getattr(context, 'should_stop', False):
+                logger.debug(f"🛑 Pipeline stopped at ValidationStage")
+                return True
+            
+            # Always run session resolution second
+            self.stages['SESSION_RESOLUTION'].execute(context)
+            if getattr(context, 'should_stop', False):
+                logger.debug(f"🛑 Pipeline stopped at SessionResolutionStage")
+                return True
+            
+            # Now we can make smart decisions based on session state
+            self._run_smart_stages(context)
                     
             logger.debug(f"✅ Pipeline processing completed for message {context.message.name}")
             return True
@@ -861,6 +1082,59 @@ class MessageProcessingPipeline:
         except Exception as e:
             logger.error(f"❌ Pipeline processing failed for message {context.message.name}: {e}")
             return False
+    
+    def _run_smart_stages(self, context: MessageProcessingContext):
+        """Run stages based on session state and message type."""
+        
+        # If we already have subscriber from session, skip SubscriberResolutionStage
+        if not context.subscriber_found:
+            logger.debug(f"🎯 Smart routing: Need to resolve subscriber")
+            self.stages['SUBSCRIBER_RESOLUTION'].execute(context)
+        else:
+            logger.debug(f"🎯 Smart routing: Skipping SubscriberResolutionStage - subscriber already found")
+
+        if context.message_flow_type == "START":
+            # New session flow
+            if not context.session_found:
+                logger.debug(f"🎯 Smart routing: START flow - creating session")
+                self.stages['SESSION_CREATION'].execute(context)
+            else:
+                logger.debug(f"🎯 Smart routing: START flow but session exists")
+            #
+            self.stages['SESSION_START'].execute(context)
+            self.stages['SESSION_BINDING'].execute(context)
+
+        elif context.message_flow_type == "UPDATE":
+            # Update session flow
+            if context.session_found:
+                logger.debug(f"🎯 Smart routing: UPDATE flow - updating session")
+                self.stages['SESSION_UPDATE'].execute(context)
+            else:
+                logger.debug(f"🎯 Smart routing: UPDATE flow but no session - skipping update")
+
+        elif context.message_flow_type == "REFRESH":
+            # Refresh session flow
+            if context.session_found:
+                logger.debug(f"🎯 Smart routing: REFRESH flow - refreshing session")
+                self.stages['SESSION_REFRESH'].execute(context)
+            else:
+                logger.debug(f"🎯 Smart routing: REFRESH flow but no session - skipping refresh")
+
+        elif context.message_flow_type == "TERMINATE":
+            # Terminate session flow
+            if context.session_found:
+                logger.debug(f"🎯 Smart routing: TERMINATE flow - terminating session")
+                self.stages['SESSION_TERMINATE'].execute(context)
+            else:
+                logger.debug(f"🎯 Smart routing: TERMINATE flow but no session - skipping termination")
+        else:
+            # Unknown flow type
+            logger.debug(f"🎯 Smart routing: Unknown flow type {context.message_flow_type} - updating session if available")
+            if context.session_found:
+                self.stages['SESSION_UPDATE'].execute(context)
+                # Always run message storage and cleanup
+        self.stages['MESSAGE_STORAGE'].execute(context)
+        self.stages['CLEANUP'].execute(context)
     
     def handle_stage_error(self, stage: ProcessingStage, context: MessageProcessingContext, error: Exception):
         """Handle errors that occur during stage processing."""

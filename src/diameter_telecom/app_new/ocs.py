@@ -64,7 +64,7 @@ class OcsSyApplication(CommonThreadingApplication):
 
     def create_session(self, subscriber: Subscriber) -> SySession:
         sy_session = SySession(self.node.session_generator.next_id(), subscriber=subscriber)
-        self.session_manager.sessions.add_session(APP_3GPP_SY, sy_session)
+        # self.session_manager.sessions.add_session(APP_3GPP_SY, sy_session)
         return sy_session
 
     def create_request(self, message_name: str, session: SySession) -> SpendingLimitRequest | SpendingStatusNotificationRequest | SessionTerminationRequest:

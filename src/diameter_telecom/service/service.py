@@ -203,7 +203,7 @@ class ApplicationService:
             request.header.end_to_end_identifier = app.node.end_to_end_seq.next_sequence()
         return request
 
-    def start_session(self, app_id: int, session: DiameterSession, request: Message = None) -> DiameterSession:
+    def start_session(self, app_id: int, session: DiameterSession, request: Message = None, custom_avps: List[Dict[str, Any]] = None) -> DiameterSession:
         self.logger.debug(f"Starting session {session.session_id} for application {app_id}")
         app = self._applications_by_id.get(app_id)
         if not app:
@@ -218,7 +218,8 @@ class ApplicationService:
             request: Message = self._create_request(app_id, session, goal="create")
         
         # Apply all AVP layers for session start
-        request = self._apply_avp_layers(app_id, session, request)
+        request = self._apply_avp_layers(app_id, session, request, custom_avps=custom_avps)
+        self.session_manager.sessions.add_session(app_id, session)
         answer = app.send_request_custom(request)
         time.sleep(1)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
@@ -228,9 +229,9 @@ class ApplicationService:
         self.logger.debug(f"{app_id}, {session.session_id}: Session started")
         return session
 
-    def start_diameter_session(self, session: DiameterSession):
+    def start_diameter_session(self, session: DiameterSession, custom_avps: List[Dict[str, Any]] = None):
         app_id = session.app_id
-        return self.start_session(app_id, session)
+        return self.start_session(app_id, session, custom_avps=custom_avps)
 
     def update_session(self, app_id: int, session: DiameterSession, avps_list: List[Dict[str, Any]] = None, 
                       request: Message = None, apply_subscriber: bool = False):
@@ -268,7 +269,7 @@ class ApplicationService:
         request = self._create_request(app_id, session, goal="terminate")
         
         # Apply all AVP layers for session termination
-        request = self._apply_avp_layers(app_id, session, request)
+        request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
         answer = app.send_request_custom(request)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
@@ -302,3 +303,9 @@ class ApplicationService:
             if i.node._started:
                 i.node.stop()
  
+
+    def terminate_all_sessions(self):
+        for k, v in self.session_manager.sessions.sessions_index.items():
+            app_id, session_id = k
+            session = v
+            self.terminate_session(app_id, session)

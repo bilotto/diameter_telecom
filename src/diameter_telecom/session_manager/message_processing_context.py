@@ -26,6 +26,7 @@ class MessageProcessingContext:
     message: DiameterMessage
     session_id: str
     app_id: int
+    message_flow_type: Optional[str] = None  # START, UPDATE, REFRESH, TERMINATE, UNKNOWN
     owner_app: Optional[Any] = None  # Reference to the application object that processed this message
     owner_key: Optional[str] = None  # Stable registry key of the owner in SessionManager
     framed_ip_address: Optional[str] = None
@@ -43,6 +44,33 @@ class MessageProcessingContext:
     origin_realm: Optional[str] = None
     destination_host: Optional[str] = None
     destination_realm: Optional[str] = None
+    is_request: bool = False
+    
+    # Pipeline stage results
+    validated: bool = False
+    validation_errors: Optional[list] = None
+    should_stop: bool = False
+    session_found: bool = False
+    subscriber_found: bool = False
+    subscriber_created: bool = False
+    subscriber_resolution_method: Optional[str] = None
+    session_created: bool = False
+    session_started: bool = False
+    session_bound: bool = False
+    binding_method: Optional[str] = None
+    session_refreshed: bool = False
+    session_terminated: bool = False
+    session_updated: bool = False
+    message_stored: bool = False
+    session_id_added: bool = False
+    
+    # Pipeline configuration (set by main pipeline)
+    sessions: Optional[Any] = None  # Sessions collection
+    subscribers: Optional[Any] = None  # Subscribers collection
+    clear_sessions_after_termination: bool = False
+    save_messages_to_session: bool = True
+    save_messages_to_subscriber: bool = True
+    save_session_ids_to_subscriber: bool = True
     
     # Extensible data storage for pipeline stages
     _additional_data: Dict[str, Any] = field(default_factory=dict)
@@ -176,6 +204,7 @@ class MessageProcessingContext:
             MessageProcessingContext: New context initialized with the message
         """
         context = cls(message=dm, session_id=dm.session_id, app_id=dm.app_id)
+        context.is_request = dm.is_request
         if hasattr(dm.message, 'framed_ip_address') and dm.message.framed_ip_address:
             framed_ip_address = decode_framed_ip_address(dm.message.framed_ip_address)
             context.framed_ip_address = framed_ip_address

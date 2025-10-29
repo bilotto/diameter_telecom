@@ -36,7 +36,7 @@ class PcefGxApplication(CommonThreadingApplication):
         session_id = self.node.session_generator.next_id()
         gx_session = GxSession(session_id=session_id, subscriber=subscriber)
         # gx_session.framed_ip_address = self.ip_queue.get_ip()
-        self.session_manager.sessions.add_gx_session(gx_session)
+        # self.session_manager.sessions.add_gx_session(gx_session)
         subscriber.add_session_id(APP_3GPP_GX, session_id)
         return gx_session
 

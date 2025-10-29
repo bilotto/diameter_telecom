@@ -52,7 +52,7 @@ class AfRxApplication(CommonThreadingApplication):
     def create_session(self, subscriber: Subscriber) -> RxSession:
         session_id = self.node.session_generator.next_id()
         rx_session = RxSession(session_id=session_id, subscriber=subscriber)
-        self.session_manager.sessions.add_rx_session(rx_session)
+        # self.session_manager.sessions.add_rx_session(rx_session)
         subscriber.add_session_id(APP_3GPP_RX, session_id)
         return rx_session
 

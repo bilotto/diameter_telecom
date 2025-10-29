@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 
-from diameter.message.avp.grouped import ChargingRuleInstall
+from diameter.message.avp.grouped import ChargingRuleInstall, ChargingRuleRemove
 from diameter.message.commands import CreditControlRequest, CreditControlAnswer
 
 from ..diameter_layer.parse_avp import *
@@ -52,6 +52,31 @@ class GxSession(DiameterSession):
     def apn(self):
         return self.called_station_id
 
+    @property
+    def charging_rule_names_display(self) -> List[str]:
+        """
+        Get charging rule names as strings for display purposes.
+        Handles both direct charging_rule_name list and charging_rule_definition objects.
+        """
+        display_names = []
+        
+        # Add names from charging_rule_name list
+        for name in self.charging_rule_name:
+            if isinstance(name, bytes):
+                display_names.append(name.decode())
+            else:
+                display_names.append(str(name))
+        
+        # Add names from charging_rule_definition objects
+        for definition in self.charging_rule_definition:
+            if hasattr(definition, 'charging_rule_name') and definition.charging_rule_name:
+                if isinstance(definition.charging_rule_name, bytes):
+                    display_names.append(definition.charging_rule_name.decode())
+                else:
+                    display_names.append(str(definition.charging_rule_name))
+        
+        return display_names
+
     def add_message(self, diameter_message: DiameterMessage):
         message = diameter_message.message
 
@@ -94,6 +119,56 @@ class GxSession(DiameterSession):
                         else:
                             self.charging_rule_definition.append(charging_rule_install.charging_rule_definition)
 
+            if hasattr(message, 'charging_rule_remove') and message.charging_rule_remove:
+                if not isinstance(message.charging_rule_remove, list):
+                    message.charging_rule_remove = [message.charging_rule_remove]
+                for charging_rule_remove in message.charging_rule_remove:
+                    if not isinstance(charging_rule_remove, ChargingRuleRemove):
+                        raise ValueError(f"Charging rule remove is not a ChargingRuleRemove")
+                    if charging_rule_remove.charging_rule_base_name:
+                        if isinstance(charging_rule_remove.charging_rule_base_name, list):
+                            for i in charging_rule_remove.charging_rule_base_name:
+                                if i in self.charging_rule_base_name:
+                                    self.charging_rule_base_name.remove(i)
+                                    self.logger.debug(f"🔧 GxSession: Removed charging_rule_base_name: {i}")
+                                else:
+                                    self.logger.debug(f"🔧 GxSession: charging_rule_base_name not found for removal: {i}")
+                        else:
+                            if charging_rule_remove.charging_rule_base_name in self.charging_rule_base_name:
+                                self.charging_rule_base_name.remove(charging_rule_remove.charging_rule_base_name)
+                                self.logger.debug(f"🔧 GxSession: Removed charging_rule_base_name: {charging_rule_remove.charging_rule_base_name}")
+                            else:
+                                self.logger.debug(f"🔧 GxSession: charging_rule_base_name not found for removal: {charging_rule_remove.charging_rule_base_name}")
+                    if charging_rule_remove.charging_rule_name:
+                        if isinstance(charging_rule_remove.charging_rule_name, list):
+                            for i in charging_rule_remove.charging_rule_name:
+                                if i in self.charging_rule_name:
+                                    self.charging_rule_name.remove(i)
+                                    self.logger.debug(f"🔧 GxSession: Removed charging_rule_name: {i}")
+                                else:
+                                    self.logger.debug(f"🔧 GxSession: charging_rule_name not found for removal: {i}")
+                        else:
+                            if charging_rule_remove.charging_rule_name in self.charging_rule_name:
+                                self.charging_rule_name.remove(charging_rule_remove.charging_rule_name)
+                                self.logger.debug(f"🔧 GxSession: Removed charging_rule_name: {charging_rule_remove.charging_rule_name}")
+                            else:
+                                self.logger.debug(f"🔧 GxSession: charging_rule_name not found for removal: {charging_rule_remove.charging_rule_name}")
+                    if charging_rule_remove.charging_rule_definition:
+                        if isinstance(charging_rule_remove.charging_rule_definition, list):
+                            for i in charging_rule_remove.charging_rule_definition:
+                                if i in self.charging_rule_definition:
+                                    self.charging_rule_definition.remove(i)
+                                    self.logger.debug(f"🔧 GxSession: Removed charging_rule_definition: {i}")
+                                else:
+                                    self.logger.debug(f"🔧 GxSession: charging_rule_definition not found for removal: {i}")
+                        else:
+                            if charging_rule_remove.charging_rule_definition in self.charging_rule_definition:
+                                self.charging_rule_definition.remove(charging_rule_remove.charging_rule_definition)
+                                self.logger.debug(f"🔧 GxSession: Removed charging_rule_definition: {charging_rule_remove.charging_rule_definition}")
+                            else:
+                                self.logger.debug(f"🔧 GxSession: charging_rule_definition not found for removal: {charging_rule_remove.charging_rule_definition}")
+
+
         # Make sure cc_request_number is updated
         if isinstance(message, CreditControlRequest):
             self.cc_request_number = message.cc_request_number
@@ -126,5 +201,5 @@ class GxSession(DiameterSession):
         if self.charging_rule_base_name:
             session_data['charging_rule_base_name'] = self.charging_rule_base_name
         if self.charging_rule_name:
-            session_data['charging_rule_name'] = self.charging_rule_name
+            session_data['charging_rule_name'] = self.charging_rule_names_display
         return session_data
