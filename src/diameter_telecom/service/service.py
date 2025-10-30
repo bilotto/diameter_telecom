@@ -14,6 +14,47 @@ import logging
 from ..constants import *
 import time
 
+logger = logging.getLogger("diameter_telecom.services")
+
+def apply_avp_layers(request: Message,
+                    app: CommonThreadingApplication = None,
+                    session: DiameterSession = None,
+                    subscriber: Subscriber = None,
+                    custom_avps: List[Dict[str, Any]] = None) -> Message:
+    """
+    Apply AVP layers to a Diameter request message.
+    
+    Args:
+        request: Message to apply AVPs to
+        app: Application to apply AVPs to
+        session: Diameter session to apply AVPs to
+        subscriber: Subscriber to apply AVPs to
+        custom_avps: Optional list of custom AVPs to apply
+        
+    Returns:
+        Message with AVPs applied
+    """
+
+    if app:
+        logger.debug(f"Applying AVPs to application {app.application_id}")
+        request = app.add_avps(request)
+    if session:
+        logger.debug(f"Applying AVPs to session {session.session_id}")
+        request = session.add_avps(request)
+    if subscriber:
+        logger.debug(f"Applying AVPs to subscriber {subscriber.msisdn}")
+        request = subscriber.add_avps(request)
+    if custom_avps:
+        logger.debug(f"Applying custom AVPs")
+        for avp in custom_avps:
+            avp_name = avp.get("name")
+            avp_value = avp.get("value")
+            if hasattr(request, avp_name):
+                setattr(request, avp_name, avp_value)
+                logger.debug(f"Custom AVP: {avp_name} = {avp_value}")
+                
+    return request
+
 class ApplicationService:
     """
     ApplicationService is a combination of applications of different app_ids.
@@ -43,7 +84,7 @@ class ApplicationService:
             session_manager = get_session_manager()
         self.session_manager = session_manager
         self.set_session_manager(session_manager)
-        self.logger = logging.getLogger("diameter_telecom.services")
+        self.logger = logger
 
     @property
     def subscribers(self) -> Subscribers:
@@ -203,6 +244,17 @@ class ApplicationService:
             request.header.end_to_end_identifier = app.node.end_to_end_seq.next_sequence()
         return request
 
+    def send_request(self, request: Message) -> DiameterMessage:
+        app_id = request.header.application_id
+        app = self._applications_by_id.get(app_id)
+        if not app:
+            raise ValueError(f"Application ID {app_id} not found")
+        if not hasattr(app, "send_request_custom"):
+            raise ValueError(f"Application {app_id} does not have a send_request_custom method")
+        # request = apply_avp_layers(request, app)
+        request = self.add_avps(request)
+        return app.send_request_custom(request)
+
     def start_session(self, app_id: int, session: DiameterSession, request: Message = None, custom_avps: List[Dict[str, Any]] = None) -> DiameterSession:
         self.logger.debug(f"Starting session {session.session_id} for application {app_id}")
         app = self._applications_by_id.get(app_id)
@@ -220,7 +272,8 @@ class ApplicationService:
         # Apply all AVP layers for session start
         request = self._apply_avp_layers(app_id, session, request, custom_avps=custom_avps)
         self.session_manager.sessions.add_session(app_id, session)
-        answer = app.send_request_custom(request)
+        # answer = app.send_request_custom(request)
+        answer = self.send_request(request)
         time.sleep(1)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             self.logger.error(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
@@ -252,7 +305,8 @@ class ApplicationService:
             apply_service=True,
             apply_subscriber=apply_subscriber
         )
-        answer = app.send_request_custom(request)
+        # answer = app.send_request_custom(request)
+        answer = self.send_request(request)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             self.logger.error(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
             self.terminate_session(app_id, session)
@@ -270,7 +324,8 @@ class ApplicationService:
         
         # Apply all AVP layers for session termination
         request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
-        answer = app.send_request_custom(request)
+        # answer = app.send_request_custom(request)
+        answer = self.send_request(request)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         return session
@@ -287,7 +342,8 @@ class ApplicationService:
         # Apply all AVP layers for session refresh
         request = self._apply_avp_layers(app_id, session, request)
         
-        return app.send_request_custom(request)
+        # return app.send_request_custom(request)
+        return self.send_request(request)
 
     def start(self):
         for i in self.applications:
@@ -309,3 +365,4 @@ class ApplicationService:
             app_id, session_id = k
             session = v
             self.terminate_session(app_id, session)
+

@@ -103,7 +103,7 @@ class CommonThreadingApplication(ThreadingApplication):
         """Override in subclasses to implement request handling logic"""
         raise NotImplementedError("Subclasses must implement _handle_request")
 
-    def send_request_custom(self, diameter_message: DiameterMessage | Message, timeout=10):
+    def send_request_custom(self, diameter_message: DiameterMessage | Message, timeout=10) -> DiameterMessage:
         """Send request with full session management handled by SessionManager"""
         if isinstance(diameter_message, Message):
             diameter_message = DiameterMessage(diameter_message)

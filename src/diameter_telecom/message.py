@@ -173,9 +173,7 @@ from dataclasses import dataclass, field
 class DiameterMessages:
     messages: List[DiameterMessage] = field(default_factory=list)
     messages_pairs: List[Tuple[DiameterMessage, DiameterMessage]] = field(default_factory=list)
-    last_end_to_end_id: Optional[str] = field(default=None) # end_to_end_id
-    last_is_request: Optional[bool] = field(default=None) # is_request
-
+    _last_end_to_end_id: Optional[str] = field(default=None) # end_to_end_id
 
     def __iter__(self):
         return iter(self.messages)
@@ -208,14 +206,12 @@ class DiameterMessages:
         if len(self.messages) == 0:
             logger.debug(f"First message: {message}")
             if not message.is_request:
-                logger.error(f"Tried to start DiameterMessages with a message that is not a request: {message.name}")
-                return
+                logger.error(f"Starting DiameterMessages with a message that is not a request: {message.name}")
         else:
-            if self.last_end_to_end_id and message.end_to_end_id != self.last_end_to_end_id:
-                logger.error(f"Tried to add message with different end_to_end_id: {message.name}")
-                return
+            if self._last_end_to_end_id and message.end_to_end_id != self._last_end_to_end_id:
+                logger.error(f"Adding message with different end_to_end_id: {message.name}")
         self.messages.append(message)
         if message.is_request:
-            self.last_end_to_end_id = message.end_to_end_id
+            self._last_end_to_end_id = message.end_to_end_id
         else:
-            self.last_end_to_end_id = None
+            self._last_end_to_end_id = None
