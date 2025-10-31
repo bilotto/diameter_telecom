@@ -16,44 +16,7 @@ import time
 
 logger = logging.getLogger("diameter_telecom.services")
 
-def apply_avp_layers(request: Message,
-                    app: CommonThreadingApplication = None,
-                    session: DiameterSession = None,
-                    subscriber: Subscriber = None,
-                    custom_avps: List[Dict[str, Any]] = None) -> Message:
-    """
-    Apply AVP layers to a Diameter request message.
-    
-    Args:
-        request: Message to apply AVPs to
-        app: Application to apply AVPs to
-        session: Diameter session to apply AVPs to
-        subscriber: Subscriber to apply AVPs to
-        custom_avps: Optional list of custom AVPs to apply
-        
-    Returns:
-        Message with AVPs applied
-    """
 
-    if app:
-        logger.debug(f"Applying AVPs to application {app.application_id}")
-        request = app.add_avps(request)
-    if session:
-        logger.debug(f"Applying AVPs to session {session.session_id}")
-        request = session.add_avps(request)
-    if subscriber:
-        logger.debug(f"Applying AVPs to subscriber {subscriber.msisdn}")
-        request = subscriber.add_avps(request)
-    if custom_avps:
-        logger.debug(f"Applying custom AVPs")
-        for avp in custom_avps:
-            avp_name = avp.get("name")
-            avp_value = avp.get("value")
-            if hasattr(request, avp_name):
-                setattr(request, avp_name, avp_value)
-                logger.debug(f"Custom AVP: {avp_name} = {avp_value}")
-                
-    return request
 
 class ApplicationService:
     """
@@ -125,6 +88,9 @@ class ApplicationService:
             self.logger.debug(f"Adding AVP: {key} = {value}")
             if hasattr(message, key):
                 setattr(message, key, value)
+        # If the message has framed_ip_address and its not set, we will need to find the IP address to put it there.
+        # if hasattr(message, "framed_ip_address") and not message.framed_ip_address:
+        #     message.framed_ip_address = self.ip_queue.get_ip()
         return message
 
     def _apply_avp_layers(self, app_id: int, session: DiameterSession, request: Message, 
@@ -252,7 +218,7 @@ class ApplicationService:
         if not hasattr(app, "send_request_custom"):
             raise ValueError(f"Application {app_id} does not have a send_request_custom method")
         # request = apply_avp_layers(request, app)
-        request = self.add_avps(request)
+        # request = self.add_avps(request)
         return app.send_request_custom(request)
 
     def start_session(self, app_id: int, session: DiameterSession, request: Message = None, custom_avps: List[Dict[str, Any]] = None) -> DiameterSession:
@@ -270,7 +236,8 @@ class ApplicationService:
             request: Message = self._create_request(app_id, session, goal="create")
         
         # Apply all AVP layers for session start
-        request = self._apply_avp_layers(app_id, session, request, custom_avps=custom_avps)
+        # request = self._apply_avp_layers(app_id, session, request, custom_avps=custom_avps)
+        request = apply_avp_layers(request, app=app, session=session, subscriber=session.subscriber, service=self, custom_avps=custom_avps)
         self.session_manager.sessions.add_session(app_id, session)
         # answer = app.send_request_custom(request)
         answer = self.send_request(request)
@@ -287,7 +254,7 @@ class ApplicationService:
         return self.start_session(app_id, session, custom_avps=custom_avps)
 
     def update_session(self, app_id: int, session: DiameterSession, avps_list: List[Dict[str, Any]] = None, 
-                      request: Message = None, apply_subscriber: bool = False):
+                      request: Message = None, apply_subscriber: bool = False) -> DiameterSession:
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
@@ -296,15 +263,16 @@ class ApplicationService:
         if not request:
             request = self._create_request(app_id, session, goal="update")
         
-        # Apply AVP layers with configurable subscriber layer
-        request = self._apply_avp_layers(
-            app_id, session, request, 
-            custom_avps=avps_list,
-            apply_application=True,
-            apply_session=True,
-            apply_service=True,
-            apply_subscriber=apply_subscriber
-        )
+        # # Apply AVP layers with configurable subscriber layer
+        # request = self._apply_avp_layers(
+        #     app_id, session, request, 
+        #     custom_avps=avps_list,
+        #     apply_application=True,
+        #     apply_session=True,
+        #     apply_service=True,
+        #     apply_subscriber=apply_subscriber
+        # )
+        request = apply_avp_layers(request, app=app, session=session, subscriber=session.subscriber, service=self, custom_avps=avps_list)
         # answer = app.send_request_custom(request)
         answer = self.send_request(request)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
@@ -313,7 +281,7 @@ class ApplicationService:
             raise ValueError(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         return session
 
-    def terminate_session(self, app_id: int, session: DiameterSession):
+    def terminate_session(self, app_id: int, session: DiameterSession) -> DiameterSession:
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
@@ -323,7 +291,8 @@ class ApplicationService:
         request = self._create_request(app_id, session, goal="terminate")
         
         # Apply all AVP layers for session termination
-        request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
+        # request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
+        request = apply_avp_layers(request, app=app, session=session, subscriber=session.subscriber, service=self, custom_avps=None)
         # answer = app.send_request_custom(request)
         answer = self.send_request(request)
         if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
@@ -366,3 +335,48 @@ class ApplicationService:
             session = v
             self.terminate_session(app_id, session)
 
+
+
+
+def apply_avp_layers(request: Message,
+                    app: CommonThreadingApplication = None,
+                    session: DiameterSession = None,
+                    subscriber: Subscriber = None,
+                    service: ApplicationService = None,
+                    custom_avps: List[Dict[str, Any]] = None) -> Message:
+    """
+    Apply AVP layers to a Diameter request message.
+    
+    Args:
+        request: Message to apply AVPs to
+        app: Application to apply AVPs to
+        session: Diameter session to apply AVPs to
+        subscriber: Subscriber to apply AVPs to
+        custom_avps: Optional list of custom AVPs to apply
+        
+    Returns:
+        Message with AVPs applied
+    """
+
+    if app:
+        logger.debug(f"Applying Application Layer AVPS")
+        request = app.add_avps(request)
+    if session:
+        logger.debug(f"Applying Session Layer AVPS")
+        request = session.add_avps(request)
+    if subscriber:
+        logger.debug(f"Applying Subscriber Layer AVPS")
+        request = subscriber.add_avps(request)
+    if service:
+        logger.debug(f"Applying Service Layer AVPS")
+        request = service.add_avps(request)
+    if custom_avps:
+        logger.debug(f"Applying custom AVPs")
+        for avp in custom_avps:
+            avp_name = avp.get("name")
+            avp_value = avp.get("value")
+            if hasattr(request, avp_name):
+                setattr(request, avp_name, avp_value)
+                logger.debug(f"Custom AVP: {avp_name} = {avp_value}")
+                
+    return request

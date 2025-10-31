@@ -1,4 +1,4 @@
-from .apn import IpQueue, APN
+from .apn import IpQueue, APN, bytes_to_ip, ip_to_bytes
 from .carrier import *
 from .csv_file import *
 # from .diameter import *

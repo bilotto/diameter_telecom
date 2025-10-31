@@ -27,6 +27,8 @@ class DiameterSession:
     origin_host: Optional[str] = field(default=None)
     origin_realm: Optional[str] = field(default=None)
     abort: Optional[bool] = field(default=None, init=False)
+    # If the user sets the destination realm, we will include as AVP
+    _destination_realm: Optional[str] = field(default=None, init=False)
 
     @property
     def avps(self) -> Dict[str, Any]:
@@ -37,6 +39,8 @@ class DiameterSession:
             if hasattr(message, key):
                 self.logger.debug(f"Adding AVPS (session): {key} = {value}")
                 setattr(message, key, value)
+        if self._destination_realm:
+            message.destination_realm = self._destination_realm.encode()
         return message
 
     def add_avp(self, key: str, value: Any):
