@@ -185,7 +185,9 @@ class GxSession(DiameterSession):
                 if self.rat_type != message.rat_type:
                     self.logger.warning(f"🚨 GxSession: Rat type changed from {self.rat_type} to {message.rat_type}")
                     self.rat_type = message.rat_type
-        return super().add_message(message)
+        # Preserve original DiameterMessage with timestamp by passing diameter_message instead of message
+        self.logger.debug(f"[{self.session_id}] (add_message) Preserving DiameterMessage timestamp: {diameter_message.timestamp}")
+        return super().add_message(diameter_message)
 
     def to_dict(self) -> dict:
         """

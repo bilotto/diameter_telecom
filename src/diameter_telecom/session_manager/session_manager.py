@@ -15,7 +15,7 @@ from ..diameter_layer.parse_avp import *
 from ..message import DiameterMessage
 from contextlib import contextmanager
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diameter_telecom.session_manager")
 import uuid
 
 
@@ -187,8 +187,9 @@ class SessionManager:
             except Exception:
                 owner_key = None
             context.owner_key = owner_key
+        self.log_message(context, "info", f"Processing {dm.name},{dm.time} - {dm.session_id}")
+        self.log_message(context, "info", f"Processing {context.message.name},{context.message.time} - {dm.session_id}")
         self.log_message(context, "debug", f"Message:\n{dm.dump()}")
-        self.log_message(context, "info", f"Processing {dm.name} - {dm.session_id}")
         # Skip processing messages originating from the same owner host
         # try:
         #     owner_origin_host = owner_app.node.origin_host if (owner_app and hasattr(owner_app, 'node') and hasattr(owner_app.node, 'origin_host')) else None
@@ -234,31 +235,29 @@ class SessionManager:
             self.log_message(context, "error", f"Error auto-writing to CSV for message {context.message.name if context.message else 'unknown'} - {context.session_id}: {e}")
             return False
 
-    def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
-        if not diameter_message.timestamp:
-            diameter_message.timestamp = time.time()
+    # def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
+    #     if not diameter_message.timestamp:
+    #         diameter_message.timestamp = time.time()
 
-        request_context = self.process_diameter_message(diameter_message)
+    #     request_context = self.process_diameter_message(diameter_message)
         
-        answer = send_request_func(diameter_message.message, timeout=timeout)
-        diameter_message_answer = DiameterMessage(answer)
+    #     answer = send_request_func(diameter_message.message, timeout=timeout)
+    #     diameter_message_answer = DiameterMessage(answer)
         
-        answer_context = self.process_diameter_message(diameter_message_answer)
+    #     answer_context = self.process_diameter_message(diameter_message_answer)
 
-        if answer_context.session and answer_context.session.error:
-            self.sessions.remove_session(answer_context.message.app_id, answer_context.session_id)
+    #     if answer_context.session and answer_context.session.error:
+    #         self.sessions.remove_session(answer_context.message.app_id, answer_context.session_id)
         
-        if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-            self.log_message(answer_context, "error", f"Answer with error: \n {diameter_message_answer}")
-        # logger.info(f"\n{diameter_message_answer.dump()}")
+    #     if diameter_message_answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+    #         self.log_message(answer_context, "error", f"Answer with error: \n {diameter_message_answer}")
+    #     # logger.info(f"\n{diameter_message_answer.dump()}")
 
+    #     if not diameter_message_answer.timestamp:
+    #     # Set timestamp on answer
+    #         diameter_message_answer.timestamp = time.time()
         
-
-        if not diameter_message_answer.timestamp:
-        # Set timestamp on answer
-            diameter_message_answer.timestamp = time.time()
-        
-        return diameter_message_answer
+    #     return diameter_message_answer
 
     def to_dict(self) -> dict:
         session_manager_dict = {}
@@ -274,97 +273,97 @@ class SessionManager:
         }
         return app_names.get(app_id, f"App_{app_id}")
 
-    def get_session_messages(self, app_id: int, session_id: str) -> List[DiameterMessage]:
-        """Get messages for a specific session.
+    # def get_session_messages(self, app_id: int, session_id: str) -> List[DiameterMessage]:
+    #     """Get messages for a specific session.
         
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
-        with self._sessions_read_lock():
-            session = self.sessions.get_session_by_id(app_id, session_id)
-            if session:
-                return session.messages.copy()  # Return a copy to avoid external modification
-            return []
+    #     Thread Safety: This method is thread-safe and can be called concurrently
+    #     from multiple threads.
+    #     """
+    #     with self._sessions_read_lock():
+    #         session = self.sessions.get_session_by_id(app_id, session_id)
+    #         if session:
+    #             return session.messages.copy()  # Return a copy to avoid external modification
+    #         return []
 
-    def get_messages_by_msisdn(self, msisdn: str) -> List[DiameterMessage]:
-        """Get all messages for a subscriber by MSISDN.
+    # def get_messages_by_msisdn(self, msisdn: str) -> List[DiameterMessage]:
+    #     """Get all messages for a subscriber by MSISDN.
         
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
-        with self._subscribers_read_lock():
-            subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn)
-            if not subscriber:
-                return []
+    #     Thread Safety: This method is thread-safe and can be called concurrently
+    #     from multiple threads.
+    #     """
+    #     with self._subscribers_read_lock():
+    #         subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn)
+    #         if not subscriber:
+    #             return []
         
-        messages: List[DiameterMessage] = []
-        # Get session IDs safely
-        session_ids = subscriber.session_ids.copy()  # Copy to avoid modification during iteration
+    #     messages: List[DiameterMessage] = []
+    #     # Get session IDs safely
+    #     session_ids = subscriber.session_ids.copy()  # Copy to avoid modification during iteration
         
-        for app_id, session_id_list in session_ids.items():
-            for session_id in session_id_list:
-                messages.extend(self.get_session_messages(app_id, session_id))
+    #     for app_id, session_id_list in session_ids.items():
+    #         for session_id in session_id_list:
+    #             messages.extend(self.get_session_messages(app_id, session_id))
         
-        messages.sort(key=lambda x: x.timestamp if x.timestamp else float('inf'))
-        return messages
+    #     messages.sort(key=lambda x: x.timestamp if x.timestamp else float('inf'))
+    #     return messages
 
-    def get_subscriber_message_by_index(self, msisdn: str, index: int) -> DiameterMessage:
-        """Get a specific message by index for a subscriber.
+    # def get_subscriber_message_by_index(self, msisdn: str, index: int) -> DiameterMessage:
+    #     """Get a specific message by index for a subscriber.
         
-        Thread Safety: This method is thread-safe and can be called concurrently
-        from multiple threads.
-        """
-        messages = self.get_messages_by_msisdn(msisdn)
-        if 0 <= index < len(messages):
-            return messages[index].dump()
-        else:
-            raise IndexError(f"Message index {index} out of range for subscriber {msisdn}")
+    #     Thread Safety: This method is thread-safe and can be called concurrently
+    #     from multiple threads.
+    #     """
+    #     messages = self.get_messages_by_msisdn(msisdn)
+    #     if 0 <= index < len(messages):
+    #         return messages[index].dump()
+    #     else:
+    #         raise IndexError(f"Message index {index} out of range for subscriber {msisdn}")
 
-    def _calculate_statistics(self, sessions_data: dict, subscribers_data: dict, messages_data: list) -> dict:
-        """Calculate comprehensive statistics for the session manager."""
-        try:
-            stats = {
-                "total_sessions": 0,
-                "total_subscribers": len(subscribers_data),
-                "total_messages": len(messages_data),
-                "sessions_by_app": {},
-                "sessions_by_status": {"active": 0, "ended": 0, "error": 0},
-                "subscribers_with_messages": 0
-            }
+    # def _calculate_statistics(self, sessions_data: dict, subscribers_data: dict, messages_data: list) -> dict:
+    #     """Calculate comprehensive statistics for the session manager."""
+    #     try:
+    #         stats = {
+    #             "total_sessions": 0,
+    #             "total_subscribers": len(subscribers_data),
+    #             "total_messages": len(messages_data),
+    #             "sessions_by_app": {},
+    #             "sessions_by_status": {"active": 0, "ended": 0, "error": 0},
+    #             "subscribers_with_messages": 0
+    #         }
             
-            # Calculate session statistics
-            for app_name, app_data in sessions_data.items():
-                app_sessions = app_data.get("sessions", {})
-                app_total = len(app_sessions)
-                stats["total_sessions"] += app_total
-                stats["sessions_by_app"][app_name] = {
-                    "total": app_total,
-                    "active": 0,
-                    "ended": 0,
-                    "error": 0
-                }
+    #         # Calculate session statistics
+    #         for app_name, app_data in sessions_data.items():
+    #             app_sessions = app_data.get("sessions", {})
+    #             app_total = len(app_sessions)
+    #             stats["total_sessions"] += app_total
+    #             stats["sessions_by_app"][app_name] = {
+    #                 "total": app_total,
+    #                 "active": 0,
+    #                 "ended": 0,
+    #                 "error": 0
+    #             }
                 
-                for session in app_sessions.values():
-                    if session.get("active"):
-                        stats["sessions_by_status"]["active"] += 1
-                        stats["sessions_by_app"][app_name]["active"] += 1
-                    elif session.get("ended"):
-                        stats["sessions_by_status"]["ended"] += 1
-                        stats["sessions_by_app"][app_name]["ended"] += 1
-                    elif session.get("error"):
-                        stats["sessions_by_status"]["error"] += 1
-                        stats["sessions_by_app"][app_name]["error"] += 1
+    #             for session in app_sessions.values():
+    #                 if session.get("active"):
+    #                     stats["sessions_by_status"]["active"] += 1
+    #                     stats["sessions_by_app"][app_name]["active"] += 1
+    #                 elif session.get("ended"):
+    #                     stats["sessions_by_status"]["ended"] += 1
+    #                     stats["sessions_by_app"][app_name]["ended"] += 1
+    #                 elif session.get("error"):
+    #                     stats["sessions_by_status"]["error"] += 1
+    #                     stats["sessions_by_app"][app_name]["error"] += 1
             
-            # Calculate subscriber statistics
-            for subscriber in subscribers_data.values():
-                if subscriber.get("message_count", 0) > 0:
-                    stats["subscribers_with_messages"] += 1
+    #         # Calculate subscriber statistics
+    #         for subscriber in subscribers_data.values():
+    #             if subscriber.get("message_count", 0) > 0:
+    #                 stats["subscribers_with_messages"] += 1
             
-            return stats
+    #         return stats
             
-        except Exception as e:
-            logger.exception("Failed to calculate session manager statistics")
-            return {"error": f"Statistics calculation failed: {str(e)}"}
+    #     except Exception as e:
+    #         logger.exception("Failed to calculate session manager statistics")
+    #         return {"error": f"Statistics calculation failed: {str(e)}"}
 
     def register_owner(self, owner_app: Any):
         """Register an application instance as owner of this SessionManager.

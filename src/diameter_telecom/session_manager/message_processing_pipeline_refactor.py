@@ -31,8 +31,11 @@ class ProcessingStage:
     
     def log_stage(self, context: MessageProcessingContext, level: str, message: str):
         """Helper method for consistent stage logging."""
-        owner = getattr(context, 'owner_key', None) or "Unknown"
-        prefix = f"[{owner}] [{self.name}] [{context.message.name}]"
+        owner = getattr(context, 'owner_key', None)
+        if owner:
+            prefix = f"[{owner}] [{self.name}] [{context.message.name}]"
+        else:
+            prefix = f"[{context.app_id}] [{self.name}] [{context.message.name}]"
         full_message = f"{prefix} {message}"
         
         if level == "debug":
@@ -72,13 +75,13 @@ class ValidationStage(ProcessingStage):
             context.should_stop = True
             return
         
-        # Validate app_id is valid
-        valid_app_ids = [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]
-        if context.app_id not in valid_app_ids:
-            validation_errors.append(f"Invalid app_id: {context.app_id}")
-            self.log_stage(context, "error", f"❌ Validation failed: Invalid app_id {context.app_id}")
-            context.should_stop = True
-            return
+        # # Validate app_id is valid
+        # valid_app_ids = [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]
+        # if context.app_id not in valid_app_ids:
+        #     validation_errors.append(f"Invalid app_id: {context.app_id}")
+        #     self.log_stage(context, "error", f"❌ Validation failed: Invalid app_id {context.app_id}")
+        #     context.should_stop = True
+        #     return
         
         # Check if message should be processed (skip messages from same host)
         # This logic was in the original SessionManager.process_diameter_message
@@ -440,8 +443,10 @@ class SessionCreationStage(ProcessingStage):
                 self.log_stage(context, "debug", f"✅ SySession created")
                 
             else:
-                self.log_stage(context, "error", f"❌ Unknown app_id: {app_id}")
-                return None
+                self.log_stage(context, "debug", f"🔧 Creating DiameterSession: {session_id}")
+                session = DiameterSession(session_id=session_id, subscriber=subscriber)
+                session.app_id = app_id
+                self.log_stage(context, "debug", f"✅ DiameterSession created")
             
             return session
             
@@ -497,13 +502,13 @@ class SessionStartStage(ProcessingStage):
             context.session_started = False
 
 class SessionBindingStage(ProcessingStage):
-    """Binds Rx/Sy sessions to Gx sessions."""
+    """Binds non-Gx sessions (Rx, Sy, Gy, etc.) to Gx sessions."""
     
     def __init__(self):
         super().__init__("SESSION_BINDING")
     
     def execute(self, context: MessageProcessingContext) -> None:
-        """Bind Rx/Sy sessions to Gx sessions."""
+        """Bind non-Gx sessions to Gx sessions using unified binding logic."""
         self.log_stage(context, "debug", f"✅ Binding sessions")
         
         # Get collections from context
@@ -522,7 +527,7 @@ class SessionBindingStage(ProcessingStage):
             context.binding_method = None
             return
         
-        # Only bind Rx and Sy sessions to Gx sessions
+        # Gx sessions don't need binding
         if context.app_id == APP_3GPP_GX:
             self.log_stage(context, "debug", f"📋 Gx session - no binding needed")
             context.session_bound = False
@@ -530,14 +535,8 @@ class SessionBindingStage(ProcessingStage):
             return
         
         try:
-            if context.app_id == APP_3GPP_RX:
-                success = self._bind_rx_to_gx(context, sessions)
-            elif context.app_id == APP_3GPP_SY:
-                success = self._bind_sy_to_gx(context, sessions)
-            else:
-                self.log_stage(context, "debug", f"📋 Unknown app_id {context.app_id} - no binding needed")
-                success = False
-            
+            # Use unified binding method for all non-Gx app_ids
+            success = self._bind_to_gx(context, sessions)
             context.session_bound = success
             
         except Exception as e:
@@ -545,28 +544,33 @@ class SessionBindingStage(ProcessingStage):
             context.session_bound = False
             context.binding_method = None
     
-    def _bind_rx_to_gx(self, context: MessageProcessingContext, sessions) -> bool:
-        """Bind Rx session to Gx session."""
-        rx_session = context.session
-        binding_method = None
+    def _bind_to_gx(self, context: MessageProcessingContext, sessions) -> bool:
+        """Unified binding method for all non-Gx sessions (Rx, Sy, Gy, etc.) to Gx sessions.
         
-        self.log_stage(context, "debug", f"🔗 Binding Rx session {rx_session.session_id} to Gx")
+        Binding strategy (in order):
+        1. Framed IP address lookup
+        2. Subscriber lookup (via session_ids, MSISDN, or IMSI)
+        """
+        session = context.session
+        binding_method = None
+        gx_session = None
+        
+        app_name = self._get_app_name(context.app_id)
+        self.log_stage(context, "debug", f"🔗 Binding {app_name} session {session.session_id} to Gx")
         
         # Check if already bound
-        if hasattr(rx_session, 'gx_session_id') and rx_session.gx_session_id:
-            self.log_stage(context, "debug", f"📋 Rx session already bound to Gx session: {rx_session.gx_session_id}")
+        if hasattr(session, 'gx_session_id') and session.gx_session_id:
+            self.log_stage(context, "debug", f"📋 {app_name} session already bound to Gx session: {session.gx_session_id}")
             context.binding_method = "ALREADY_BOUND"
             return True
         
-        # Method 1: Try framed IP address lookup
+        # Method 1: Try framed IP address lookup (first priority)
         if context.framed_ip_address:
             self.log_stage(context, "debug", f"🔍 Trying framed IP binding: {context.framed_ip_address}")
             gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
             if gx_session:
                 binding_method = "FRAMED_IP"
                 self.log_stage(context, "debug", f"✅ Found Gx session by framed IP address: {gx_session.session_id}")
-            else:
-                self.log_stage(context, "debug", f"📋 No Gx session found by framed IP address")
         
         # Method 2: Try subscriber session_ids lookup
         if not binding_method and context.subscriber:
@@ -584,85 +588,64 @@ class SessionBindingStage(ProcessingStage):
                     context.subscriber.session_ids.pop(APP_3GPP_GX, None)
                     self.log_stage(context, "debug", f"🧹 Cleaned up invalid Gx session ID from subscriber")
         
-        # Perform binding if we found a Gx session
-        if binding_method:
-            gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address) if binding_method == "FRAMED_IP" else sessions.get_session_by_id(APP_3GPP_GX, context.subscriber.session_ids.get(APP_3GPP_GX, [])[0])
-            
-            if gx_session:
-                # Bind Rx to Gx
-                rx_session.gx_session_id = gx_session.session_id
-                rx_session.subscriber = gx_session.subscriber
-                
-                # Bind Gx to Rx
-                gx_session.add_bound_session(APP_3GPP_RX, rx_session.session_id)
-                rx_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
-                
-                context.binding_method = binding_method
-                self.log_stage(context, "info", f"✅ [BINDING] RxSession {rx_session.session_id} bound to GxSession {gx_session.session_id} via {binding_method}")
-                return True
-        
-        # Binding failed
-        self.log_stage(context, "warning", f"⚠️ [BINDING] RxSession {rx_session.session_id} not bound to GxSession")
-        context.binding_method = "FAILED"
-        return False
-    
-    def _bind_sy_to_gx(self, context: MessageProcessingContext, sessions) -> bool:
-        """Bind Sy session to Gx session."""
-        sy_session = context.session
-        binding_method = None
-        
-        self.log_stage(context, "debug", f"🔗 Binding Sy session {sy_session.session_id} to Gx")
-        
-        # Check if already bound
-        if hasattr(sy_session, 'gx_session_id') and sy_session.gx_session_id:
-            self.log_stage(context, "debug", f"📋 Sy session already bound to Gx session: {sy_session.gx_session_id}")
-            context.binding_method = "ALREADY_BOUND"
-            return True
-        
-        # Method 1: Try MSISDN lookup
-        if context.msisdn:
+        # Method 3: Try MSISDN lookup
+        if not binding_method and context.msisdn:
             self.log_stage(context, "debug", f"🔍 Trying MSISDN binding: {context.msisdn}")
             gx_session = sessions.get_session_by_msisdn(APP_3GPP_GX, context.msisdn)
             if gx_session:
                 binding_method = "MSISDN"
                 self.log_stage(context, "debug", f"✅ Found Gx session by MSISDN: {gx_session.session_id}")
-            else:
-                self.log_stage(context, "debug", f"📋 No Gx session found by MSISDN")
         
-        # Method 2: Try IMSI lookup
+        # Method 4: Try IMSI lookup
         if not binding_method and context.imsi:
             self.log_stage(context, "debug", f"🔍 Trying IMSI binding: {context.imsi}")
             gx_session = sessions.get_session_by_imsi(APP_3GPP_GX, context.imsi)
             if gx_session:
                 binding_method = "IMSI"
                 self.log_stage(context, "debug", f"✅ Found Gx session by IMSI: {gx_session.session_id}")
-            else:
-                self.log_stage(context, "debug", f"📋 No Gx session found by IMSI")
         
         # Perform binding if we found a Gx session
-        if binding_method:
-            if binding_method == "MSISDN":
+        if binding_method and gx_session:
+            # Re-fetch the session to ensure we have the latest instance
+            if binding_method == "FRAMED_IP":
+                gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
+            elif binding_method == "SUBSCRIBER_SESSION_ID":
+                gx_session_ids = context.subscriber.session_ids.get(APP_3GPP_GX, [])
+                if gx_session_ids:
+                    gx_session = sessions.get_session_by_id(APP_3GPP_GX, gx_session_ids[0])
+            elif binding_method == "MSISDN":
                 gx_session = sessions.get_session_by_msisdn(APP_3GPP_GX, context.msisdn)
-            else:  # IMSI
+            elif binding_method == "IMSI":
                 gx_session = sessions.get_session_by_imsi(APP_3GPP_GX, context.imsi)
             
             if gx_session:
-                # Bind Sy to Gx
-                sy_session.gx_session_id = gx_session.session_id
-                sy_session.subscriber = gx_session.subscriber
+                # Bind session to Gx
+                session.gx_session_id = gx_session.session_id
+                session.subscriber = gx_session.subscriber
                 
-                # Bind Gx to Sy
-                gx_session.add_bound_session(APP_3GPP_SY, sy_session.session_id)
-                sy_session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
+                # Bind Gx to this session
+                gx_session.add_bound_session(context.app_id, session.session_id)
+                session.add_bound_session(APP_3GPP_GX, gx_session.session_id)
                 
                 context.binding_method = binding_method
-                self.log_stage(context, "info", f"✅ [BINDING] SySession {sy_session.session_id} bound to GxSession {gx_session.session_id} via {binding_method}")
+                self.log_stage(context, "info", f"✅ [BINDING] {app_name}Session {session.session_id} bound to GxSession {gx_session.session_id} via {binding_method}")
                 return True
         
         # Binding failed
-        self.log_stage(context, "warning", f"⚠️ [BINDING] SySession {sy_session.session_id} not bound to GxSession")
+        self.log_stage(context, "warning", f"⚠️ [BINDING] {app_name}Session {session.session_id} not bound to GxSession")
         context.binding_method = "FAILED"
         return False
+    
+    def _get_app_name(self, app_id: int) -> str:
+        """Get application name for logging purposes."""
+        if app_id == APP_3GPP_RX:
+            return "Rx"
+        elif app_id == APP_3GPP_SY:
+            return "Sy"
+        elif app_id == APP_DIAMETER_CREDIT_CONTROL_APPLICATION:
+            return "Gy"
+        else:
+            return f"App{app_id}"
 
 class SessionRefreshStage(ProcessingStage):
     """Handles session refresh/re-auth operations."""
@@ -936,10 +919,10 @@ class MessageStorageStage(ProcessingStage):
             
             if message not in session.messages:
                 session.add_message(message)
-                self.log_stage(context, "debug", f"✅ Message {message.name} stored in session {session.session_id}")
+                self.log_stage(context, "debug", f"✅ Message {message.name},{message.time} stored in session {session.session_id}")
                 return True
             else:
-                self.log_stage(context, "debug", f"📋 Message {message.name} already in session {session.session_id} - skipping")
+                self.log_stage(context, "debug", f"📋 Message {message.name},{message.time} already in session {session.session_id} - skipping")
                 return False
                 
         except Exception as e:
@@ -953,7 +936,7 @@ class MessageStorageStage(ProcessingStage):
             message = context.message
             
             subscriber.add_message(message)
-            self.log_stage(context, "debug", f"✅ Message {message.name} stored in subscriber {subscriber.msisdn}")
+            self.log_stage(context, "debug", f"✅ Message {message.name},{message.time} stored in subscriber {subscriber.msisdn}")
             return True
             
         except Exception as e:

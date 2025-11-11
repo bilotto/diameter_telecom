@@ -202,9 +202,9 @@ class DiameterMessages:
     def append(self, message: DiameterMessage):
         if isinstance(message, Message):
             message = DiameterMessage(message)
-        logger.debug(message)
+        logger.debug(f"Adding message: {message.name},{message.time} to DiameterMessages object")
         if len(self.messages) == 0:
-            logger.debug(f"First message: {message}")
+            logger.debug(f"Its the first message in the DiameterMessages object: {message.name},{message.time}")
             if not message.is_request:
                 logger.error(f"Starting DiameterMessages with a message that is not a request: {message.name}")
         else:

@@ -19,7 +19,7 @@ class DiameterSession:
     start_time: Optional[str] = field(default=None)
     end_time: Optional[str] = field(default=None)
     subscriber: Optional[Subscriber] = field(default=None)
-    bound_sessions: Dict[int, List[str]] = field(default_factory=lambda: {app_id: [] for app_id in [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]})
+    bound_sessions: Dict[int, List[str]] = field(default_factory=dict)
     last_result_code: Optional[int] = field(default=None)
     _avps: Dict[str, Any] = field(default_factory=dict, repr=False)
     logger: logging.Logger = field(default=logger, repr=False)
@@ -29,6 +29,7 @@ class DiameterSession:
     abort: Optional[bool] = field(default=None, init=False)
     # If the user sets the destination realm, we will include as AVP
     _destination_realm: Optional[str] = field(default=None, init=False)
+    gx_session_id: Optional[str] = field(default=None, init=False)
 
     @property
     def avps(self) -> Dict[str, Any]:
@@ -47,7 +48,10 @@ class DiameterSession:
         self._avps[key] = value
 
     def add_bound_session(self, app_id: int, session_id: str):
-        self.bound_sessions[app_id].append(session_id)
+        if app_id not in self.bound_sessions:
+            self.bound_sessions[app_id] = []
+        if session_id not in self.bound_sessions[app_id]:
+            self.bound_sessions[app_id].append(session_id)
 
     def __post_init__(self):
         if not isinstance(self.session_id, str):
@@ -103,6 +107,8 @@ class DiameterSession:
         # dm.session_id = None
         if dm.result_code:
             self.last_result_code = dm.result_code
+        if not dm.timestamp:
+            logger.warning(f"[{self.session_id}] (add_message) Message {dm.name} has no timestamp. This is not allowed.")
         self.messages.append(dm)
         return dm
 
