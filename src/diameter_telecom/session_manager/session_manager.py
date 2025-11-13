@@ -31,6 +31,10 @@ class SessionManager:
     If a csv_file is provided, every processed message will be automatically
     written to the CSV file during processing using smart attribute resolution.
     
+    To enable CSV logging, you can either:
+    - Set create_csv=True and optionally specify csv_filename (default: "diameter_messages_{id}.csv")
+    - Or manually provide a csv_file instance
+    
     Thread Safety:
     This class is thread-safe and supports true parallel message processing.
     Multiple threads can process different messages simultaneously. Fine-grained
@@ -47,6 +51,8 @@ class SessionManager:
     
     # Options
     clear_sessions_after_termination: bool = field(default=True, repr=False)
+    create_csv: bool = field(default=False, repr=False)
+    csv_filename: Optional[str] = field(default=None, repr=False)
     
     # Thread safety locks
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
@@ -58,13 +64,19 @@ class SessionManager:
     
 
     def __post_init__(self):
-        """Initialize the message processing pipeline"""
+        """Initialize the message processing pipeline and CSV file if requested"""
         self.pipeline = MessageProcessingPipeline(
             sessions=self.sessions,
             subscribers=self.subscribers,
             clear_sessions_after_termination=self.clear_sessions_after_termination,
             statistics=self.statistics,
         )
+        
+        # Auto-create CSV file if requested
+        if self.create_csv and not self.csv_file:
+            filename = self.csv_filename or f"diameter_messages_{self.id}.csv"
+            self.csv_file = CsvFile(filename)
+            logger.info(f"✅ CSV logging enabled: {filename}")
 
     def set_subscribers(self, subscribers: Subscribers):
         self.subscribers = subscribers
@@ -202,7 +214,7 @@ class SessionManager:
         result = self.pipeline.main_pipeline(context)
         if not result:
             return None
-        # Auto-write to CSV if configured (still needs synchronization for file operations)
+        # Auto-write to CSV if configured (thread-safe)
         if self.csv_file:
             self._write_context_to_csv(context)
         return context
@@ -214,26 +226,30 @@ class SessionManager:
         This method uses the MessageProcessingContext's smart attribute resolution
         to populate CSV columns from DiameterMessage, Session, and Subscriber objects.
         
+        Thread Safety: This method is thread-safe and uses _csv_lock to protect
+        concurrent CSV file operations.
+        
         Args:
             context: MessageProcessingContext containing all processed data
             
         Returns:
             bool: True if successful, False otherwise
         """
-        self.log_message(context, "info", f"Writing context to CSV: {context}")
-        try:
-            row = {}
-            for column in self.csv_file.get_csv_columns():
-                value = context.resolve_attribute(column)
-                row[column] = value if value else ""
-            
-            self.csv_file.write_row(row)
-            self.csv_file.flush()
-            return True
-            
-        except Exception as e:
-            self.log_message(context, "error", f"Error auto-writing to CSV for message {context.message.name if context.message else 'unknown'} - {context.session_id}: {e}")
-            return False
+        with self._csv_lock_context():
+            try:
+                row = {}
+                for column in self.csv_file.get_csv_columns():
+                    value = context.resolve_attribute(column)
+                    row[column] = value if value else ""
+                
+                self.csv_file.write_row(row)
+                self.csv_file.flush()
+                self.log_message(context, "debug", f"✅ CSV row written for message {context.message.name if context.message else 'unknown'}")
+                return True
+                
+            except Exception as e:
+                self.log_message(context, "error", f"❌ Error auto-writing to CSV for message {context.message.name if context.message else 'unknown'} - {context.session_id}: {e}")
+                return False
 
     # def send_request_with_session_management(self, diameter_message: DiameterMessage, send_request_func, timeout=10) -> DiameterMessage:
     #     if not diameter_message.timestamp:
