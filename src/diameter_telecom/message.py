@@ -11,6 +11,12 @@ def convert_timestamp(timestamp: str) -> str:
     return datetime.datetime.fromtimestamp(float(timestamp), tz=datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
 class DiameterMessage:
+# Definindo slots para economizar RAM (remove o __dict__ por instância)
+    __slots__ = [
+        'message_bytes', 'hop_by_hop_id', 'end_to_end_id', 
+        'is_request', 'app_id', 'cmd_code', 'timestamp', 
+        'result_code', 'cc_request_type', 'session_id', '_message'
+    ]
     def __init__(self, obj: Message | str):
         if isinstance(obj, Message):
             message = obj
@@ -87,6 +93,18 @@ class DiameterMessage:
     @property
     def header(self):
         return self.message.header
+
+    @property
+    def application_id(self):
+        return self.message.header.application_id
+
+    @property
+    def command_code(self):
+        return self.message.header.command_code
+
+    @property
+    def message_name(self):
+        return name_diameter_message(self.is_request, self.command_code, self.cc_request_type)
     
     def dump_hex_string(self, file_full_path):
         with open(file_full_path, 'w') as f:

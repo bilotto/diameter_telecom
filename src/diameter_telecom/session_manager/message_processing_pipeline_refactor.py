@@ -287,7 +287,8 @@ class SubscriberResolutionStage(ProcessingStage):
             if subscriber:
                 self.log_stage(context, "debug", f"📊 Subscriber resolved via {resolution_method}: MSISDN={subscriber.msisdn}, IMSI={getattr(subscriber, 'imsi', 'N/A')}")
             else:
-                self.log_stage(context, "warning", f"⚠️ Failed to resolve or create subscriber")
+                # self.log_stage(context, "warning", f"⚠️ Failed to resolve or create subscriber")
+                pass
                 
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error during subscriber resolution: {e}")
@@ -330,7 +331,7 @@ class SubscriberResolutionStage(ProcessingStage):
             
             # If we don't have MSISDN or IMSI, we can't create a subscriber
             if not msisdn and not imsi:
-                self.log_stage(context, "warning", f"⚠️ Cannot create subscriber: no MSISDN or IMSI available")
+                # self.log_stage(context, "warning", f"⚠️ Cannot create subscriber: no MSISDN or IMSI available")
                 return None
             
             # Create new subscriber
@@ -384,7 +385,7 @@ class SessionCreationStage(ProcessingStage):
         
         # Check if we have a subscriber
         if not context.subscriber:
-            self.log_stage(context, "warning", f"⚠️ Cannot create session: no subscriber available")
+            # self.log_stage(context, "warning", f"⚠️ Cannot create session: no subscriber available")
             context.session_created = False
             return
         
@@ -878,6 +879,7 @@ class MessageStorageStage(ProcessingStage):
         save_messages_to_session = getattr(context, 'save_messages_to_session', True)
         save_messages_to_subscriber = getattr(context, 'save_messages_to_subscriber', True)
         save_session_ids_to_subscriber = getattr(context, 'save_session_ids_to_subscriber', True)
+        save_messages_to_session_manager = getattr(context, 'save_messages_to_session_manager', False)
         
         message_stored = False
         session_id_added = False
@@ -894,6 +896,10 @@ class MessageStorageStage(ProcessingStage):
             # Add session ID to subscriber if configured
             if save_session_ids_to_subscriber and context.subscriber and context.session:
                 session_id_added = self._add_session_id_to_subscriber(context)
+            
+            # Store message in SessionManager if configured
+            if save_messages_to_session_manager:
+                self._store_message_in_session_manager(context)
             
             # Set message.subscriber reference
             if context.subscriber:
@@ -969,6 +975,37 @@ class MessageStorageStage(ProcessingStage):
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error adding session ID to subscriber: {e}")
             return False
+    
+    def _store_message_in_session_manager(self, context: MessageProcessingContext) -> None:
+        """Store message in SessionManager lists (messages or messages_orphan based on subscriber_found)."""
+        try:
+            session_manager = getattr(context, 'session_manager', None)
+            if not session_manager:
+                self.log_stage(context, "debug", f"📋 SessionManager not available in context - skipping message storage")
+                return
+            
+            message = context.message
+            subscriber_found = getattr(context, 'subscriber_found', False)
+            
+            # Use thread-safe lock context for message storage
+            with session_manager._messages_lock_context():
+                if subscriber_found:
+                    # Store in regular messages list
+                    if message not in session_manager.messages:
+                        session_manager.messages.append(message)
+                        self.log_stage(context, "debug", f"✅ Message {message.name},{message.time} stored in SessionManager.messages")
+                    else:
+                        self.log_stage(context, "debug", f"📋 Message {message.name},{message.time} already in SessionManager.messages - skipping")
+                else:
+                    # Store in orphan messages list
+                    if message not in session_manager.messages_orphan:
+                        session_manager.messages_orphan.append(message)
+                        self.log_stage(context, "debug", f"🔍 [ORPHAN] Message {message.name},{message.time} stored in SessionManager.messages_orphan (subscriber not found)")
+                    else:
+                        self.log_stage(context, "debug", f"📋 Message {message.name},{message.time} already in SessionManager.messages_orphan - skipping")
+                        
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Error storing message in SessionManager: {e}")
 
 class CleanupStage(ProcessingStage):
     """Final cleanup and session termination if needed."""
@@ -1009,6 +1046,7 @@ class MessageProcessingPipeline:
     save_messages_to_session: bool = True
     save_messages_to_subscriber: bool = True
     save_session_ids_to_subscriber: bool = True
+    save_messages_to_session_manager: bool = False
     statistics: dict = field(default_factory=dict)
     
     def __post_init__(self):
@@ -1042,6 +1080,7 @@ class MessageProcessingPipeline:
         context.save_messages_to_session = self.save_messages_to_session
         context.save_messages_to_subscriber = self.save_messages_to_subscriber
         context.save_session_ids_to_subscriber = self.save_session_ids_to_subscriber
+        context.save_messages_to_session_manager = self.save_messages_to_session_manager
         
         try:
             # Always run validation first

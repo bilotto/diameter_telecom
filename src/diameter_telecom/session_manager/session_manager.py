@@ -44,6 +44,7 @@ class SessionManager:
     sessions: Sessions = field(default_factory=Sessions, repr=False)
     subscribers: Subscribers = field(default_factory=Subscribers, repr=False)
     messages: List[DiameterMessage] = field(default_factory=list, repr=False)
+    messages_orphan: List[DiameterMessage] = field(default_factory=list, repr=False)
     csv_file: Optional[CsvFile] = field(default=None, repr=False)
     statistics: dict = field(default_factory=dict, repr=False)
     pipeline: MessageProcessingPipeline = field(init=False, repr=False)
@@ -199,6 +200,7 @@ class SessionManager:
             except Exception:
                 owner_key = None
             context.owner_key = owner_key
+        context.session_manager = self
         self.log_message(context, "info", f"Processing {dm.name},{dm.time} - {dm.session_id}")
         self.log_message(context, "info", f"Processing {context.message.name},{context.message.time} - {dm.session_id}")
         self.log_message(context, "debug", f"Message:\n{dm.dump()}")
@@ -215,7 +217,7 @@ class SessionManager:
         if not result:
             return None
         # Auto-write to CSV if configured (thread-safe)
-        if self.csv_file:
+        if self.csv_file and not context.should_stop:
             self._write_context_to_csv(context)
         return context
 

@@ -67,10 +67,12 @@ class MessageProcessingContext:
     # Pipeline configuration (set by main pipeline)
     sessions: Optional[Any] = None  # Sessions collection
     subscribers: Optional[Any] = None  # Subscribers collection
+    session_manager: Optional[Any] = None  # SessionManager reference
     clear_sessions_after_termination: bool = False
     save_messages_to_session: bool = True
     save_messages_to_subscriber: bool = True
     save_session_ids_to_subscriber: bool = True
+    save_messages_to_session_manager: bool = False
     
     # Extensible data storage for pipeline stages
     _additional_data: Dict[str, Any] = field(default_factory=dict)
