@@ -24,7 +24,6 @@ class ApplicationService:
     They share the same session manager and they can refer to each other when handling requests.
     """
     applications: List[CommonThreadingApplication]
-    subscribers: Subscribers
 
     def __init__(self, applications: List[CommonThreadingApplication],
                     diameter_config: dict,
@@ -40,7 +39,7 @@ class ApplicationService:
         self.applications = applications
         self._applications_by_id = {i.application_id: i for i in applications}
         self.diameter_config = diameter_config
-        self._avps = dict()
+        self._avps = dict[Any, Any]()
         self.framed_ip_address_cidr = framed_ip_address_cidr
         self.ip_queue = IpQueue(framed_ip_address_cidr)
         if not session_manager:
@@ -188,7 +187,7 @@ class ApplicationService:
 
     def _create_request(self, app_id: int, session: DiameterSession, goal: str = "create") -> Message:
         self.logger.debug(f"Creating request for session {session.session_id} for application {app_id} with goal {goal}")
-        if goal not in ["create", "update", "terminate", "refresh"]:
+        if goal not in ["create", "update", "terminate", "refresh", "abort"]:
             raise ValueError(f"Goal {goal} not found")
         if not isinstance(session, DiameterSession):
             raise ValueError(f"Session is not a DiameterSession")
@@ -205,6 +204,9 @@ class ApplicationService:
             request: Message = app.create_request(app.MESSAGE_TERMINATE_SESSION, session)
         elif goal == "refresh":
             request: Message = app.create_request(app.MESSAGE_REFRESH_SESSION, session)
+        elif goal == "abort":
+            request: Message = app.create_request(app.MESSAGE_ABORT_SESSION, session)
+            pass
         self.logger.debug(f"Request created: {request}")
         if not request.header.end_to_end_identifier:
             request.header.end_to_end_identifier = app.node.end_to_end_seq.next_sequence()
@@ -241,11 +243,11 @@ class ApplicationService:
         self.session_manager.sessions.add_session(app_id, session)
         # answer = app.send_request_custom(request)
         answer = self.send_request(request)
-        time.sleep(1)
-        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-            self.logger.error(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
-            self.terminate_session(app_id, session)
-            raise ValueError(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        # time.sleep(1)
+        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+        #     self.logger.error(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
+        #     self.terminate_session(app_id, session)
+        #     raise ValueError(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         self.logger.debug(f"{app_id}, {session.session_id}: Session started")
         return session
 
@@ -262,23 +264,13 @@ class ApplicationService:
             raise ValueError(f"Application {app_id} does not have a update_session method")
         if not request:
             request = self._create_request(app_id, session, goal="update")
-        
-        # # Apply AVP layers with configurable subscriber layer
-        # request = self._apply_avp_layers(
-        #     app_id, session, request, 
-        #     custom_avps=avps_list,
-        #     apply_application=True,
-        #     apply_session=True,
-        #     apply_service=True,
-        #     apply_subscriber=apply_subscriber
-        # )
         request = apply_avp_layers(request, app=app, session=session, subscriber=session.subscriber, service=self, custom_avps=avps_list)
         # answer = app.send_request_custom(request)
         answer = self.send_request(request)
-        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-            self.logger.error(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
-            self.terminate_session(app_id, session)
-            raise ValueError(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+        #     self.logger.error(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
+        #     self.terminate_session(app_id, session)
+        #     raise ValueError(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         return session
 
     def terminate_session(self, app_id: int, session: DiameterSession) -> DiameterSession:
@@ -292,11 +284,11 @@ class ApplicationService:
         
         # Apply all AVP layers for session termination
         # request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
-        request = apply_avp_layers(request, app=app, session=session, subscriber=session.subscriber, service=self, custom_avps=None)
+        request = apply_avp_layers(request, app=app, session=session, subscriber=None, service=self, custom_avps=None)
         # answer = app.send_request_custom(request)
         answer = self.send_request(request)
-        if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-            self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+        #     self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         return session
                 
     def refresh_session(self, app_id: int, session: DiameterSession):
@@ -305,14 +297,24 @@ class ApplicationService:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a refresh_session method")
-        
         request = self._create_request(app_id, session, goal="refresh")
-        
         # Apply all AVP layers for session refresh
         request = self._apply_avp_layers(app_id, session, request)
-        
         # return app.send_request_custom(request)
-        return self.send_request(request)
+        answer = self.send_request(request)
+        return session
+
+
+    def abort_session(self, app_id: int, session: DiameterSession):
+        app = self._applications_by_id.get(app_id)
+        if not app:
+            raise ValueError(f"Application ID {app_id} not found")
+        if not hasattr(app, "create_request"):
+            raise ValueError(f"Application {app_id} does not have a abort_session method")
+        request = self._create_request(app_id, session, goal="abort")
+        request = apply_avp_layers(request, app=app, session=session, subscriber=None, service=self, custom_avps=None)
+        answer = self.send_request(request)
+        return session
 
     def start(self):
         for i in self.applications:
@@ -329,14 +331,22 @@ class ApplicationService:
                 i.node.stop()
  
 
-    def terminate_all_sessions(self):
+    def terminate_all_sessions(self, app_id: int = None):
+        if app_id:
+            app = self._applications_by_id.get(app_id)
+            if not app:
+                raise ValueError(f"Application ID {app_id} not found")
+            if not hasattr(app, "terminate_all_sessions"):
+                raise ValueError(f"Application {app_id} does not have a terminate_all_sessions method")
+            app.terminate_all_sessions()
+            return
         for k, v in self.session_manager.sessions.sessions_index.items():
-            app_id, session_id = k
-            session = v
-            self.terminate_session(app_id, session)
-
-
-
+            if app_id and app_id != k[0]:
+                continue
+            for session_id in v:
+                session = self.session_manager.sessions.get_session(app_id, session_id)
+                if session:
+                    self.terminate_session(app_id, session)
 
 def apply_avp_layers(request: Message,
                     app: CommonThreadingApplication = None,

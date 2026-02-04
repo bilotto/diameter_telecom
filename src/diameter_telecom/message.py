@@ -43,6 +43,15 @@ class DiameterMessage:
         self.session_id = None
         if hasattr(message, 'result_code'):
             self.result_code = message.result_code
+        elif hasattr(message, 'experimental_result_code'):
+            # Fallback to Experimental-Result-Code if Result-Code is not present
+            self.result_code = message.experimental_result_code
+            logger.debug(f"📋 Using Experimental-Result-Code ({self.result_code}) instead of Result-Code")
+        elif hasattr(message, 'experimental_result') and message.experimental_result:
+            # Experimental-Result is a grouped AVP, extract Experimental-Result-Code from it
+            if hasattr(message.experimental_result, 'experimental_result_code'):
+                self.result_code = message.experimental_result.experimental_result_code
+                logger.debug(f"📋 Using Experimental-Result-Code ({self.result_code}) from grouped AVP instead of Result-Code")
         if hasattr(message, 'cc_request_type'):
             self.cc_request_type = message.cc_request_type
         if hasattr(message, 'session_id'): 
@@ -121,8 +130,9 @@ class DiameterMessage:
             message_data['is_request'] = self.is_request
             message_data['name'] = self.name
             message_data['time'] = self.time
-            if hasattr(self.message, 'result_code') and self.message.result_code is not None:
-                message_data['result_code'] = self.message.result_code
+            # Use self.result_code which already handles both Result-Code and Experimental-Result-Code
+            if self.result_code is not None:
+                message_data['result_code'] = self.result_code
             return message_data
             
         except Exception as e:

@@ -10,6 +10,11 @@ from typing import Dict, Any
 import time
 
 class CommonThreadingApplication(ThreadingApplication):
+    MESSAGE_CREATE_SESSION = None
+    MESSAGE_UPDATE_SESSION = None
+    MESSAGE_TERMINATE_SESSION = None
+    MESSAGE_REFRESH_SESSION = None
+    MESSAGE_ABORT_SESSION = None
     session_manager: SessionManager
     subscribers: Subscribers
     def __init__(self, application_id: int, is_acct_application: bool, is_auth_application: bool, max_threads: int = 1):
@@ -91,9 +96,10 @@ class CommonThreadingApplication(ThreadingApplication):
         self.session_manager.process_diameter_message(dm_request, owner_app=self)
         # Delegate to subclass implementation
         answer = self._handle_request(message)
-        
         # Process outgoing answer
         if answer:
+            if not answer.origin_host:
+                answer.origin_host = self.node.origin_host.encode()
             dm_answer = DiameterMessage(answer)
             self.session_manager.process_diameter_message(dm_answer, owner_app=self)
         

@@ -46,6 +46,7 @@ class Subscriber:
     _avps: Dict[str, str] = field(default_factory=dict, repr=False)
     carrier_name: str = field(default=None, repr=False)
     # We will replace sessions with sessions
+    policy_counters: Dict[str, str] = field(default_factory=dict, repr=False)
 
     @property
     def session_ids(self) -> Dict[int, List[str]]:

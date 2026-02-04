@@ -53,6 +53,7 @@ class SessionManager:
     clear_sessions_after_termination: bool = field(default=True, repr=False)
     create_csv: bool = field(default=False, repr=False)
     csv_filename: Optional[str] = field(default=None, repr=False)
+    save_contexts: bool = field(default=False, repr=False)
     
     # Thread safety locks
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)

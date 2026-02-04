@@ -27,7 +27,8 @@ class Sessions:
     - framed_ip_index: Secondary O(1) lookup by (app_id, ip) → session_id
     - framed_ipv6_index: Secondary O(1) lookup by (app_id, ipv6) → session_id
     - msisdn_index: Secondary O(1) lookup by (app_id, msisdn) → session_id
-    
+    - imsi_index: Secondary O(1) lookup by (app_id, imsi) → session_id
+
     Thread Safety:
     This class is thread-safe and can be safely shared across multiple threads.
     It uses a single RLock to protect all session operations.
@@ -41,6 +42,7 @@ class Sessions:
     framed_ip_index: Dict[Tuple[int, str], str] = field(default_factory=dict)
     framed_ipv6_index: Dict[Tuple[int, str], str] = field(default_factory=dict) 
     msisdn_index: Dict[Tuple[int, str], str] = field(default_factory=dict)
+    imsi_index: Dict[Tuple[int, str], str] = field(default_factory=dict)
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
 
     @property
@@ -91,6 +93,14 @@ class Sessions:
             result[app_id][msisdn] = session_id
             
         return result
+
+    @property
+    def sessions_by_imsi(self) -> Dict[int, Dict[str, str]]:
+        """Backwards compatibility property - creates nested view of imsi_index."""
+        result = {app_id: {} for app_id in [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]}
+        for (app_id, imsi), session_id in self.imsi_index.items():
+            result[app_id][imsi] = session_id
+        return result
     
     def __post_init__(self):
         """Initialize hash-based indexing system.
@@ -128,6 +138,8 @@ class Sessions:
                     self.framed_ipv6_index[(app_id, session.framed_ipv6_prefix)] = session.session_id
                 if session.subscriber and session.subscriber.msisdn:
                     self.msisdn_index[(app_id, session.subscriber.msisdn)] = session.session_id
+                if session.subscriber and getattr(session.subscriber, "imsi", None):
+                    self.imsi_index[(app_id, session.subscriber.imsi)] = session.session_id
             
             logger.debug(f"Added session {session.session_id} for app_id {app_id} [hash-indexed]")
     
@@ -161,6 +173,8 @@ class Sessions:
                     self.framed_ipv6_index.pop((app_id, session.framed_ipv6_prefix), None)
                 if session.subscriber and session.subscriber.msisdn:
                     self.msisdn_index.pop((app_id, session.subscriber.msisdn), None)
+                if session.subscriber and getattr(session.subscriber, "imsi", None):
+                    self.imsi_index.pop((app_id, session.subscriber.imsi), None)
             
             logger.debug(f"Removed session {session_id} for app_id {app_id} [hash-indexed]")
             return session
@@ -471,7 +485,23 @@ class Sessions:
                 session for (aid, _), session in self.sessions_index.items()
                 if aid == app_id and session.subscriber and session.subscriber.msisdn == msisdn
             ]
-    
+
+    def get_sessions_by_imsi(self, app_id: int, imsi: str) -> List[DiameterSession]:
+        """Get all sessions for a specific IMSI using optimized search.
+        
+        Args:
+            app_id: Application ID
+            imsi: IMSI
+        
+        Returns:
+            List of sessions for the IMSI
+        """
+        with self._lock:
+            return [
+                session for (aid, _), session in self.sessions_index.items()
+                if aid == app_id and session.subscriber and getattr(session.subscriber, "imsi", None) == imsi
+            ]
+
     def update_session_indexes(self, app_id: int, session: DiameterSession):
         """Update indexes for an existing session using optimized indexing.
         
@@ -492,6 +522,8 @@ class Sessions:
                         self.framed_ipv6_index.pop((app_id, old_session.framed_ipv6_prefix), None)
                     if old_session.subscriber and old_session.subscriber.msisdn:
                         self.msisdn_index.pop((app_id, old_session.subscriber.msisdn), None)
+                    if old_session.subscriber and getattr(old_session.subscriber, "imsi", None):
+                        self.imsi_index.pop((app_id, old_session.subscriber.imsi), None)
                 
                 # Add new indexes using optimized hash keys
                 if session.framed_ip_address:
@@ -500,6 +532,8 @@ class Sessions:
                     self.framed_ipv6_index[(app_id, session.framed_ipv6_prefix)] = session.session_id
                 if session.subscriber and session.subscriber.msisdn:
                     self.msisdn_index[(app_id, session.subscriber.msisdn)] = session.session_id
+                if session.subscriber and getattr(session.subscriber, "imsi", None):
+                    self.imsi_index[(app_id, session.subscriber.imsi)] = session.session_id
                 
                 # Update primary index
                 self.sessions_index[(app_id, session.session_id)] = session
@@ -518,7 +552,8 @@ class Sessions:
             secondary_keys_to_remove = {
                 'framed_ip': [key for key in self.framed_ip_index.keys() if key[0] == app_id],
                 'framed_ipv6': [key for key in self.framed_ipv6_index.keys() if key[0] == app_id],
-                'msisdn': [key for key in self.msisdn_index.keys() if key[0] == app_id]
+                'msisdn': [key for key in self.msisdn_index.keys() if key[0] == app_id],
+                'imsi': [key for key in self.imsi_index.keys() if key[0] == app_id],
             }
             
             # Remove from all indices
@@ -533,6 +568,8 @@ class Sessions:
                 
             for key in secondary_keys_to_remove['msisdn']:
                 self.msisdn_index.pop(key, None)
+            for key in secondary_keys_to_remove['imsi']:
+                self.imsi_index.pop(key, None)
             
             logger.info(f"Cleared {len(primary_keys_to_remove)} sessions for app_id {app_id} [hash-indexed]")
     
@@ -545,6 +582,7 @@ class Sessions:
             self.framed_ip_index.clear()
             self.framed_ipv6_index.clear()
             self.msisdn_index.clear()
+            self.imsi_index.clear()
             
             logger.info(f"Cleared {total_sessions} sessions for all applications [hash-indexed]")
 
@@ -610,3 +648,4 @@ class Sessions:
     @property
     def sy_sessions(self) -> List[SySession]:
         """Get all Sy sessions."""
+        return [session for session in self.sessions_index.values() if isinstance(session, SySession)]
