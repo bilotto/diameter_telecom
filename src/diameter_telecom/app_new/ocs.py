@@ -18,7 +18,7 @@ class OcsSyApplication(CommonThreadingApplication):
     MESSAGE_CREATE_SESSION = None
     MESSAGE_UPDATE_SESSION = SSNR
     MESSAGE_TERMINATE_SESSION = None
-    MESSAGE_ABORT_SESSION = ASR
+    MESSAGE_ABORT_SESSION = None
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_SY, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         # related_apps removed; use owner-based discovery via get_app_by_id
@@ -60,37 +60,18 @@ class OcsSyApplication(CommonThreadingApplication):
             subscriber = None
             if message.subscription_id:
                 msisdn, imsi, _, _, _ = parse_subscription_id(message.subscription_id)
-                print(f"🔍 OCS Sy: Parsed subscription_id: {msisdn}, {imsi}")
             if msisdn:
                 subscriber = self.subscribers.get_subscriber_by_msisdn(msisdn)
                 self.logger.debug(f"👤 Gx CCR: Found subscriber by MSISDN: {subscriber}")
-                print(f"🔍 OCS Sy: Found subscriber by MSISDN: {subscriber}")
             elif imsi:
                 subscriber = self.subscribers.get_subscriber_by_imsi(imsi)
                 self.logger.debug(f"👤 Gx CCR: Found subscriber by IMSI: {imsi}")
-                print(f"🔍 OCS Sy: Found subscriber by IMSI: {imsi}")
 
             if not subscriber:
                 answer.result_code = E_RESULT_CODE_DIAMETER_USER_UNKNOWN
             else:
-
-                print(f"🔍 OCS Sy: Found subscriber: {subscriber}")
-                print(f"🔍 OCS Sy: Found subscriber PC: {subscriber.policy_counters}")
-
                 answer = subscriber.add_avps(answer)
 
-                if subscriber.policy_counters:
-                    for key, value in subscriber.policy_counters.items():
-                        pcsr = PolicyCounterStatusReport(
-                            policy_counter_identifier=key,
-                            policy_counter_status=value
-                        )
-                        answer.policy_counter_status_report.append(pcsr)
-
-
-            answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
-        elif isinstance(message, SpendingStatusNotificationRequest):
-            self.logger.info(f"🔔 OCS Sy: Handling SpendingStatusNotificationRequest for session {message.session_id}")
             answer.result_code = E_RESULT_CODE_DIAMETER_SUCCESS
         elif isinstance(message, SessionTerminationRequest):
             self.logger.info(f"🛑 OCS Sy: Handling SessionTerminationRequest for session {message.session_id}")
@@ -115,8 +96,8 @@ class OcsSyApplication(CommonThreadingApplication):
     def create_request(self, message_name: str, session: SySession) -> SpendingStatusNotificationRequest | AbortSessionRequest:
         if message_name == SSNR:
             request = SpendingStatusNotificationRequest()
-        elif message_name == ASR:
-            request = AbortSessionRequest()
+        else:
+            raise ValueError(f"Unknown message name: {message_name}")
         request.header.application_id = APP_3GPP_SY
         request.session_id = session.session_id
         return request

@@ -45,8 +45,6 @@ class Subscriber:
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _avps: Dict[str, str] = field(default_factory=dict, repr=False)
     carrier_name: str = field(default=None, repr=False)
-    # We will replace sessions with sessions
-    policy_counters: Dict[str, str] = field(default_factory=dict, repr=False)
 
     @property
     def session_ids(self) -> Dict[int, List[str]]:
@@ -68,18 +66,6 @@ class Subscriber:
             if val is not None:
                 setattr(self, attr, str(val))
 
-    # def __repr__(self) -> str:
-    #     fields = []
-    #     for attr in ['msisdn', 'imsi', 'sip_uri', 'nai', 'private_id', 'imei', 'apn']:
-    #         val = getattr(self, attr)
-    #         if val is not None:
-    #             if attr == 'apn':
-    #                 fields.append(f"{attr}={val!r}")
-    #             else:
-    #                 fields.append(f"{attr}='{val}'")
-    #     # Add message count
-    #     fields.append(f"messages={len(self.messages)}")
-    #     return f"Subscriber({', '.join(fields)})"
 
     def add_avps(self, message: Message) -> Message:
         logger.debug(f"Subscriber AVPS: {self.avps}")

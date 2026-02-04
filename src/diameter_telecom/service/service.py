@@ -16,7 +16,7 @@ import time
 
 logger = logging.getLogger("diameter_telecom.services")
 
-
+from diameter.message import dump
 
 class ApplicationService:
     """
@@ -47,6 +47,7 @@ class ApplicationService:
         self.session_manager = session_manager
         self.set_session_manager(session_manager)
         self.logger = logger
+        self.confirm_message_mode = False
 
     @property
     def subscribers(self) -> Subscribers:
@@ -219,6 +220,11 @@ class ApplicationService:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "send_request_custom"):
             raise ValueError(f"Application {app_id} does not have a send_request_custom method")
+        if self.confirm_message_mode:
+            print(f"The following message will be sent: {dump(request)}")
+            confirm = input("Confirm message? (y/n): ")
+            if confirm != "y":
+                raise ValueError(f"Message not confirmed")
         # request = apply_avp_layers(request, app)
         # request = self.add_avps(request)
         return app.send_request_custom(request)
