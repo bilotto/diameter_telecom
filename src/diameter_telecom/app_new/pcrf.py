@@ -29,6 +29,8 @@ from ..diameter_layer import ChargingRuleInstall, QosInformation, DefaultEpsBear
 class PcrfGxApplication(CommonThreadingApplication):
     MESSAGE_REFRESH_SESSION = RAR
     MESSAGE_ABORT_SESSION = ASR
+    #
+    SESSION_STARTER = False
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_GX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         # related_apps removed; use owner-based discovery via get_app_by_id
@@ -222,6 +224,8 @@ def identify_voice_call(request: AaRequest) -> bool:
 class PcrfRxApplication(CommonThreadingApplication):
     MESSAGE_REFRESH_SESSION = RAR
     MESSAGE_ABORT_SESSION = ASR
+    #
+    SESSION_STARTER = False
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_RX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         # self.related_apps: List[CommonThreadingApplication] = []
@@ -303,6 +307,8 @@ class PcrfSyApplication(CommonThreadingApplication):
     MESSAGE_UPDATE_SESSION = None
     MESSAGE_TERMINATE_SESSION = STR
     MESSAGE_ABORT_SESSION = None
+    #
+    SESSION_STARTER = True
 
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_SY, is_acct_application=False, is_auth_application=True, max_threads=max_threads)

@@ -19,6 +19,9 @@ class OcsSyApplication(CommonThreadingApplication):
     MESSAGE_UPDATE_SESSION = SSNR
     MESSAGE_TERMINATE_SESSION = None
     MESSAGE_ABORT_SESSION = None
+    #
+    SESSION_STARTER = False
+    
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_SY, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         # related_apps removed; use owner-based discovery via get_app_by_id

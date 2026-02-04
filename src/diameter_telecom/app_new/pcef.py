@@ -15,6 +15,8 @@ class PcefGxApplication(CommonThreadingApplication):
     MESSAGE_UPDATE_SESSION = CCR_U
     MESSAGE_TERMINATE_SESSION = CCR_T
     MESSAGE_ABORT_SESSION = None
+    #
+    SESSION_STARTER = True
 
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_GX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)

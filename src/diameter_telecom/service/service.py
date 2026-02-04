@@ -286,6 +286,10 @@ class ApplicationService:
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a terminate_session method")
         
+        if not app.SESSION_STARTER:
+            print(f"Application {app_id} is not a session starter")
+            return None
+            
         request = self._create_request(app_id, session, goal="terminate")
         
         # Apply all AVP layers for session termination
@@ -336,23 +340,17 @@ class ApplicationService:
             if i.node._started:
                 i.node.stop()
  
+    def terminate_all_sessions(self):
+        try:
+            for k, v in self.session_manager.sessions.sessions_index.items():
+                app_id, session_id = k
+                session = v
+                self.terminate_session(app_id, session)
+        except Exception as e:
+            print(f"Error terminating all sessions: {e}")
+            return False
+        return True
 
-    def terminate_all_sessions(self, app_id: int = None):
-        if app_id:
-            app = self._applications_by_id.get(app_id)
-            if not app:
-                raise ValueError(f"Application ID {app_id} not found")
-            if not hasattr(app, "terminate_all_sessions"):
-                raise ValueError(f"Application {app_id} does not have a terminate_all_sessions method")
-            app.terminate_all_sessions()
-            return
-        for k, v in self.session_manager.sessions.sessions_index.items():
-            if app_id and app_id != k[0]:
-                continue
-            for session_id in v:
-                session = self.session_manager.sessions.get_session(app_id, session_id)
-                if session:
-                    self.terminate_session(app_id, session)
 
 def apply_avp_layers(request: Message,
                     app: CommonThreadingApplication = None,
