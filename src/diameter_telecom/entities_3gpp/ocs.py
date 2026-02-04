@@ -63,6 +63,7 @@ class OCS(DiameterEntity):
         app_id = int(app_id)
         if app_id == APP_3GPP_SY:
             app = OcsSyApplication(max_threads=max_threads)
+            self.add_realm(APP_3GPP_SY, self.realm_name)
             self.node.add_application(app, self.sy_peers, self.sy_realms)
             self.all_applications[APP_3GPP_SY] = app
             logger.info(f"{type(self).__name__} setup Sy application with {len(self.sy_peers)} peers and {self.sy_realms} realms")

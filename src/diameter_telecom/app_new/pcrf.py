@@ -28,6 +28,9 @@ from ..diameter_layer import ChargingRuleInstall, QosInformation, DefaultEpsBear
 
 class PcrfGxApplication(CommonThreadingApplication):
     MESSAGE_REFRESH_SESSION = RAR
+    MESSAGE_ABORT_SESSION = ASR
+    #
+    SESSION_STARTER = False
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_GX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         # related_apps removed; use owner-based discovery via get_app_by_id
@@ -219,6 +222,10 @@ def identify_voice_call(request: AaRequest) -> bool:
 
 
 class PcrfRxApplication(CommonThreadingApplication):
+    MESSAGE_REFRESH_SESSION = RAR
+    MESSAGE_ABORT_SESSION = ASR
+    #
+    SESSION_STARTER = False
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_RX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
         # self.related_apps: List[CommonThreadingApplication] = []
@@ -298,7 +305,10 @@ from .. import Subscriber
 class PcrfSyApplication(CommonThreadingApplication):
     MESSAGE_CREATE_SESSION = SLR
     MESSAGE_UPDATE_SESSION = None
-    MESSAGE_TERMINATE_SESSION = SLR
+    MESSAGE_TERMINATE_SESSION = STR
+    MESSAGE_ABORT_SESSION = None
+    #
+    SESSION_STARTER = True
 
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_SY, is_acct_application=False, is_auth_application=True, max_threads=max_threads)
@@ -309,20 +319,25 @@ class PcrfSyApplication(CommonThreadingApplication):
         self.session_manager.sessions.add_session(APP_3GPP_SY, sy_session)
         return sy_session
 
-    def create_request(self, message_name: str, session: SySession) -> CreditControlRequest:
+    def create_request(self, message_name: str, session: SySession) -> SpendingLimitRequest | SessionTerminationRequest:
         if message_name == SLR:
             request = SpendingLimitRequest()
-            request.header.application_id = APP_3GPP_SY
-            request.session_id = session.session_id
-            for k, v in self.avps.items():
-                setattr(request, k, v)
-            for k, v in session.avps.items():
-                setattr(request, k, v)
-            for k, v in session.subscriber.avps.items():
-                setattr(request, k, v)
-            return request
-        elif message_name == SLR:
-            pass
+            # for k, v in self.avps.items():
+            #     setattr(request, k, v)
+            # for k, v in session.avps.items():
+            #     setattr(request, k, v)
+            # for k, v in session.subscriber.avps.items():
+            #     setattr(request, k, v)
+        elif message_name == STR:
+            request = SessionTerminationRequest()
+            # for k, v in self.avps.items():
+            #     setattr(request, k, v)
+            # for k, v in session.avps.items():
+            #     setattr(request, k, v)
+            # for k, v in session.subscriber.avps.items():
+            #     setattr(request, k, v)
+        request.header.application_id = APP_3GPP_SY
+        request.session_id = session.session_id
         return request
         
     def _handle_request(self, message: Message):

@@ -15,6 +15,7 @@ class AfRxApplication(CommonThreadingApplication):
     MESSAGE_CREATE_SESSION = AAR
     MESSAGE_UPDATE_SESSION = AAR
     MESSAGE_TERMINATE_SESSION = STR
+    MESSAGE_ABORT_SESSION = ASR
 
     def __init__(self, max_threads: int = 1):
         super().__init__(application_id=APP_3GPP_RX, is_acct_application=False, is_auth_application=True, max_threads=max_threads)

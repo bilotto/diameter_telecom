@@ -5,7 +5,7 @@ from .csv_file import *
 from .diameter_layer import *
 from .constants import *
 from .app import GxApplication, RxApplication, SyApplication, CustomSimpleThreadingApplication
-from .app_new import PcefGxApplication, PcrfGxApplication, PcrfRxApplication, PcrfSyApplication, AfRxApplication, OcsSyApplication, CommonThreadingApplication
+from .app_new import PcefGxApplication, PcrfGxApplication, PcrfRxApplication, PcrfSyApplication, AfRxApplication, CommonThreadingApplication, OcsSyApplication
 from .entities_3gpp import PCEF, PCRF, OCS, AF, DSC, DiameterEntity
 from .service import ApplicationService
 from .session import GxSession, RxSession, SySession, DiameterSession

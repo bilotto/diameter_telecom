@@ -78,6 +78,10 @@ class MessageProcessingContext:
     _additional_data: Dict[str, Any] = field(default_factory=dict)
     stop_processing: bool = False
 
+    # Pcap support
+    pcap_filepath: Optional[str] = None
+    frame_number: Optional[int] = None
+
     # @property
     # def session_id(self):
     #     return self.message.session_id
@@ -225,8 +229,16 @@ class MessageProcessingContext:
                 context.msisdn = msisdn
             if imsi:
                 context.imsi = imsi
+        # Extract result code, checking both Result-Code and Experimental-Result-Code
         if hasattr(dm.message, 'result_code') and dm.message.result_code:
             context.result_code = dm.message.result_code
+        elif hasattr(dm.message, 'experimental_result_code') and dm.message.experimental_result_code:
+            # Fallback to Experimental-Result-Code if Result-Code is not present
+            context.result_code = dm.message.experimental_result_code
+        elif hasattr(dm.message, 'experimental_result') and dm.message.experimental_result:
+            # Experimental-Result is a grouped AVP, extract Experimental-Result-Code from it
+            if hasattr(dm.message.experimental_result, 'experimental_result_code'):
+                context.result_code = dm.message.experimental_result.experimental_result_code
         if hasattr(dm.message, 'origin_host') and dm.message.origin_host:
             context.origin_host = dm.message.origin_host.decode()
         # if hasattr(dm.message, 'origin_realm') and dm.message.origin_realm:

@@ -93,6 +93,14 @@ class Sessions:
             result[app_id][msisdn] = session_id
             
         return result
+
+    @property
+    def sessions_by_imsi(self) -> Dict[int, Dict[str, str]]:
+        """Backwards compatibility property - creates nested view of imsi_index."""
+        result = {app_id: {} for app_id in [APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY]}
+        for (app_id, imsi), session_id in self.imsi_index.items():
+            result[app_id][imsi] = session_id
+        return result
     
     @property
     def sessions_by_imsi(self) -> Dict[int, Dict[str, str]]:
@@ -487,7 +495,23 @@ class Sessions:
                 session for (aid, _), session in self.sessions_index.items()
                 if aid == app_id and session.subscriber and session.subscriber.msisdn == msisdn
             ]
-    
+
+    def get_sessions_by_imsi(self, app_id: int, imsi: str) -> List[DiameterSession]:
+        """Get all sessions for a specific IMSI using optimized search.
+        
+        Args:
+            app_id: Application ID
+            imsi: IMSI
+        
+        Returns:
+            List of sessions for the IMSI
+        """
+        with self._lock:
+            return [
+                session for (aid, _), session in self.sessions_index.items()
+                if aid == app_id and session.subscriber and getattr(session.subscriber, "imsi", None) == imsi
+            ]
+
     def update_session_indexes(self, app_id: int, session: DiameterSession):
         """Update indexes for an existing session using optimized indexing.
         
@@ -635,3 +659,4 @@ class Sessions:
     @property
     def sy_sessions(self) -> List[SySession]:
         """Get all Sy sessions."""
+        return [session for session in self.sessions_index.values() if isinstance(session, SySession)]
