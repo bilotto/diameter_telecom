@@ -10,12 +10,16 @@ from ..app.custom_simple_threading_application import CustomSimpleThreadingAppli
 from ..app.gx import GxApplication
 from ..app.rx import RxApplication
 from ..app.sy import SyApplication
+from diameter.node.application import Application, ThreadingApplication, SimpleThreadingApplication
+
 
 from ..subscriber import Subscribers
 from ..session_manager.session_manager import SessionManager
 
 # logging.getLogger("diameter_telecom.entities_3gpp").setLevel(logging.DEBUG)
 logger = logging.getLogger("diameter_telecom.entities_3gpp")
+
+
 
 def node_peer_uri(node: Node):
     if node.tcp_port:
@@ -143,6 +147,10 @@ class DiameterEntity:
     def sy_realms(self):
         return self.all_realms.get(APP_3GPP_SY, [])
 
+    @property
+    def setup_app_ran(self):
+        return self._setup_app_ran or len(self.all_applications) > 0
+
     def set_session_manager(self, session_manager: SessionManager):
         self.session_manager = session_manager
 
@@ -178,28 +186,19 @@ class DiameterEntity:
             self.add_realm(APP_3GPP_SY, realm_name)
 
     def setup_app(self, app_id: int, max_threads, request_handler: Callable):
-        # logger.info(f"{type(self).__name__} setting up app {app_id} with max_threads {max_threads} and request_handler {request_handler}")
         app_id = int(app_id)
         if app_id == APP_3GPP_GX:
-            # self.gx_app = GxApplication(max_threads=max_threads, request_handler=request_handler)
             app = GxApplication(max_threads=max_threads, request_handler=request_handler)
-            # if self.subscribers and hasattr(app, 'subscribers'):
-            #     app.subscribers = self.subscribers
             self.node.add_application(app, self.gx_peers, self.gx_realms)
             self.all_applications[APP_3GPP_GX] = app
             logger.info(f"{type(self).__name__} setup Gx application with {len(self.gx_peers)} peers and {self.gx_realms} realms")
         elif app_id == APP_3GPP_RX:
             app = RxApplication(max_threads=max_threads, request_handler=request_handler)
-            # if self.subscribers and hasattr(app, 'subscribers'):
-            #     app.subscribers = self.subscribers
             self.node.add_application(app, self.rx_peers, self.rx_realms)
             self.all_applications[APP_3GPP_RX] = app
-            # logger.info(f"{type(self).__name__} setup Rx application with peers {self.rx_peers} and realms {self.rx_realms}")
             logger.info(f"{type(self).__name__} setup Rx application with {len(self.rx_peers)} peers and {self.rx_realms} realms")
         elif app_id == APP_3GPP_SY:
             app = SyApplication(max_threads=max_threads, request_handler=request_handler)
-            # if self.subscribers and hasattr(app, 'subscribers'):
-            #     app.subscribers = self.subscribers
             self.node.add_application(app, self.sy_peers, self.sy_realms)
             self.all_applications[APP_3GPP_SY] = app
             logger.info(f"{type(self).__name__} setup Sy application with {len(self.sy_peers)} peers and {self.sy_realms} realms")
@@ -224,7 +223,7 @@ class DiameterEntity:
         self.setup_app(APP_3GPP_SY, max_threads, request_handler)
 
     def start(self):
-        if not self._setup_app_ran:
+        if not self.setup_app_ran:
             logger.error("setup_app must be called before start")
             raise ValueError("setup_app must be called before start")
         logger.info(f"Starting {type(self).__name__} entity {self.origin_host}")
@@ -282,3 +281,12 @@ class DiameterEntity:
             entity_dict['applications'].append(app_dict)
         entity_dict_[entity_type] = entity_dict
         return entity_dict_
+
+    def _add_application(self, app: Application):
+        app_id = int(app.application_id)
+        peers = self.all_peers.get(app_id, [])
+        realms = self.all_realms.get(app_id, [])
+        if not peers or not realms:
+            raise ValueError(f"Peers or realms are not set for app {app_id}")
+        self.node.add_application(app, peers, realms)
+        self.all_applications[app_id] = app

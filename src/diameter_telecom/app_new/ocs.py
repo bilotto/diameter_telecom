@@ -48,9 +48,9 @@ class OcsSyApplication(CommonThreadingApplication):
         # # Query node_manager/session_manager for session
         sy_session = self.session_manager.sessions.get_session_by_id(APP_3GPP_SY, message.session_id)
         if not sy_session:
-            self.logger.error(f"❌ OCS Sy: Session {message.session_id} not found")
             # Check if is a STR (Session Termination Request). If so, let it pass so the session can be terminated on the other side even if does not exist in our session manager.
             if not isinstance(message, SessionTerminationRequest):
+                self.logger.error(f"❌ OCS Sy: Session {message.session_id} not found")
                 raise ValueError(f"Session {message.session_id} not found")
 
         # Business logic for each message type

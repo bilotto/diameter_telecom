@@ -1,5 +1,4 @@
 from diameter.node.application import Application
-
 from ._diameter_entity import DiameterEntity, node_peer_uri, PEER_READY_STATES
 from ..constants import APP_3GPP_GX, APP_3GPP_RX, APP_3GPP_SY
 from ..app import *
@@ -40,8 +39,7 @@ class DSC(DiameterEntity):
     
     The DSC is a generic Diameter entity that can handle all 3GPP applications
     (GX, RX, SY) and provides routing capabilities for Diameter messages.
-    """
-    
+    """    
     def setup_apps(self, max_threads: int = 10, request_handler: callable = handle_request_dsc):
         for app_id, peers in self.all_peers.items():
             self.add_realm(app_id, self.realm_name)

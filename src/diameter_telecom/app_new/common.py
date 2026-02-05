@@ -129,3 +129,7 @@ class CommonThreadingApplication(ThreadingApplication):
         self.logger.info(f"Received answer {diameter_message_answer.cmd_code} through node {self.node.origin_host}")
         self.logger.debug(f"\n{diameter_message_answer.dump()}")
         return diameter_message_answer
+
+
+    def create_session(self, subscriber):
+        raise NotImplementedError("Subclasses must implement create_session")

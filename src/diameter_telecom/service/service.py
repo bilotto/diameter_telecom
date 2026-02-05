@@ -31,8 +31,8 @@ class ApplicationService:
                     session_manager: SessionManager = None):
         app_ids = []
         for i in applications:
-            if not isinstance(i, CommonThreadingApplication):
-                raise ValueError(f"Application {i} is not a CommonThreadingApplication")
+            # if not isinstance(i, CommonThreadingApplication):
+            #     raise ValueError(f"Application {i} is not a CommonThreadingApplication")
             if i.application_id in app_ids:
                 raise ValueError(f"Application ID {i.application_id} is already in the list")
             app_ids.append(i.application_id)
@@ -280,6 +280,30 @@ class ApplicationService:
         return session
 
     def terminate_session(self, app_id: int, session: DiameterSession) -> DiameterSession:
+        app = self._applications_by_id.get(app_id)
+        if not app:
+            raise ValueError(f"Application ID {app_id} not found")
+        if not hasattr(app, "create_request"):
+            raise ValueError(f"Application {app_id} does not have a terminate_session method")
+        
+        if not app.SESSION_STARTER:
+            print(f"Application {app_id} is not a session starter")
+            return None
+            
+        request = self._create_request(app_id, session, goal="terminate")
+        
+        # Apply all AVP layers for session termination
+        # request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
+        request = apply_avp_layers(request, app=app, session=session, subscriber=None, service=self, custom_avps=None)
+        # answer = app.send_request_custom(request)
+        answer = self.send_request(request)
+        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+        #     self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
+        return session
+
+
+    def _terminate_session(self, session: DiameterSession) -> DiameterSession:
+        app_id = session.app_id
         app = self._applications_by_id.get(app_id)
         if not app:
             raise ValueError(f"Application ID {app_id} not found")
