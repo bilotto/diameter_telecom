@@ -242,18 +242,9 @@ class ApplicationService:
             raise ValueError(f"Session is not a DiameterSession")
         if not request:
             request: Message = self._create_request(app_id, session, goal="create")
-        
-        # Apply all AVP layers for session start
-        # request = self._apply_avp_layers(app_id, session, request, custom_avps=custom_avps)
         request = apply_avp_layers(request, app=app, session=session, subscriber=session.subscriber, service=self, custom_avps=custom_avps)
         self.session_manager.sessions.add_session(app_id, session)
-        # answer = app.send_request_custom(request)
         answer = self.send_request(request)
-        # time.sleep(1)
-        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-        #     self.logger.error(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
-        #     self.terminate_session(app_id, session)
-        #     raise ValueError(f"Failed to start session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         self.logger.debug(f"{app_id}, {session.session_id}: Session started")
         return session
 
@@ -271,12 +262,7 @@ class ApplicationService:
         if not request:
             request = self._create_request(app_id, session, goal="update")
         request = apply_avp_layers(request, app=app, session=session, subscriber=session.subscriber, service=self, custom_avps=avps_list)
-        # answer = app.send_request_custom(request)
         answer = self.send_request(request)
-        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-        #     self.logger.error(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}. Triggering termination.")
-        #     self.terminate_session(app_id, session)
-        #     raise ValueError(f"Failed to update session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         return session
 
     def terminate_session(self, app_id: int, session: DiameterSession) -> DiameterSession:
@@ -285,20 +271,9 @@ class ApplicationService:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a terminate_session method")
-        
-        if not app.SESSION_STARTER:
-            print(f"Application {app_id} is not a session starter")
-            return None
-            
         request = self._create_request(app_id, session, goal="terminate")
-        
-        # Apply all AVP layers for session termination
-        # request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
         request = apply_avp_layers(request, app=app, session=session, subscriber=None, service=self, custom_avps=None)
-        # answer = app.send_request_custom(request)
         answer = self.send_request(request)
-        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-        #     self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         return session
 
 
@@ -309,20 +284,9 @@ class ApplicationService:
             raise ValueError(f"Application ID {app_id} not found")
         if not hasattr(app, "create_request"):
             raise ValueError(f"Application {app_id} does not have a terminate_session method")
-        
-        if not app.SESSION_STARTER:
-            print(f"Application {app_id} is not a session starter")
-            return None
-            
         request = self._create_request(app_id, session, goal="terminate")
-        
-        # Apply all AVP layers for session termination
-        # request = self._apply_avp_layers(app_id, session, request, apply_subscriber=False, apply_session=False)
         request = apply_avp_layers(request, app=app, session=session, subscriber=None, service=self, custom_avps=None)
-        # answer = app.send_request_custom(request)
         answer = self.send_request(request)
-        # if answer.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-        #     self.logger.error(f"Failed to terminate session {session.session_id} for application {app_id}. Result code: {answer.result_code}")
         return session
                 
     def refresh_session(self, app_id: int, session: DiameterSession):
@@ -368,6 +332,9 @@ class ApplicationService:
         try:
             for k, v in self.session_manager.sessions.sessions_index.items():
                 app_id, session_id = k
+                app = self._applications_by_id.get(app_id)
+                if not app.SESSION_STARTER:
+                    continue
                 session = v
                 self.terminate_session(app_id, session)
         except Exception as e:
