@@ -1036,6 +1036,7 @@ class MessageProcessingPipeline:
         logger.debug(f"🚀 Starting pipeline processing for message {context.message.name}")
         
         # Add collections to context so stages can access them
+        # todo: Check if this should be here
         context.sessions = self.sessions
         context.subscribers = self.subscribers
         context.clear_sessions_after_termination = self.clear_sessions_after_termination

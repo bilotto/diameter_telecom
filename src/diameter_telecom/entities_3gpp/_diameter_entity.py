@@ -155,14 +155,14 @@ class DiameterEntity:
         self.session_manager = session_manager
 
     def set_subscribers(self, subscribers: Subscribers):
-        self.subscribers = subscribers
+        self.subscribers = subscribers 
 
-    def add_node_as_peer(self, node_: Node, app_id: int, initiate_connection: bool = False):
+    def add_node_as_peer(self, node_: Node, app_id: int, initiate_connection: bool = False, is_default: bool = False):
         app_id = int(app_id)
         if app_id not in self.all_peers:
             self.all_peers[app_id] = []
         logger.info(f"{type(self).__name__} adding node {node_.origin_host} as peer for app {app_id}")
-        self.all_peers[app_id].append(self.node.add_peer(node_peer_uri(node_), node_.realm_name, node_.ip_addresses, is_persistent=initiate_connection))
+        self.all_peers[app_id].append(self.node.add_peer(node_peer_uri(node_), node_.realm_name, node_.ip_addresses, is_persistent=initiate_connection, is_default=is_default))
         self.add_realm(app_id, node_.realm_name)
 
     def add_realm(self, app_id: int, realm_name: str):

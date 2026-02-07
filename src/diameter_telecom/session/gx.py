@@ -187,6 +187,13 @@ class GxSession(DiameterSession):
                     self.rat_type = message.rat_type
         # Preserve original DiameterMessage with timestamp by passing diameter_message instead of message
         self.logger.debug(f"[{self.session_id}] (add_message) Preserving DiameterMessage timestamp: {diameter_message.timestamp}")
+
+        if hasattr(message, 'called_station_id') and not self.called_station_id:
+            self.called_station_id = message.called_station_id
+        if hasattr(message, 'sgsn_mcc_mnc') and not self.sgsn_mcc_mnc:
+            self.sgsn_mcc_mnc = message.sgsn_mcc_mnc
+
+
         return super().add_message(diameter_message)
 
     def to_dict(self) -> dict:

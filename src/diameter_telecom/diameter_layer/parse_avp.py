@@ -414,8 +414,13 @@ def parse_usage_monitoring_information(umi_list: List[UsageMonitoringInformation
         umi_gsu_usu['used_service_unit'] = usu
     return umi_gsu_usu
     
-
-
+from diameter.message.avp.grouped import PolicyCounterStatusReport
+def parse_policy_counter_status_report(policy_counter_status_report_list: List[PolicyCounterStatusReport]) -> Dict[str, str]:
+    policy_counter_status_dict = {}
+    if policy_counter_status_report_list:
+        for pcsr in policy_counter_status_report_list:
+            policy_counter_status_dict[pcsr.policy_counter_identifier] = pcsr.policy_counter_status
+    return policy_counter_status_dict
 
 __all__ = [
     'parse_subscription_id',
@@ -428,5 +433,6 @@ __all__ = [
     'check_rat_type',
     'parse_user_location_info_fixed',
     'build_user_location_info_hex',
-    'parse_usage_monitoring_information'
+    'parse_usage_monitoring_information',
+    'parse_policy_counter_status_report'
 ] 

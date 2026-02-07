@@ -2,7 +2,6 @@ from ..subscriber import Subscriber, Subscribers
 from ..session import GxSession, RxSession, SySession, DiameterSession
 from .sessions import Sessions
 from .message_processing_pipeline_refactor import MessageProcessingPipeline
-# from .message_processing_pipeline import MessageProcessingPipeline
 from .message_processing_context import MessageProcessingContext
 from ..csv_file import CsvFile
 from typing import List, Dict, Optional, Any
@@ -218,6 +217,11 @@ class SessionManager:
         # Auto-write to CSV if configured (thread-safe)
         if self.csv_file:
             self._write_context_to_csv(context)
+
+        if context.result_code and context.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+            self.log_message(context, "error", f"❌ Result code: {context.result_code} for message {context.message.name if context.message else 'unknown'}")
+            self.log_message(context, "error", f"❌ Message:\n{context.message.dump()}")
+            return None
         return context
 
     def _write_context_to_csv(self, context: MessageProcessingContext):
