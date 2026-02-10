@@ -53,6 +53,7 @@ class SessionManager:
     create_csv: bool = field(default=False, repr=False)
     csv_filename: Optional[str] = field(default=None, repr=False)
     save_contexts: bool = field(default=False, repr=False)
+    csv_flush_every_message: bool = field(default=True, repr=False)
     
     # Thread safety locks
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
@@ -220,7 +221,7 @@ class SessionManager:
 
         if context.result_code and context.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
             self.log_message(context, "error", f"❌ Result code: {context.result_code} for message {context.message.name if context.message else 'unknown'}")
-            self.log_message(context, "error", f"❌ Message:\n{context.message.dump()}")
+            self.log_message(context, "error", f"❌ Message at {context.message.time}:\n{context.message.dump()}")
             return None
         return context
 
@@ -248,7 +249,8 @@ class SessionManager:
                     row[column] = value if value else ""
                 
                 self.csv_file.write_row(row)
-                self.csv_file.flush()
+                if self.csv_flush_every_message:
+                    self.csv_file.flush()
                 self.log_message(context, "debug", f"✅ CSV row written for message {context.message.name if context.message else 'unknown'}")
                 return True
                 
