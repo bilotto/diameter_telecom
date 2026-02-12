@@ -53,7 +53,7 @@ class SessionManager:
     create_csv: bool = field(default=False, repr=False)
     csv_filename: Optional[str] = field(default=None, repr=False)
     save_contexts: bool = field(default=False, repr=False)
-    csv_flush_every_message: bool = field(default=True, repr=False)
+    csv_flush_every_message: bool = field(default=False, repr=False)
     
     # Thread safety locks
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
