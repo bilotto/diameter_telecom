@@ -176,13 +176,13 @@ def name_diameter_message(is_request, cmd_code, cc_request_type):
         return f"{cmd_code}"
 
 from typing import List, Optional
-from typing_extensions import Tuple
+# from typing_extensions import Tuple
 from dataclasses import dataclass, field
 
 @dataclass
 class DiameterMessages:
     messages: List[DiameterMessage] = field(default_factory=list)
-    messages_pairs: List[Tuple[DiameterMessage, DiameterMessage]] = field(default_factory=list)
+    # messages_pairs: List[Tuple[DiameterMessage, DiameterMessage]] = field(default_factory=list)
     _last_end_to_end_id: Optional[str] = field(default=None) # end_to_end_id
 
     def __iter__(self):
