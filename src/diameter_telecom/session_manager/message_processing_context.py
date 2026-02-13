@@ -245,6 +245,8 @@ class MessageProcessingContext:
         #     context.destination_host = dm.message.destination_host
         # if hasattr(dm.message, 'destination_realm') and dm.message.destination_realm:
         #     context.destination_realm = dm.message.destination_realm
+        if hasattr(dm.message, 'policy_counter_status_report') and dm.message.policy_counter_status_report:
+            context._additional_data['policy_counter_status_report'] = parse_policy_counter_status_report(dm.message.policy_counter_status_report)
 
         return context
     
