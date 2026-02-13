@@ -251,6 +251,9 @@ class MessageProcessingContext:
             context._additional_data['charging_rule_install'] = check_charging_rule_install(dm)
         if hasattr(dm.message, 'charging_rule_remove') and dm.message.charging_rule_remove:
             context._additional_data['charging_rule_remove'] = check_charging_rule_remove(dm)
+        if hasattr(dm.message, 'cc_request_number') and dm.message.cc_request_number:
+            context._additional_data['cc_request_number'] = dm.message.cc_request_number
+
         return context
     
     # def to_dict(self) -> Dict[str, Any]:
