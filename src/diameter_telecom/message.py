@@ -37,7 +37,7 @@ class DiameterMessage:
         else:
             raise TypeError(f"Parameter must be a hex string or a Message instance. Provided: {obj},{type(obj)}")
         
-        self.timestamp = time.time()
+        self.timestamp = None
         self.result_code = None
         self.cc_request_type = None
         self.session_id = None
