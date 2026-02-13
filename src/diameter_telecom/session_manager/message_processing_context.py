@@ -247,7 +247,10 @@ class MessageProcessingContext:
         #     context.destination_realm = dm.message.destination_realm
         if hasattr(dm.message, 'policy_counter_status_report') and dm.message.policy_counter_status_report:
             context._additional_data['policy_counter_status_report'] = parse_policy_counter_status_report(dm.message.policy_counter_status_report)
-
+        if hasattr(dm.message, 'charging_rule_install') and dm.message.charging_rule_install:
+            context._additional_data['charging_rule_install'] = check_charging_rule_install(dm)
+        if hasattr(dm.message, 'charging_rule_remove') and dm.message.charging_rule_remove:
+            context._additional_data['charging_rule_remove'] = check_charging_rule_remove(dm)
         return context
     
     # def to_dict(self) -> Dict[str, Any]:
