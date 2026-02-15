@@ -1,4 +1,5 @@
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 from ...constants import *
 
@@ -7,7 +8,7 @@ class SessionBindingStage(ProcessingStage):
     """Binds non-Gx sessions (Rx, Sy, Gy, etc.) to Gx sessions."""
     
     def __init__(self):
-        super().__init__("SESSION_BINDING")
+        super().__init__(STAGE_SESSION_BINDING)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Bind non-Gx sessions to Gx sessions using unified binding logic."""
@@ -18,7 +19,7 @@ class SessionBindingStage(ProcessingStage):
         if not enable_session_binding:
             self.log_stage(context, "debug", f"📋 Session binding disabled - skipping")
             context.session_bound = False
-            context.binding_method = "DISABLED"
+            context.binding_method = BINDING_DISABLED
             return
         
         # Get collections from context
@@ -41,7 +42,7 @@ class SessionBindingStage(ProcessingStage):
         if context.app_id == APP_3GPP_GX:
             self.log_stage(context, "debug", f"📋 Gx session - no binding needed")
             context.session_bound = False
-            context.binding_method = "NONE"
+            context.binding_method = BINDING_NONE
             return
         
         try:
@@ -71,7 +72,7 @@ class SessionBindingStage(ProcessingStage):
         # Check if already bound
         if hasattr(session, 'gx_session_id') and session.gx_session_id:
             self.log_stage(context, "debug", f"📋 {app_name} session already bound to Gx session: {session.gx_session_id}")
-            context.binding_method = "ALREADY_BOUND"
+            context.binding_method = BINDING_ALREADY_BOUND
             return True
         
         # Method 1: Try framed IP address lookup (first priority)
@@ -79,7 +80,7 @@ class SessionBindingStage(ProcessingStage):
             self.log_stage(context, "debug", f"🔍 Trying framed IP binding: {context.framed_ip_address}")
             gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
             if gx_session:
-                binding_method = "FRAMED_IP"
+                binding_method = BINDING_FRAMED_IP
                 self.log_stage(context, "debug", f"✅ Found Gx session by framed IP address: {gx_session.session_id}")
         
         # Method 2: Try subscriber session_ids lookup
@@ -90,7 +91,7 @@ class SessionBindingStage(ProcessingStage):
                 gx_session_id = gx_session_ids[0]  # Take first Gx session
                 gx_session = sessions.get_session_by_id(APP_3GPP_GX, gx_session_id)
                 if gx_session:
-                    binding_method = "SUBSCRIBER_SESSION_ID"
+                    binding_method = BINDING_SUBSCRIBER_SESSION_ID
                     self.log_stage(context, "debug", f"✅ Found Gx session by subscriber session ID: {gx_session.session_id}")
                 else:
                     self.log_stage(context, "debug", f"📋 Gx session ID {gx_session_id} not found in sessions")
@@ -103,7 +104,7 @@ class SessionBindingStage(ProcessingStage):
             self.log_stage(context, "debug", f"🔍 Trying MSISDN binding: {context.msisdn}")
             gx_session = sessions.get_session_by_msisdn(APP_3GPP_GX, context.msisdn)
             if gx_session:
-                binding_method = "MSISDN"
+                binding_method = BINDING_MSISDN
                 self.log_stage(context, "debug", f"✅ Found Gx session by MSISDN: {gx_session.session_id}")
         
         # Method 4: Try IMSI lookup
@@ -111,21 +112,21 @@ class SessionBindingStage(ProcessingStage):
             self.log_stage(context, "debug", f"🔍 Trying IMSI binding: {context.imsi}")
             gx_session = sessions.get_session_by_imsi(APP_3GPP_GX, context.imsi)
             if gx_session:
-                binding_method = "IMSI"
+                binding_method = BINDING_IMSI
                 self.log_stage(context, "debug", f"✅ Found Gx session by IMSI: {gx_session.session_id}")
         
         # Perform binding if we found a Gx session
         if binding_method and gx_session:
             # Re-fetch the session to ensure we have the latest instance
-            if binding_method == "FRAMED_IP":
+            if binding_method == BINDING_FRAMED_IP:
                 gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
-            elif binding_method == "SUBSCRIBER_SESSION_ID":
+            elif binding_method == BINDING_SUBSCRIBER_SESSION_ID:
                 gx_session_ids = context.subscriber.session_ids.get(APP_3GPP_GX, [])
                 if gx_session_ids:
                     gx_session = sessions.get_session_by_id(APP_3GPP_GX, gx_session_ids[0])
-            elif binding_method == "MSISDN":
+            elif binding_method == BINDING_MSISDN:
                 gx_session = sessions.get_session_by_msisdn(APP_3GPP_GX, context.msisdn)
-            elif binding_method == "IMSI":
+            elif binding_method == BINDING_IMSI:
                 gx_session = sessions.get_session_by_imsi(APP_3GPP_GX, context.imsi)
             
             if gx_session:
@@ -143,16 +144,16 @@ class SessionBindingStage(ProcessingStage):
         
         # Binding failed
         self.log_stage(context, "warning", f"⚠️ [BINDING] {app_name}Session {session.session_id} not bound to GxSession")
-        context.binding_method = "FAILED"
+        context.binding_method = BINDING_FAILED
         return False
     
     def _get_app_name(self, app_id: int) -> str:
         """Get application name for logging purposes."""
         if app_id == APP_3GPP_RX:
-            return "Rx"
+            return APP_NAME_RX
         elif app_id == APP_3GPP_SY:
-            return "Sy"
+            return APP_NAME_SY
         elif app_id == APP_DIAMETER_CREDIT_CONTROL_APPLICATION:
-            return "Gy"
+            return APP_NAME_GY
         else:
             return f"App{app_id}"

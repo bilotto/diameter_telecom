@@ -1,4 +1,5 @@
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 from ...constants import E_RESULT_CODE_DIAMETER_SUCCESS
 
@@ -7,14 +8,14 @@ class SessionStartStage(ProcessingStage):
     """Starts sessions for START flow messages only."""
     
     def __init__(self):
-        super().__init__("SESSION_START")
+        super().__init__(STAGE_SESSION_START)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Start session for START flow messages."""
         self.log_stage(context, "debug", f"✅ Starting session if needed")
         
         # Skip if not a start flow
-        if context.message_flow_type != "START":
+        if context.message_flow_type != FLOW_START:
             self.log_stage(context, "debug", f"📋 Not a start flow - skipping")
             context.session_started = False
             return

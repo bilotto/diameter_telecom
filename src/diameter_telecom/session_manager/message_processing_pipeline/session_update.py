@@ -1,4 +1,5 @@
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 from ...session._diameter_session import DiameterSession
 from ...message import DiameterMessage
@@ -9,7 +10,7 @@ class SessionUpdateStage(ProcessingStage):
     """Updates session state for UPDATE flow messages only."""
     
     def __init__(self):
-        super().__init__("SESSION_UPDATE")
+        super().__init__(STAGE_SESSION_UPDATE)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Update session state for UPDATE flow messages."""
@@ -22,7 +23,7 @@ class SessionUpdateStage(ProcessingStage):
             return
         
         # Skip if not an update flow
-        if context.message_flow_type != "UPDATE":
+        if context.message_flow_type != FLOW_UPDATE:
             self.log_stage(context, "debug", f"📋 Not an update flow - skipping")
             context.session_updated = False
             return

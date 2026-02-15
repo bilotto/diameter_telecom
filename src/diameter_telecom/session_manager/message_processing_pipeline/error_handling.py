@@ -1,4 +1,5 @@
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 from ...constants import E_RESULT_CODE_DIAMETER_SUCCESS
 
@@ -7,7 +8,7 @@ class ErrorHandlingStage(ProcessingStage):
     """Handles error detection and marking sessions with errors."""
     
     def __init__(self):
-        super().__init__("ERROR_HANDLING")
+        super().__init__(STAGE_ERROR_HANDLING)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Detect and handle error responses for all message types."""

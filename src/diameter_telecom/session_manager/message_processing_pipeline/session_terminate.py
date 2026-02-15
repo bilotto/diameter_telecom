@@ -1,4 +1,5 @@
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 
 
@@ -6,7 +7,7 @@ class SessionTerminateStage(ProcessingStage):
     """Handles session termination operations."""
     
     def __init__(self):
-        super().__init__("SESSION_TERMINATE")
+        super().__init__(STAGE_SESSION_TERMINATE)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Handle session termination operations (CCR-T, STR)."""
@@ -19,16 +20,16 @@ class SessionTerminateStage(ProcessingStage):
             return
          
         # Skip if not a terminate flow
-        if context.message_flow_type != "TERMINATE":
+        if context.message_flow_type != FLOW_TERMINATE:
             self.log_stage(context, "debug", f"📋 Not a terminate flow - skipping")
             context.session_terminated = False
             return
         
         try:
             # Handle specific termination operations based on message type
-            if context.message.name == "CCR-T":
+            if context.message.name == MSG_CCR_T:
                 self._handle_ccr_t_termination(context)
-            elif context.message.name == "STR":
+            elif context.message.name == MSG_STR:
                 self._handle_str_termination(context)
             
             context.session_terminated = True

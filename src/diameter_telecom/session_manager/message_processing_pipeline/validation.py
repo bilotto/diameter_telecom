@@ -1,4 +1,5 @@
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 from ...constants import *
 
@@ -7,7 +8,7 @@ class ValidationStage(ProcessingStage):
     """Validates message and context before processing."""
     
     def __init__(self):
-        super().__init__("VALIDATION")
+        super().__init__(STAGE_VALIDATION)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Validate message and context before processing."""
@@ -47,21 +48,21 @@ class ValidationStage(ProcessingStage):
         """Classify the message flow type based on message name."""
         # Check request messages
         if message_name in REQUESTS_CREATE_SESSION:
-            return "START"
+            return FLOW_START
         elif message_name in REQUESTS_UPDATE_SESSION:
-            return "UPDATE"
+            return FLOW_UPDATE
         elif message_name in REQUESTS_REFRESH_SESSION:
-            return "REFRESH"
+            return FLOW_REFRESH
         elif message_name in REQUESTS_TERMINATE_SESSION:
-            return "TERMINATE"
+            return FLOW_TERMINATE
         # Check response messages
         elif message_name in RESPONSES_CREATE_SESSION:
-            return "START"
+            return FLOW_START
         elif message_name in RESPONSES_UPDATE_SESSION:
-            return "UPDATE"
+            return FLOW_UPDATE
         elif message_name in RESPONSES_REFRESH_SESSION:
-            return "REFRESH"
+            return FLOW_REFRESH
         elif message_name in RESPONSES_TERMINATE_SESSION:
-            return "TERMINATE"
+            return FLOW_TERMINATE
         else:
-            return "UNKNOWN"
+            return FLOW_UNKNOWN

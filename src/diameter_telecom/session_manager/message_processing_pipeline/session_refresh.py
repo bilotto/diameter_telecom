@@ -1,5 +1,6 @@
 from datetime import datetime
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 
 
@@ -7,7 +8,7 @@ class SessionRefreshStage(ProcessingStage):
     """Handles session refresh/re-auth operations."""
     
     def __init__(self):
-        super().__init__("SESSION_REFRESH")
+        super().__init__(STAGE_SESSION_REFRESH)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Handle session refresh operations (RAR, ASR)."""
@@ -20,7 +21,7 @@ class SessionRefreshStage(ProcessingStage):
             return
         
         # Skip if not a refresh flow
-        if context.message_flow_type != "REFRESH":
+        if context.message_flow_type != FLOW_REFRESH:
             self.log_stage(context, "debug", f"📋 Not a refresh flow - skipping")
             context.session_refreshed = False
             return
@@ -30,9 +31,9 @@ class SessionRefreshStage(ProcessingStage):
             context.session.last_activity_time = datetime.now()
             
             # Handle specific refresh operations based on message type
-            if context.message.name == "RAR":
+            if context.message.name == MSG_RAR:
                 self._handle_rar_refresh(context)
-            elif context.message.name == "ASR":
+            elif context.message.name == MSG_ASR:
                 self._handle_asr_refresh(context)
             
             context.session_refreshed = True

@@ -1,5 +1,6 @@
 from typing import Optional
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 from ...session._diameter_session import DiameterSession
 from ...session.gx import GxSession
@@ -12,7 +13,7 @@ class SessionCreationStage(ProcessingStage):
     """Creates new session for START flow messages only."""
     
     def __init__(self):
-        super().__init__("SESSION_CREATION")
+        super().__init__(STAGE_SESSION_CREATION)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Create new session for START flow messages."""
@@ -25,7 +26,7 @@ class SessionCreationStage(ProcessingStage):
             return
         
         # Skip if not a start flow
-        if context.message_flow_type != "START":
+        if context.message_flow_type != FLOW_START:
             self.log_stage(context, "debug", f"📋 Not a start flow - skipping")
             context.session_created = False
             return

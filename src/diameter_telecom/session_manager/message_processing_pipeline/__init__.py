@@ -20,6 +20,9 @@ Usage:
 from .base import ProcessingStage
 from .decorators import timing_decorator
 
+# Constants
+from . import constants
+
 # Pipeline orchestrator
 from .pipeline import MessageProcessingPipeline
 
@@ -41,6 +44,9 @@ __all__ = [
     # Base classes
     'ProcessingStage',
     'timing_decorator',
+    
+    # Constants
+    'constants',
     
     # Main pipeline
     'MessageProcessingPipeline',

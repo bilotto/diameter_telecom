@@ -1,6 +1,6 @@
 from ..subscriber import Subscribers
 from .sessions import Sessions
-from .message_processing_pipeline_refactor import MessageProcessingPipeline
+from .message_processing_pipeline import MessageProcessingPipeline
 from .message_processing_context import MessageProcessingContext
 from ..csv_file import CsvFile
 from typing import List, Dict, Optional, Any

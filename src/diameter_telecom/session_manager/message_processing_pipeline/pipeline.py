@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import logging
 
+from .constants import *
 from .decorators import timing_decorator
 from .validation import ValidationStage
 from .session_resolution import SessionResolutionStage
@@ -39,18 +40,18 @@ class MessageProcessingPipeline:
     def __post_init__(self):
         """Initialize the processing stages."""
         self.stages = {
-            'VALIDATION': ValidationStage(),           # Validate message and context
-            'SESSION_RESOLUTION': SessionResolutionStage(),    # Find existing session
-            'SUBSCRIBER_RESOLUTION': SubscriberResolutionStage(), # Find/create subscriber  
-            'SESSION_CREATION': SessionCreationStage(),      # Create new session for START flow
-            'SESSION_START': SessionStartStage(),         # Start session for START flow
-            'SESSION_BINDING': SessionBindingStage(),       # Bind Rx/Sy to Gx sessions
-            'SESSION_REFRESH': SessionRefreshStage(),       # Handle REFRESH flow (RAR, ASR)
-            'SESSION_TERMINATE': SessionTerminateStage(),     # Handle TERMINATE flow (CCR-T, STR)
-            'SESSION_UPDATE': SessionUpdateStage(),       # Update session for UPDATE flow
-            'ERROR_HANDLING': ErrorHandlingStage(),        # Handle error responses for all messages
-            'MESSAGE_STORAGE': MessageStorageStage(),      # Store message in session/subscriber
-            'CLEANUP': CleanupStage()              # Cleanup and finalize
+            STAGE_VALIDATION: ValidationStage(),           # Validate message and context
+            STAGE_SESSION_RESOLUTION: SessionResolutionStage(),    # Find existing session
+            STAGE_SUBSCRIBER_RESOLUTION: SubscriberResolutionStage(), # Find/create subscriber  
+            STAGE_SESSION_CREATION: SessionCreationStage(),      # Create new session for START flow
+            STAGE_SESSION_START: SessionStartStage(),         # Start session for START flow
+            STAGE_SESSION_BINDING: SessionBindingStage(),       # Bind Rx/Sy to Gx sessions
+            STAGE_SESSION_REFRESH: SessionRefreshStage(),       # Handle REFRESH flow (RAR, ASR)
+            STAGE_SESSION_TERMINATE: SessionTerminateStage(),     # Handle TERMINATE flow (CCR-T, STR)
+            STAGE_SESSION_UPDATE: SessionUpdateStage(),       # Update session for UPDATE flow
+            STAGE_ERROR_HANDLING: ErrorHandlingStage(),        # Handle error responses for all messages
+            STAGE_MESSAGE_STORAGE: MessageStorageStage(),      # Store message in session/subscriber
+            STAGE_CLEANUP: CleanupStage()              # Cleanup and finalize
         }
     
     def __repr__(self):
@@ -72,13 +73,13 @@ class MessageProcessingPipeline:
         
         try:
             # Always run validation first
-            self.stages['VALIDATION'].execute(context)
+            self.stages[STAGE_VALIDATION].execute(context)
             if getattr(context, 'should_stop', False):
                 logger.debug(f"🛑 Pipeline stopped at ValidationStage")
                 return True
             
             # Always run session resolution second
-            self.stages['SESSION_RESOLUTION'].execute(context)
+            self.stages[STAGE_SESSION_RESOLUTION].execute(context)
             if getattr(context, 'should_stop', False):
                 logger.debug(f"🛑 Pipeline stopped at SessionResolutionStage")
                 return True
@@ -99,56 +100,56 @@ class MessageProcessingPipeline:
         # If we already have subscriber from session, skip SubscriberResolutionStage
         if not context.subscriber_found:
             logger.debug(f"🎯 Smart routing: Need to resolve subscriber")
-            self.stages['SUBSCRIBER_RESOLUTION'].execute(context)
+            self.stages[STAGE_SUBSCRIBER_RESOLUTION].execute(context)
         else:
             logger.debug(f"🎯 Smart routing: Skipping SubscriberResolutionStage - subscriber already found")
 
-        if context.message_flow_type == "START":
+        if context.message_flow_type == FLOW_START:
             # New session flow
             if not context.session_found:
                 logger.debug(f"🎯 Smart routing: START flow - creating session")
-                self.stages['SESSION_CREATION'].execute(context)
+                self.stages[STAGE_SESSION_CREATION].execute(context)
             else:
                 logger.debug(f"🎯 Smart routing: START flow but session exists")
             #
-            self.stages['SESSION_START'].execute(context)
-            self.stages['SESSION_BINDING'].execute(context)
+            self.stages[STAGE_SESSION_START].execute(context)
+            self.stages[STAGE_SESSION_BINDING].execute(context)
 
-        elif context.message_flow_type == "UPDATE":
+        elif context.message_flow_type == FLOW_UPDATE:
             # Update session flow
             if context.session_found:
                 logger.debug(f"🎯 Smart routing: UPDATE flow - updating session")
-                self.stages['SESSION_UPDATE'].execute(context)
+                self.stages[STAGE_SESSION_UPDATE].execute(context)
             else:
                 logger.debug(f"🎯 Smart routing: UPDATE flow but no session - skipping update")
 
-        elif context.message_flow_type == "REFRESH":
+        elif context.message_flow_type == FLOW_REFRESH:
             # Refresh session flow
             if context.session_found:
                 logger.debug(f"🎯 Smart routing: REFRESH flow - refreshing session")
-                self.stages['SESSION_REFRESH'].execute(context)
+                self.stages[STAGE_SESSION_REFRESH].execute(context)
             else:
                 logger.debug(f"🎯 Smart routing: REFRESH flow but no session - skipping refresh")
 
-        elif context.message_flow_type == "TERMINATE":
+        elif context.message_flow_type == FLOW_TERMINATE:
             # Terminate session flow
             if context.session_found:
                 logger.debug(f"🎯 Smart routing: TERMINATE flow - terminating session")
-                self.stages['SESSION_TERMINATE'].execute(context)
+                self.stages[STAGE_SESSION_TERMINATE].execute(context)
             else:
                 logger.debug(f"🎯 Smart routing: TERMINATE flow but no session - skipping termination")
         else:
             # Unknown flow type
             logger.debug(f"🎯 Smart routing: Unknown flow type {context.message_flow_type} - updating session if available")
             if context.session_found:
-                self.stages['SESSION_UPDATE'].execute(context)
+                self.stages[STAGE_SESSION_UPDATE].execute(context)
         
         # Always run error handling for response messages (regardless of flow type)
-        self.stages['ERROR_HANDLING'].execute(context)
+        self.stages[STAGE_ERROR_HANDLING].execute(context)
         
         # Always run message storage and cleanup
-        self.stages['MESSAGE_STORAGE'].execute(context)
-        self.stages['CLEANUP'].execute(context)
+        self.stages[STAGE_MESSAGE_STORAGE].execute(context)
+        self.stages[STAGE_CLEANUP].execute(context)
     
     def handle_stage_error(self, stage: ProcessingStage, context: MessageProcessingContext, error: Exception):
         """Handle errors that occur during stage processing."""

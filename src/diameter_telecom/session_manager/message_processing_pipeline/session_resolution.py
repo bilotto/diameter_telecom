@@ -1,4 +1,5 @@
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 
 
@@ -6,7 +7,7 @@ class SessionResolutionStage(ProcessingStage):
     """Finds existing session by app_id and session_id."""
     
     def __init__(self):
-        super().__init__("SESSION_RESOLUTION")
+        super().__init__(STAGE_SESSION_RESOLUTION)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Find existing session by app_id and session_id."""
@@ -35,7 +36,7 @@ class SessionResolutionStage(ProcessingStage):
                 if session.subscriber:
                     context.subscriber = session.subscriber
                     context.subscriber_found = True
-                    context.subscriber_resolution_method = "SESSION"
+                    context.subscriber_resolution_method = RESOLUTION_SESSION
                     self.log_stage(context, "debug", f"✅ Subscriber found from session: {session.subscriber.msisdn}")
                 
                 # Determine session state

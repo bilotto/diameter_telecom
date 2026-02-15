@@ -1,5 +1,6 @@
 from typing import Optional
 from .base import ProcessingStage
+from .constants import *
 from ..message_processing_context import MessageProcessingContext
 from ...subscriber import Subscriber
 from ...constants import APP_3GPP_GX
@@ -9,7 +10,7 @@ class SubscriberResolutionStage(ProcessingStage):
     """Finds or creates subscriber based on message data."""
     
     def __init__(self):
-        super().__init__("SUBSCRIBER_RESOLUTION")
+        super().__init__(STAGE_SUBSCRIBER_RESOLUTION)
     
     def execute(self, context: MessageProcessingContext) -> None:
         """Find or create subscriber based on message data."""
@@ -38,7 +39,7 @@ class SubscriberResolutionStage(ProcessingStage):
             # Method 0: Check if we already have a session with a subscriber (HIGHEST PRIORITY)
             if context.session and context.session.subscriber:
                 subscriber = context.session.subscriber
-                resolution_method = "EXISTING_SESSION"
+                resolution_method = RESOLUTION_EXISTING_SESSION
                 self.log_stage(context, "debug", f"✅ Subscriber found from existing session: {subscriber.msisdn}")
             
             # Method 1: Try to find subscriber by MSISDN
@@ -46,7 +47,7 @@ class SubscriberResolutionStage(ProcessingStage):
                 self.log_stage(context, "debug", f"🔍 Resolving subscriber by MSISDN: {context.msisdn}")
                 subscriber = subscribers.get_subscriber_by_msisdn(context.msisdn)
                 if subscriber:
-                    resolution_method = "MSISDN"
+                    resolution_method = RESOLUTION_MSISDN
                     self.log_stage(context, "debug", f"✅ Subscriber found by MSISDN: {context.msisdn}")
             
             # Method 2: Try to find subscriber by IMSI
@@ -54,7 +55,7 @@ class SubscriberResolutionStage(ProcessingStage):
                 self.log_stage(context, "debug", f"🔍 Resolving subscriber by IMSI: {context.imsi}")
                 subscriber = subscribers.get_subscriber_by_imsi(context.imsi)
                 if subscriber:
-                    resolution_method = "IMSI"
+                    resolution_method = RESOLUTION_IMSI
                     self.log_stage(context, "debug", f"✅ Subscriber found by IMSI: {context.imsi}")
             
             # Method 3: Try to find subscriber by framed IP address (via Gx session)
@@ -63,7 +64,7 @@ class SubscriberResolutionStage(ProcessingStage):
                 gx_session = sessions.get_session_by_framed_ip(APP_3GPP_GX, context.framed_ip_address)
                 if gx_session and gx_session.subscriber:
                     subscriber = gx_session.subscriber
-                    resolution_method = "FRAMED_IP"
+                    resolution_method = RESOLUTION_FRAMED_IP
                     self.log_stage(context, "debug", f"✅ Subscriber found by framed IP address: {context.framed_ip_address}")
             
             # Method 4: Create new subscriber if none found (requests only; answers typically don't carry MSISDN/IMSI)
@@ -71,18 +72,18 @@ class SubscriberResolutionStage(ProcessingStage):
                 self.log_stage(context, "debug", f"🔍 No subscriber found. Creating new subscriber.")
                 subscriber = self._create_subscriber(context, subscribers)
                 if subscriber:
-                    resolution_method = "CREATED"
+                    resolution_method = RESOLUTION_CREATED
                     self.log_stage(context, "debug", f"✅ New subscriber created: {subscriber.msisdn}")
             
             # Ensure subscriber is in the collection if found
-            if subscriber and resolution_method != "CREATED":
+            if subscriber and resolution_method != RESOLUTION_CREATED:
                 # Subscriber was found, ensure it's in the collection
                 self._ensure_subscriber_in_collection(subscriber, subscribers, resolution_method, context)
             
             # Set context results
             context.subscriber = subscriber
             context.subscriber_found = subscriber is not None
-            context.subscriber_created = (resolution_method == "CREATED")
+            context.subscriber_created = (resolution_method == RESOLUTION_CREATED)
             context.subscriber_resolution_method = resolution_method
             
             if subscriber:
