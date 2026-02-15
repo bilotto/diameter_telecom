@@ -265,7 +265,7 @@ class SubscriberResolutionStage(ProcessingStage):
                     resolution_method = "FRAMED_IP"
                     self.log_stage(context, "debug", f"✅ Subscriber found by framed IP address: {context.framed_ip_address}")
             
-            # Method 4: Create new subscriber if none found
+            # Method 4: Create new subscriber if none found (requests only; answers typically don't carry MSISDN/IMSI)
             if not subscriber:
                 self.log_stage(context, "debug", f"🔍 No subscriber found. Creating new subscriber.")
                 subscriber = self._create_subscriber(context, subscribers)
@@ -286,8 +286,10 @@ class SubscriberResolutionStage(ProcessingStage):
             
             if subscriber:
                 self.log_stage(context, "debug", f"📊 Subscriber resolved via {resolution_method}: MSISDN={subscriber.msisdn}, IMSI={getattr(subscriber, 'imsi', 'N/A')}")
-            else:
+            elif context.is_request:
                 self.log_stage(context, "warning", f"⚠️ Failed to resolve or create subscriber")
+            else:
+                self.log_stage(context, "debug", f"Subscriber not resolved (answer message, no MSISDN/IMSI - expected)")
                 
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error during subscriber resolution: {e}")
@@ -328,9 +330,11 @@ class SubscriberResolutionStage(ProcessingStage):
             msisdn = context.msisdn
             imsi = context.imsi
             
-            # If we don't have MSISDN or IMSI, we can't create a subscriber
+            # If we don't have MSISDN or IMSI, we can't create a subscriber.
+            # Answers (e.g. CCA) typically don't carry MSISDN/IMSI - only log for requests.
             if not msisdn and not imsi:
-                self.log_stage(context, "warning", f"⚠️ Cannot create subscriber: no MSISDN or IMSI available")
+                if context.is_request:
+                    self.log_stage(context, "warning", f"⚠️ Cannot create subscriber: no MSISDN or IMSI available")
                 return None
             
             # Create new subscriber
@@ -355,6 +359,12 @@ class SessionCreationStage(ProcessingStage):
     def execute(self, context: MessageProcessingContext) -> None:
         """Create new session for START flow messages."""
         self.log_stage(context, "debug", f"✅ Creating session if needed")
+        
+        # Only requests create sessions; answers (CCA) don't carry MSISDN/IMSI and session already exists
+        if not context.is_request:
+            self.log_stage(context, "debug", f"📋 Answer message - skipping session creation")
+            context.session_created = False
+            return
         
         # Skip if not a start flow
         if context.message_flow_type != "START":
@@ -510,6 +520,14 @@ class SessionBindingStage(ProcessingStage):
     def execute(self, context: MessageProcessingContext) -> None:
         """Bind non-Gx sessions to Gx sessions using unified binding logic."""
         self.log_stage(context, "debug", f"✅ Binding sessions")
+        
+        # Check if session binding is enabled
+        enable_session_binding = getattr(context, 'enable_session_binding', True)
+        if not enable_session_binding:
+            self.log_stage(context, "debug", f"📋 Session binding disabled - skipping")
+            context.session_bound = False
+            context.binding_method = "DISABLED"
+            return
         
         # Get collections from context
         sessions = getattr(context, 'sessions', None)
@@ -711,7 +729,7 @@ class SessionTerminateStage(ProcessingStage):
             self.log_stage(context, "debug", f"📋 No session to terminate")
             context.session_terminated = False
             return
-        
+         
         # Skip if not a terminate flow
         if context.message_flow_type != "TERMINATE":
             self.log_stage(context, "debug", f"📋 Not a terminate flow - skipping")
@@ -727,6 +745,8 @@ class SessionTerminateStage(ProcessingStage):
             
             context.session_terminated = True
             context.session.end(context.message.timestamp)
+            if context.clear_sessions_after_termination:
+                context.sessions.remove_session(context.app_id, context.session_id)
             self.log_stage(context, "debug", f"✅ Session termination completed: {context.session_id}")
             
         except Exception as e:
@@ -835,7 +855,7 @@ class SessionUpdateStage(ProcessingStage):
             return False
     
     def _handle_response_message(self, context: MessageProcessingContext, session: DiameterSession, message: DiameterMessage) -> bool:
-        """Handle response messages - activate session, handle errors, etc."""
+        """Handle response messages - activate session, update timestamps, etc."""
         updated = False
         
         try:
@@ -845,11 +865,7 @@ class SessionUpdateStage(ProcessingStage):
                 updated = True
                 self.log_stage(context, "debug", f"✅ Session activated after successful response: {session.session_id}")
             
-            # Handle error responses
-            if context.result_code and context.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
-                session.error = True
-                updated = True
-                self.log_stage(context, "debug", f"❌ Session marked as error due to result code: {context.result_code}")
+            # Note: Error handling is now done in the dedicated ErrorHandlingStage
             
             # Update session timestamps
             if message.timestamp:
@@ -863,6 +879,42 @@ class SessionUpdateStage(ProcessingStage):
         except Exception as e:
             self.log_stage(context, "error", f"❌ Error handling response message: {e}")
             return False
+
+class ErrorHandlingStage(ProcessingStage):
+    """Handles error detection and marking sessions with errors."""
+    
+    def __init__(self):
+        super().__init__("ERROR_HANDLING")
+    
+    def execute(self, context: MessageProcessingContext) -> None:
+        """Detect and handle error responses for all message types."""
+        self.log_stage(context, "debug", f"✅ Checking for errors")
+        
+        # Skip if this is a request message
+        if context.is_request:
+            self.log_stage(context, "debug", f"📋 Request message - skipping error handling")
+            context.error_handled = False
+            return
+        
+        # Skip if no session found
+        if not context.session:
+            self.log_stage(context, "debug", f"📋 No session to mark as error")
+            context.error_handled = False
+            return
+        
+        try:
+            # Check for error result codes
+            if context.result_code and context.result_code != E_RESULT_CODE_DIAMETER_SUCCESS:
+                context.session.error = True
+                context.error_handled = True
+                # self.log_stage(context, "error", f"❌ Session marked as error due to result code: {context.result_code} in message {context.message.name}")
+            else:
+                context.error_handled = False
+                self.log_stage(context, "debug", f"✅ No errors detected in response")
+        
+        except Exception as e:
+            self.log_stage(context, "error", f"❌ Error during error handling: {e}")
+            context.error_handled = False
 
 class MessageStorageStage(ProcessingStage):
     """Stores message in session and subscriber."""
@@ -1007,8 +1059,9 @@ class MessageProcessingPipeline:
     subscribers: Subscribers
     clear_sessions_after_termination: bool = False
     save_messages_to_session: bool = True
-    save_messages_to_subscriber: bool = True
-    save_session_ids_to_subscriber: bool = True
+    save_messages_to_subscriber: bool = False
+    save_session_ids_to_subscriber: bool = False
+    enable_session_binding: bool = True
     statistics: dict = field(default_factory=dict)
     
     def __post_init__(self):
@@ -1023,12 +1076,13 @@ class MessageProcessingPipeline:
             'SESSION_REFRESH': SessionRefreshStage(),       # Handle REFRESH flow (RAR, ASR)
             'SESSION_TERMINATE': SessionTerminateStage(),     # Handle TERMINATE flow (CCR-T, STR)
             'SESSION_UPDATE': SessionUpdateStage(),       # Update session for UPDATE flow
+            'ERROR_HANDLING': ErrorHandlingStage(),        # Handle error responses for all messages
             'MESSAGE_STORAGE': MessageStorageStage(),      # Store message in session/subscriber
             'CLEANUP': CleanupStage()              # Cleanup and finalize
         }
     
     def __repr__(self):
-        return f"MessageProcessingPipeline(clear_sessions_after_termination={self.clear_sessions_after_termination}, save_messages_to_session={self.save_messages_to_session})"
+        return f"MessageProcessingPipeline(clear_sessions_after_termination={self.clear_sessions_after_termination}, save_messages_to_session={self.save_messages_to_session}, enable_session_binding={self.enable_session_binding})"
     
     @timing_decorator
     def main_pipeline(self, context: MessageProcessingContext) -> bool:
@@ -1043,6 +1097,7 @@ class MessageProcessingPipeline:
         context.save_messages_to_session = self.save_messages_to_session
         context.save_messages_to_subscriber = self.save_messages_to_subscriber
         context.save_session_ids_to_subscriber = self.save_session_ids_to_subscriber
+        context.enable_session_binding = self.enable_session_binding
         
         try:
             # Always run validation first
@@ -1116,7 +1171,11 @@ class MessageProcessingPipeline:
             logger.debug(f"🎯 Smart routing: Unknown flow type {context.message_flow_type} - updating session if available")
             if context.session_found:
                 self.stages['SESSION_UPDATE'].execute(context)
-                # Always run message storage and cleanup
+        
+        # Always run error handling for response messages (regardless of flow type)
+        self.stages['ERROR_HANDLING'].execute(context)
+        
+        # Always run message storage and cleanup
         self.stages['MESSAGE_STORAGE'].execute(context)
         self.stages['CLEANUP'].execute(context)
     

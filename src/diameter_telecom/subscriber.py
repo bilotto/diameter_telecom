@@ -40,7 +40,7 @@ class Subscriber:
     private_id: str = field(default=None, repr=False)
     imei: str = field(default=None, repr=False)
     apn: str = field(default=None, repr=False)
-    messages: List[DiameterMessage] = field(default_factory=list, repr=False)
+    messages: List[DiameterMessage] = field(default_factory=list, repr=True)
     sessions: Dict[int, List[str]] = field(default_factory=dict, repr=True)
     _sessions_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _avps: Dict[str, str] = field(default_factory=dict, repr=False)

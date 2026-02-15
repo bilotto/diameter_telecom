@@ -56,6 +56,16 @@ def write_to_csv(csv_file: CsvFile,
                 # Convert value to string and handle None values
                 if value is None:
                     row[column] = ""
+                elif isinstance(value, dict):
+                    dump_str = ""
+                    for k, v in value.items():
+                        dump_str += f"{k}|{v}"
+                    row[column] = dump_str.strip()
+                elif isinstance(value, list):
+                    dump_str = ""
+                    for v in value:
+                        dump_str += f"{v}|"
+                    row[column] = dump_str.strip()
                 else:
                     row[column] = str(value).strip()
             csv_file.write_row(row)

@@ -147,33 +147,84 @@ class DiameterMessage:
 def name_diameter_message(is_request, cmd_code, cc_request_type):
     if cmd_code == CMD_CREDIT_CONTROL:
         if cc_request_type == E_CC_REQUEST_TYPE_INITIAL_REQUEST:
-            return "CCR-I" if is_request else "CCA-I"
+            return CCR_I if is_request else CCA_I
         elif cc_request_type == E_CC_REQUEST_TYPE_UPDATE_REQUEST:
-            return "CCR-U" if is_request else "CCA-U"
+            return CCR_U if is_request else CCA_U
         elif cc_request_type == E_CC_REQUEST_TYPE_TERMINATION_REQUEST:
-            return "CCR-T" if is_request else "CCA-T"
+            return CCR_T if is_request else CCA_T
         else:
-            return "CCR" if is_request else "CCA"
+            return CCR if is_request else CCA
     elif cmd_code == CMD_RE_AUTH:
-        return "RAR" if is_request else "RAA"
+        return RAR if is_request else RAA
     elif cmd_code == CMD_ABORT_SESSION:
-        return "ASR" if is_request else "ASA"
+        return ASR if is_request else ASA
     elif cmd_code == CMD_SPENDING_LIMIT:
-        return "SLR" if is_request else "SLA"
+        return SLR if is_request else SLA
     elif cmd_code == CMD_SPENDING_STATUS_NOTIFICATION:
-        return "SSNR" if is_request else "SSNA"
+        return SNR if is_request else SNA
     elif cmd_code == CMD_DEVICE_WATCHDOG:
-        return "DWR" if is_request else "DWA"
+        return DWR if is_request else DWA
     elif cmd_code == CMD_CAPABILITIES_EXCHANGE:
-        return "CER" if is_request else "CEA"
+        return CER if is_request else CEA
     elif cmd_code == CMD_SESSION_TERMINATION:
-        return "STR" if is_request else "STA"
+        return STR if is_request else STA
     elif cmd_code == CMD_AA:
-        return "AAR" if is_request else "AAA"
+        return AAR if is_request else AAA
     elif cmd_code == CMD_DISCONNECT_PEER:
-        return "DPR" if is_request else "DPA"
+        return DPR if is_request else DPA
     else:
         return f"{cmd_code}"
+
+
+def get_parameters_from_name(name: str) -> tuple:
+    if name == CCR_I:
+        return (True, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_INITIAL_REQUEST)
+    elif name == CCA_I:
+        return (False, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_INITIAL_REQUEST)
+    elif name == CCR_U:
+        return (True, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_UPDATE_REQUEST)
+    elif name == CCA_U:
+        return (False, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_UPDATE_REQUEST)
+    elif name == CCR_T:
+        return (True, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_TERMINATION_REQUEST)
+    elif name == CCA_T:
+        return (False, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_TERMINATION_REQUEST)
+    elif name == CCR_E:
+        return (True, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_EVENT_REQUEST)
+    elif name == CCA_E:
+        return (False, CMD_CREDIT_CONTROL, E_CC_REQUEST_TYPE_EVENT_REQUEST)
+    elif name == CCR:
+        return (True, CMD_CREDIT_CONTROL, None)
+    elif name == CCA:
+        return (False, CMD_CREDIT_CONTROL, None)
+    elif name == RAR:
+        return (True, CMD_RE_AUTH, None)
+    elif name == RAA:
+        return (False, CMD_RE_AUTH, None)
+    elif name == ASR:
+        return (True, CMD_ABORT_SESSION, None)
+    elif name == ASA:
+        return (False, CMD_ABORT_SESSION, None)
+    elif name == SLR:
+        return (True, CMD_SPENDING_LIMIT, None)
+    elif name == SLA:
+        return (False, CMD_SPENDING_LIMIT, None)
+    elif name == SNR:
+        return (True, CMD_SPENDING_STATUS_NOTIFICATION, None)
+    elif name == SNA:
+        return (False, CMD_SPENDING_STATUS_NOTIFICATION, None)
+    elif name == DWR:
+        return (True, CMD_DEVICE_WATCHDOG, None)
+    elif name == DWA:
+        return (False, CMD_DEVICE_WATCHDOG, None)
+    elif name == CER:
+        return (True, CMD_CAPABILITIES_EXCHANGE, None)
+    elif name == CEA:
+        return (False, CMD_CAPABILITIES_EXCHANGE, None)
+    elif name == STR:
+        return (True, CMD_SESSION_TERMINATION, None)
+    elif name == STA:
+        return (False, CMD_SESSION_TERMINATION, None)
 
 from typing import List, Optional
 # from typing_extensions import Tuple

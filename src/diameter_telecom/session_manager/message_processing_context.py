@@ -61,6 +61,7 @@ class MessageProcessingContext:
     session_refreshed: bool = False
     session_terminated: bool = False
     session_updated: bool = False
+    error_handled: bool = False
     message_stored: bool = False
     session_id_added: bool = False
     
@@ -71,6 +72,7 @@ class MessageProcessingContext:
     save_messages_to_session: bool = True
     save_messages_to_subscriber: bool = True
     save_session_ids_to_subscriber: bool = True
+    enable_session_binding: bool = True
     
     # Extensible data storage for pipeline stages
     _additional_data: Dict[str, Any] = field(default_factory=dict)
@@ -131,65 +133,44 @@ class MessageProcessingContext:
         """Dict-like keys() method for iteration."""
         core_keys = ['dm', 'message', 'session_id', 'app_id', 'owner_key', 'session', 'subscriber']
         return core_keys + list(self._additional_data.keys())
+
+    def _resolve_return_value(self, value: Any) -> str:
+        if isinstance(value, list) or isinstance(value, set):
+            return "|".join(str(item) for item in value)
+        elif isinstance(value, dict):
+            return "|".join(f"{k}:{v}" for k, v in value.items())
+        elif isinstance(value, bytes):
+            return value.decode()
+        else:
+            return str(value).strip()
     
     def resolve_attribute(self, attr_name: str) -> str:
-        """
-        Smart attribute resolution for CSV generation and other use cases.
-        
-        Resolution priority:
-        1. DiameterMessage attributes (direct properties and __getattr__)
-        2. Session attributes (if session exists)
-        3. Subscriber attributes (if subscriber exists)
-        4. Additional data from pipeline stages
-        5. Default empty string
-        
-        Args:
-            attr_name: Name of the attribute to resolve
-            
-        Returns:
-            str: String representation of the attribute value, or empty string if not found
-        """
         try:
+            if attr_name in self._additional_data:
+                value = self._additional_data[attr_name]
+                if value is not None:
+                    return self._resolve_return_value(value)
 
             if self.session and hasattr(self.session, attr_name):
                 value = getattr(self.session, attr_name)
                 if value is not None:
-                    return str(value).strip()
+                    return self._resolve_return_value(value)
 
-            # 1. Try DiameterMessage first (includes properties like msisdn, imsi via subscriber)
             if hasattr(self.message, attr_name):
                 value = getattr(self.message, attr_name)
                 if value is not None:
-                    return str(value).strip()
-            
-            # # Handle special case for 'dm' key (backward compatibility)
-            # if attr_name == 'dm':
-            #     return str(self.message).strip() if self.message else ""
-            
-            # 2. Try Session attributes (e.g., GxSession.apn, framed_ip_address, sgsn_mcc_mnc)
-
-            
-            # 3. Try Subscriber attributes (direct access)
+                    return self._resolve_return_value(value)
+                        
             if self.subscriber and hasattr(self.subscriber, attr_name):
                 value = getattr(self.subscriber, attr_name)
                 if value is not None:
-                    return str(value).strip()
+                    return self._resolve_return_value(value)
             
-            # 4. Try additional pipeline data
-            if attr_name in self._additional_data:
-                value = self._additional_data[attr_name]
-                if value is not None:
-                    return str(value).strip()
-            
-            # 5. Try core context attributes
             if hasattr(self, attr_name):
                 value = getattr(self, attr_name)
                 if value is not None:
-                    return str(value).strip()
+                    return self._resolve_return_value(value)
 
-
-            
-            # 6. Default to empty string
             return ""
             
         except Exception as e:
@@ -256,38 +237,3 @@ class MessageProcessingContext:
 
         return context
     
-    # def to_dict(self) -> Dict[str, Any]:
-    #     """
-    #     Convert context to dictionary for logging/debugging purposes.
-        
-    #     Returns:
-    #         Dict containing all context data
-    #     """
-    #     result = {
-    #         'session_id': self.session_id,
-    #         'app_id': self.app_id,
-    #         'message_name': self.message.name if self.message else None,
-    #         'has_session': self.session is not None,
-    #         'has_subscriber': self.subscriber is not None,
-    #         'additional_data_keys': list(self._additional_data.keys())
-    #     }
-        
-    #     if self.session:
-    #         result['session_type'] = type(self.session).__name__
-    #         result['session_active'] = getattr(self.session, 'active', None)
-        
-    #     if self.subscriber:
-    #         result['subscriber_msisdn'] = self.subscriber.msisdn
-    #         result['subscriber_imsi'] = getattr(self.subscriber, 'imsi', None)
-        
-    #     return result
-    
-    # def __repr__(self) -> str:
-    #     """String representation for debugging."""
-    #     return (f"MessageProcessingContext("
-    #             f"message={self.message.name if self.message else None}, "
-    #             f"session_id={self.session_id}, "
-    #             f"app_id={self.app_id}, "
-    #             f"has_session={self.session is not None}, "
-    #             f"has_subscriber={self.subscriber is not None}"
-    #             f")")

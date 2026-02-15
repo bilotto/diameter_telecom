@@ -45,6 +45,9 @@ class Sessions:
     imsi_index: Dict[Tuple[int, str], str] = field(default_factory=dict)
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
 
+    def __repr__(self) -> str:
+        return str(self.get_all_statistics())
+
     @property
     def n_sessions(self) -> int:
         """Get the number of sessions."""
@@ -427,7 +430,8 @@ class Sessions:
                         ended += 1
                     if session.error:
                         error += 1
-                    if not session.active:
+                    # Inactive is actually an error state because all sessions should be something above
+                    if not session.active and not session.ended and not session.error:
                         inactive += 1
             
             return {
@@ -463,7 +467,7 @@ class Sessions:
                         stats[app_id]['ended'] += 1
                     if session.error:
                         stats[app_id]['error'] += 1
-                    if not session.active:
+                    if not session.active and not session.ended and not session.error:
                         stats[app_id]['inactive'] += 1
             
             return stats

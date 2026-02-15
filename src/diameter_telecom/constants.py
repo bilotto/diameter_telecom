@@ -33,8 +33,10 @@ SLR = "SLR"  # Spending Limit Request
 SLA = "SLA"  # Spending Limit Answer
 
 # Spending Status Notification Messages
-SSNR = "SSNR"  # Spending Status Notification Request
-SSNA = "SSNA"  # Spending Status Notification Answer
+SSNR = "SNR"  # Spending Status Notification Request
+SSNA = "SNA"  # Spending Status Notification Answer
+SNR = "SNR"  # Spending Status Notification Request
+SNA = "SNA"  # Spending Status Notification Answer
 
 # Device Watchdog Messages
 DWR = "DWR"  # Device Watchdog Request
